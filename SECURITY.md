@@ -8,36 +8,44 @@
 
 ## Reporting a Vulnerability
 
-**DO NOT** open public GitHub issues for security vulnerabilities.
+**For security vulnerabilities**, please use GitHub's private security reporting:
 
 ### How to Report
 
-1. **Email**: security@yourproject.com (preferred)
-2. **GitHub Security Advisory**: Use the "Security" tab to create a private advisory
-3. **Encrypted**: Use our PGP key (available on request) for sensitive information
+1. **GitHub Security Advisory** (Recommended):
+   - Go to the "Security" tab in the repository
+   - Click "Report a vulnerability"
+   - Create a private security advisory
+   - This allows secure, private discussion with maintainers
+
+2. **GitHub Issues** (For non-critical security concerns):
+   - Use for security improvements or questions
+   - **DO NOT** disclose critical vulnerabilities in public issues
 
 ### What to Include
 
-- Description of the vulnerability
-- Steps to reproduce
-- Potential impact
-- Suggested fix (if any)
-- Your contact information
+- Clear description of the vulnerability
+- Steps to reproduce the issue
+- Potential impact and attack scenarios
+- Suggested fix or mitigation (if any)
+- Environment details (OS, Python version, Neo4j version)
+- Your GitHub username for credit
 
 ### Response Timeline
 
-- **Acknowledgment**: Within 48 hours
+- **Acknowledgment**: Within 72 hours
 - **Initial Assessment**: Within 1 week
-- **Fix Development**: Depends on severity
-- **Disclosure**: Coordinated after fix is available
+- **Fix Development**: Depends on severity (critical: days, medium: weeks)
+- **Disclosure**: Coordinated after fix is released
 
 ### Security Update Process
 
-1. We validate the report
-2. Develop and test a fix
-3. Prepare a security advisory
-4. Release the fix
-5. Publish the advisory (after grace period)
+1. **Validation**: We verify and assess the reported vulnerability
+2. **Fix Development**: Create and test a patch in a private branch
+3. **Security Advisory**: Prepare detailed advisory (CVE if applicable)
+4. **Release**: Deploy the fix in a new version
+5. **Public Disclosure**: Publish advisory 7-14 days after release
+6. **Credit**: Acknowledge reporter in release notes and advisory
 
 ## Security Features
 
@@ -193,15 +201,16 @@ Consider additional validation for your use case.
 
 ## Security Contacts
 
-- **Security Team**: security@yourproject.com
-- **Maintainers**: See CODEOWNERS file
+- **Primary Contact**: Use GitHub Security Advisories (see "Reporting a Vulnerability" above)
+- **General Questions**: Open a GitHub issue with the `security` label
+- **Maintainers**: See [CODEOWNERS](CODEOWNERS) file or repository contributors
 
 ## Acknowledgments
 
-We thank security researchers who responsibly disclose vulnerabilities.
+We thank security researchers who responsibly disclose vulnerabilities through GitHub Security Advisories.
 
-Hall of Fame:
-- (Coming soon)
+**Hall of Fame** (Responsible Disclosure):
+- (Future contributors will be listed here with their consent)
 
 ---
 
