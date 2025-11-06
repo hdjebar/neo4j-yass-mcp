@@ -1,0 +1,70 @@
+# Git
+.git/
+.gitignore
+.github/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+ENV/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs and data (will be mounted as volumes)
+logs/
+data/
+*.log
+
+# Environment files (use docker-compose env)
+.env
+.env.local
+.env.production
+
+# Documentation (not needed in runtime)
+docs/
+*.md
+!README.md
+LICENSE
+CONTRIBUTING.md
+SECURITY.md
+QUICK_START.md
+
+# CI/CD
+.github/
+Makefile
+
+# Docker
+docker-compose*.yml
+Dockerfile
+.dockerignore
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
