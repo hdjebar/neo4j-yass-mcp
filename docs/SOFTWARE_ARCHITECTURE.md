@@ -57,113 +57,94 @@ Neo4j YASS (Yet Another Semantic Search) MCP Server provides **server-side natur
 
 ### 2.1 High-Level Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                           Client Layer                               │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
-│  │ Claude       │  │   HTTP       │  │   Custom     │              │
-│  │ Desktop      │  │   Client     │  │   MCP Client │              │
-│  └──────────────┘  └──────────────┘  └──────────────┘              │
-└─────────────────────────────────────────────────────────────────────┘
-                            │
-                            │ MCP Protocol (stdio/HTTP/SSE)
-                            ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                      Neo4j YASS MCP Server                           │
-│  ┌───────────────────────────────────────────────────────────────┐  │
-│  │                    MCP Server Layer                            │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐           │  │
-│  │  │ Tools API   │  │ Resources   │  │ Prompts     │           │  │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘           │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-│                            │                                         │
-│  ┌───────────────────────────────────────────────────────────────┐  │
-│  │                  Business Logic Layer                          │  │
-│  │  ┌─────────────────────────────────────────────────────────┐  │  │
-│  │  │           Query Processing Pipeline                      │  │  │
-│  │  │  1. Natural Language → 2. LLM → 3. Cypher → 4. Results │  │  │
-│  │  └─────────────────────────────────────────────────────────┘  │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-│                            │                                         │
-│  ┌───────────────────────────────────────────────────────────────┐  │
-│  │                  Security & Compliance Layer                   │  │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │  │
-│  │  │ Sanitizer    │  │ Audit Logger │  │ Read-Only    │        │  │
-│  │  │ (UTF-8,      │  │ (PII         │  │ Enforcement  │        │  │
-│  │  │  Injection)  │  │  Redaction)  │  │              │        │  │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘        │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-│                            │                                         │
-│  ┌───────────────────────────────────────────────────────────────┐  │
-│  │                    Integration Layer                           │  │
-│  │  ┌─────────────────────┐  ┌─────────────────────┐            │  │
-│  │  │   LLM Providers     │  │   Neo4j Driver      │            │  │
-│  │  │  ┌────┐ ┌────┐     │  │  ┌──────────────┐   │            │  │
-│  │  │  │GPT │ │Claude│    │  │  │  Bolt        │   │            │  │
-│  │  │  └────┘ └────┘     │  │  │  Protocol    │   │            │  │
-│  │  │  ┌────┐            │  │  └──────────────┘   │            │  │
-│  │  │  │Gem.│            │  │                      │            │  │
-│  │  │  └────┘            │  │                      │            │  │
-│  │  └─────────────────────┘  └─────────────────────┘            │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                        Neo4j Database                                │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                │
-│  │   Graph     │  │   APOC      │  │    GDS      │                │
-│  │   Store     │  │   Plugin    │  │   Plugin    │                │
-│  └─────────────┘  └─────────────┘  └─────────────┘                │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph ClientLayer["Client Layer"]
+        Claude["Claude Desktop"]
+        HTTP["HTTP Client"]
+        Custom["Custom MCP Client"]
+    end
+
+    subgraph MCPServer["Neo4j YASS MCP Server"]
+        subgraph MCPLayer["MCP Server Layer"]
+            Tools["Tools API"]
+            Resources["Resources"]
+            Prompts["Prompts"]
+        end
+
+        subgraph BusinessLayer["Business Logic Layer"]
+            Pipeline["Query Processing Pipeline<br/>1. NL → 2. LLM → 3. Cypher → 4. Results"]
+        end
+
+        subgraph SecurityLayer["Security & Compliance Layer"]
+            Sanitizer["Sanitizer<br/>(UTF-8, Injection)"]
+            AuditLogger["Audit Logger<br/>(PII Redaction)"]
+            ReadOnly["Read-Only<br/>Enforcement"]
+        end
+
+        subgraph IntegrationLayer["Integration Layer"]
+            subgraph LLMProviders["LLM Providers"]
+                GPT["GPT"]
+                Claude2["Claude"]
+                Gemini["Gemini"]
+            end
+
+            subgraph Neo4jDriver["Neo4j Driver"]
+                Bolt["Bolt Protocol"]
+            end
+        end
+    end
+
+    subgraph DataLayer["Neo4j Database"]
+        GraphStore["Graph Store"]
+        APOC["APOC Plugin"]
+        GDS["GDS Plugin"]
+    end
+
+    ClientLayer -->|MCP Protocol<br/>(stdio/HTTP/SSE)| MCPLayer
+    MCPLayer --> BusinessLayer
+    BusinessLayer --> SecurityLayer
+    SecurityLayer --> IntegrationLayer
+    LLMProviders -.->|HTTPS| ExternalLLM[("External LLM APIs<br/>OpenAI/Anthropic/Google")]
+    Neo4jDriver -->|Bolt (7687)| DataLayer
+
+    style MCPServer fill:#e1f5ff
+    style ClientLayer fill:#fff4e1
+    style DataLayer fill:#e8f5e9
+    style ExternalLLM fill:#fce4ec
 ```
 
 ### 2.2 Architectural Layers
 
-#### Layer 1: Client Layer
-- **Responsibility**: User interaction, MCP client implementation
-- **Technology**: Claude Desktop, HTTP clients, custom MCP clients
-- **Communication**: MCP protocol (stdio, HTTP, SSE)
+```mermaid
+graph LR
+    subgraph Layers["Architectural Layers"]
+        L1["Layer 1:<br/>Client Layer<br/>(User Interaction)"]
+        L2["Layer 2:<br/>MCP Server Layer<br/>(Protocol Handling)"]
+        L3["Layer 3:<br/>Business Logic<br/>(Query Processing)"]
+        L4["Layer 4:<br/>Security & Compliance<br/>(Validation)"]
+        L5["Layer 5:<br/>Integration Layer<br/>(External Systems)"]
+        L6["Layer 6:<br/>Data Layer<br/>(Neo4j Database)"]
+    end
 
-#### Layer 2: MCP Server Layer
-- **Responsibility**: MCP protocol handling, tool/resource/prompt exposure
-- **Technology**: FastMCP (Python)
-- **Key Components**:
-  - `query_graph` tool: Natural language query execution
-  - `get_schema` tool: Neo4j schema retrieval
-  - `estimate_tokens` tool: Cost estimation
+    L1 --> L2 --> L3 --> L4 --> L5 --> L6
 
-#### Layer 3: Business Logic Layer
-- **Responsibility**: Core query processing pipeline
-- **Technology**: LangChain, Python asyncio
-- **Key Components**:
-  - GraphCypherQAChain: Natural language to Cypher translation
-  - Query execution orchestration
-  - Result formatting and transformation
+    style L1 fill:#fff4e1
+    style L2 fill:#e3f2fd
+    style L3 fill:#f3e5f5
+    style L4 fill:#ffebee
+    style L5 fill:#e8f5e9
+    style L6 fill:#fce4ec
+```
 
-#### Layer 4: Security & Compliance Layer
-- **Responsibility**: Query validation, audit logging, access control
-- **Technology**: Custom Python modules
-- **Key Components**:
-  - `sanitizer.py`: Query sanitization (UTF-8 attacks, injection prevention)
-  - `audit_logger.py`: Compliance logging with PII redaction
-  - Read-only mode enforcement
+**Layer Descriptions:**
 
-#### Layer 5: Integration Layer
-- **Responsibility**: External system integration
-- **Technology**: LangChain providers, Neo4j Python driver
-- **Key Components**:
-  - Multi-LLM provider abstraction (OpenAI, Anthropic, Google)
-  - Neo4j Bolt protocol driver
-  - Connection pooling and retry logic
-
-#### Layer 6: Data Layer
-- **Responsibility**: Graph data storage and management
-- **Technology**: Neo4j 5.x
-- **Key Components**:
-  - Graph database engine
-  - APOC plugin (required)
-  - GDS plugin (optional)
+- **Layer 1 - Client Layer**: Claude Desktop, HTTP clients, custom MCP clients
+- **Layer 2 - MCP Server Layer**: FastMCP protocol handling, tool/resource exposure
+- **Layer 3 - Business Logic Layer**: GraphCypherQAChain, query orchestration
+- **Layer 4 - Security & Compliance Layer**: Sanitization, audit logging, access control
+- **Layer 5 - Integration Layer**: Multi-LLM abstraction, Neo4j driver, connection pooling
+- **Layer 6 - Data Layer**: Neo4j 5.x, APOC/GDS plugins
 
 ---
 
@@ -171,135 +152,166 @@ Neo4j YASS (Yet Another Semantic Search) MCP Server provides **server-side natur
 
 ### 3.1 System Boundary
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      External Systems                            │
-│                                                                  │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐               │
-│  │  OpenAI    │  │ Anthropic  │  │  Google    │               │
-│  │  API       │  │  API       │  │  GenAI     │               │
-│  └────────────┘  └────────────┘  └────────────┘               │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                                                                  │
-│              System Boundary: Neo4j YASS MCP Server             │
-│                                                                  │
-│  Inputs:                                                         │
-│  - Natural language queries                                      │
-│  - Configuration (environment variables)                         │
-│  - User authentication (future)                                  │
-│                                                                  │
-│  Outputs:                                                        │
-│  - Query results (JSON)                                          │
-│  - Schema information                                            │
-│  - Error messages (sanitized)                                    │
-│  - Audit logs                                                    │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      Neo4j Database                              │
-│                                                                  │
-│  ┌────────────────────────────────────────────────────────┐    │
-│  │  Graph Database (Customer-managed)                      │    │
-│  │  - May be on-premises, cloud, or AuraDB                │    │
-│  │  - Contains organization's graph data                   │    │
-│  └────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph External["External Systems"]
+        OpenAI["OpenAI API"]
+        Anthropic["Anthropic API"]
+        Google["Google GenAI"]
+    end
+
+    subgraph SystemBoundary["Neo4j YASS MCP Server<br/>(System Boundary)"]
+        Inputs["<b>Inputs:</b><br/>- Natural language queries<br/>- Configuration (env vars)<br/>- User authentication (future)"]
+        Processing["<b>Processing:</b><br/>- NL to Cypher translation<br/>- Query sanitization<br/>- Audit logging"]
+        Outputs["<b>Outputs:</b><br/>- Query results (JSON)<br/>- Schema information<br/>- Error messages (sanitized)<br/>- Audit logs"]
+    end
+
+    subgraph Database["Neo4j Database"]
+        GraphDB["Graph Database<br/>(Customer-managed)<br/>On-prem/Cloud/AuraDB"]
+    end
+
+    External -.->|HTTPS/REST| Processing
+    Inputs --> Processing --> Outputs
+    Processing -->|Bolt (7687)| GraphDB
+
+    style SystemBoundary fill:#e1f5ff,stroke:#01579b,stroke-width:3px
+    style External fill:#fce4ec
+    style Database fill:#e8f5e9
 ```
 
 ### 3.2 External Dependencies
 
-| System | Purpose | Protocol | Criticality | Fallback |
-|--------|---------|----------|-------------|----------|
-| **LLM Provider** | Natural language to Cypher | HTTPS/REST | High | Switch provider |
-| **Neo4j Database** | Graph data storage/query | Bolt (7687) | Critical | None (hard dependency) |
-| **MCP Client** | User interface | MCP (stdio/HTTP) | Critical | None (entry point) |
+```mermaid
+graph LR
+    subgraph System["Neo4j YASS MCP"]
+        Core["MCP Server Core"]
+    end
+
+    LLM["LLM Provider<br/>(OpenAI/Anthropic/Google)<br/><b>Criticality:</b> High<br/><b>Fallback:</b> Switch provider"]
+    Neo4j["Neo4j Database<br/>(Bolt Protocol)<br/><b>Criticality:</b> Critical<br/><b>Fallback:</b> None"]
+    Client["MCP Client<br/>(stdio/HTTP/SSE)<br/><b>Criticality:</b> Critical<br/><b>Fallback:</b> None"]
+
+    Client -->|MCP Protocol| Core
+    Core -->|HTTPS/REST| LLM
+    Core -->|Bolt (7687)| Neo4j
+
+    style System fill:#e1f5ff
+    style LLM fill:#fff3e0
+    style Neo4j fill:#e8f5e9
+    style Client fill:#f3e5f5
+```
 
 ### 3.3 Integration Points
 
 #### 3.3.1 MCP Client Integration
 
-**Protocol**: Model Context Protocol (MCP)
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client
+    participant Server as Neo4j YASS MCP
 
-**Transport Options**:
-1. **stdio** (Standard Input/Output)
-   - Use case: Claude Desktop, local CLI tools
-   - Pros: Simple, no network configuration
-   - Cons: Single-client, no remote access
+    Note over Client,Server: Transport Options
 
-2. **HTTP** (Recommended)
-   - Use case: Web clients, remote access, multiple clients
-   - Pros: Scalable, firewall-friendly, standard
-   - Cons: Requires network configuration
+    rect rgb(255, 244, 225)
+        Note right of Client: Option 1: stdio<br/>(Claude Desktop, CLI)
+        Client->>Server: stdin/stdout
+        Server->>Client: Response via stdout
+    end
 
-3. **SSE** (Server-Sent Events)
-   - Use case: Real-time streaming responses
-   - Pros: Push-based updates
-   - Cons: Less widely supported
+    rect rgb(225, 245, 254)
+        Note right of Client: Option 2: HTTP<br/>(Web, Remote, Multiple Clients)
+        Client->>Server: HTTP POST :8000
+        Server->>Client: JSON Response
+    end
 
-**MCP Tools Exposed**:
-```python
-@mcp_server.tool()
-async def query_graph(query: str) -> str:
-    """Execute natural language query against Neo4j"""
+    rect rgb(232, 245, 233)
+        Note right of Client: Option 3: SSE<br/>(Server-Sent Events)
+        Client->>Server: SSE Connection
+        Server-->>Client: Stream Response
+    end
+```
 
-@mcp_server.tool()
-async def get_schema() -> str:
-    """Retrieve Neo4j graph schema"""
+**MCP Tools Exposed:**
 
-@mcp_server.tool()
-async def estimate_tokens(text: str) -> str:
-    """Estimate LLM token usage for cost planning"""
+```mermaid
+classDiagram
+    class MCPServer {
+        <<interface>>
+    }
+
+    class query_graph {
+        +query: str
+        +returns: JSON results
+        Execute NL query
+    }
+
+    class get_schema {
+        +returns: JSON schema
+        Retrieve Neo4j schema
+    }
+
+    class estimate_tokens {
+        +text: str
+        +returns: Token count
+        Estimate LLM cost
+    }
+
+    MCPServer <|-- query_graph
+    MCPServer <|-- get_schema
+    MCPServer <|-- estimate_tokens
 ```
 
 #### 3.3.2 LLM Provider Integration
 
-**Pattern**: Strategy Pattern with provider abstraction
+```mermaid
+graph TB
+    subgraph Config["LLM Configuration"]
+        LLMConfig["LLMConfig<br/>- provider<br/>- model<br/>- temperature<br/>- api_key<br/>- streaming"]
+    end
 
-**Supported Providers** (as of v1.0):
-- OpenAI (GPT-4o, o3, o4-mini)
-- Anthropic (Claude Sonnet 4.5, Opus 4.1, Haiku 4.5)
-- Google (Gemini 2.5 Pro, 2.5 Flash)
+    subgraph Factory["Factory Pattern"]
+        chatLLM["chatLLM(config)"]
+    end
 
-**Configuration**:
-```python
-@dataclass
-class LLMConfig:
-    provider: str       # "openai", "anthropic", "google-genai"
-    model: str          # Model identifier
-    temperature: float  # 0.0 = deterministic, 1.0 = creative
-    api_key: str        # API authentication
-    streaming: bool     # Enable token-by-token streaming
+    subgraph Providers["LLM Providers"]
+        OpenAI["OpenAI<br/>GPT-4o, o3, o4-mini"]
+        Anthropic["Anthropic<br/>Claude Sonnet 4.5<br/>Opus 4.1, Haiku 4.5"]
+        Google["Google GenAI<br/>Gemini 2.5 Pro/Flash"]
+        Extensible["...<br/>600+ providers<br/>via LangChain"]
+    end
+
+    LLMConfig --> chatLLM
+    chatLLM -->|provider='openai'| OpenAI
+    chatLLM -->|provider='anthropic'| Anthropic
+    chatLLM -->|provider='google-genai'| Google
+    chatLLM -.->|Extensible| Extensible
+
+    style Config fill:#fff3e0
+    style Factory fill:#e1f5ff
+    style Providers fill:#e8f5e9
 ```
-
-**Extensibility**: Supports 600+ LangChain providers (see [ADDING_LLM_PROVIDERS.md](../docs/ADDING_LLM_PROVIDERS.md))
 
 #### 3.3.3 Neo4j Integration
 
-**Protocol**: Bolt (binary protocol over TCP)
+```mermaid
+graph LR
+    subgraph Driver["Neo4j Python Driver 5.15+"]
+        Connection["Connection Config<br/>- URI: bolt://host:7687<br/>- Auth: (user, pass)<br/>- Pool size: 50<br/>- Timeout: 30s"]
+    end
 
-**Driver**: Neo4j Python Driver 5.15+
+    subgraph Neo4j["Neo4j 5.x"]
+        Engine["Database Engine"]
+        APOC["APOC Plugin<br/>(Required)"]
+        GDS["GDS Plugin<br/>(Optional)"]
+    end
 
-**Connection Configuration**:
-```python
-driver = GraphDatabase.driver(
-    uri=NEO4J_URI,           # bolt://host:7687 or neo4j+s://...
-    auth=(username, password),
-    max_connection_pool_size=50,
-    connection_timeout=30,
-    max_transaction_retry_time=30
-)
+    Driver -->|Bolt Protocol<br/>Port 7687| Engine
+    Engine --- APOC
+    Engine --- GDS
+
+    style Driver fill:#e1f5ff
+    style Neo4j fill:#e8f5e9
 ```
-
-**Required Neo4j Components**:
-- Neo4j 5.x (database engine)
-- APOC plugin (graph algorithms, utilities)
-- GDS plugin (optional, for advanced analytics)
 
 ---
 
@@ -307,277 +319,70 @@ driver = GraphDatabase.driver(
 
 ### 4.1 Component Diagram
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                          server.py (Main)                            │
-│  ┌───────────────────────────────────────────────────────────────┐  │
-│  │  FastMCP Server Initialization                                 │  │
-│  │  - Load configuration from environment                         │  │
-│  │  - Initialize Neo4j driver                                     │  │
-│  │  - Initialize LLM (via config.py)                             │  │
-│  │  - Register MCP tools                                          │  │
-│  │  - Start server (stdio/HTTP/SSE)                              │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
-                            │
-                            │ uses
-                            ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                         config.py                                    │
-│  ┌───────────────────────────────────────────────────────────────┐  │
-│  │  LLMConfig (dataclass)                                         │  │
-│  │  - provider, model, temperature, api_key, streaming           │  │
-│  │                                                                │  │
-│  │  chatLLM(config) → LangChain ChatModel                        │  │
-│  │  - Factory for OpenAI/Anthropic/Google LLMs                   │  │
-│  │                                                                │  │
-│  │  Utility Functions                                             │  │
-│  │  - configure_logging()                                         │  │
-│  │  - find_available_port()                                       │  │
-│  │  - get_preferred_ports_from_env()                             │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
-                            │
-                            │ uses
-                            ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                    utilities/sanitizer.py                            │
-│  ┌───────────────────────────────────────────────────────────────┐  │
-│  │  sanitize_cypher_query(query: str) → str                      │  │
-│  │  - Remove UTF-8 attacks (zero-width chars, homoglyphs)        │  │
-│  │  - Block query chaining (semicolons, newlines)                │  │
-│  │  - Prevent APOC privilege escalation                          │  │
-│  │  - Validate read-only operations (if enabled)                 │  │
-│  │                                                                │  │
-│  │  Patterns:                                                     │  │
-│  │  - DANGEROUS_PATTERNS: List[re.Pattern]                       │  │
-│  │  - READ_ONLY_VIOLATIONS: List[re.Pattern]                     │  │
-│  │  - UTF8_ATTACK_PATTERNS: List[re.Pattern]                     │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph Main["server.py (Main)"]
+        Init["FastMCP Server Init<br/>- Load config from env<br/>- Initialize Neo4j driver<br/>- Initialize LLM<br/>- Register MCP tools<br/>- Start server"]
+    end
 
-┌─────────────────────────────────────────────────────────────────────┐
-│                  utilities/audit_logger.py                           │
-│  ┌───────────────────────────────────────────────────────────────┐  │
-│  │  AuditLogger (class)                                           │  │
-│  │  - __init__(log_dir, enabled, pii_redaction)                  │  │
-│  │  - log_query_execution(user, query, cypher, results)          │  │
-│  │  - log_security_event(event_type, details)                    │  │
-│  │  - _redact_pii(text) → str                                    │  │
-│  │                                                                │  │
-│  │  Output:                                                       │  │
-│  │  - JSON logs with timestamp, user, action, details            │  │
-│  │  - Automatic PII redaction (emails, SSNs, credit cards)       │  │
-│  │  - Rotation: Daily log files (audit_YYYY-MM-DD.log)           │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
+    subgraph Config["config.py"]
+        LLMConfigClass["LLMConfig (dataclass)"]
+        chatLLMFunc["chatLLM(config) → ChatModel<br/>Factory for OpenAI/Anthropic/Google"]
+        Utils["Utility Functions<br/>- configure_logging()<br/>- find_available_port()"]
+    end
 
-┌─────────────────────────────────────────────────────────────────────┐
-│                     LangChain Components                             │
-│  ┌───────────────────────────────────────────────────────────────┐  │
-│  │  GraphCypherQAChain                                            │  │
-│  │  - Natural language → Cypher translation                       │  │
-│  │  - Schema-aware query generation                              │  │
-│  │  - Self-correction on syntax errors                           │  │
-│  │  - Result interpretation                                       │  │
-│  │                                                                │  │
-│  │  Neo4jGraph                                                    │  │
-│  │  - Schema extraction (nodes, relationships, properties)        │  │
-│  │  - Query execution                                             │  │
-│  │  - Connection management                                       │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
+    subgraph Security["utilities/sanitizer.py"]
+        Sanitize["sanitize_cypher_query(query)<br/>- Remove UTF-8 attacks<br/>- Block query chaining<br/>- Prevent APOC escalation<br/>- Validate read-only"]
+        Patterns["Security Patterns<br/>- DANGEROUS_PATTERNS<br/>- READ_ONLY_VIOLATIONS<br/>- UTF8_ATTACK_PATTERNS"]
+    end
+
+    subgraph Audit["utilities/audit_logger.py"]
+        Logger["AuditLogger (class)<br/>- log_query_execution()<br/>- log_security_event()<br/>- _redact_pii()"]
+        Output["Output: JSON logs<br/>- Timestamp, user, action<br/>- PII redacted<br/>- Daily rotation"]
+    end
+
+    subgraph LangChain["LangChain Components"]
+        GraphChain["GraphCypherQAChain<br/>- NL → Cypher translation<br/>- Schema-aware generation<br/>- Self-correction"]
+        Neo4jGraph["Neo4jGraph<br/>- Schema extraction<br/>- Query execution<br/>- Connection management"]
+    end
+
+    Main -->|uses| Config
+    Main -->|uses| Security
+    Main -->|uses| Audit
+    Main -->|uses| LangChain
+
+    style Main fill:#e1f5ff
+    style Config fill:#fff3e0
+    style Security fill:#ffebee
+    style Audit fill:#f3e5f5
+    style LangChain fill:#e8f5e9
 ```
 
-### 4.2 Component Responsibilities
+### 4.2 Query Processing Pipeline
 
-#### 4.2.1 server.py (Main Server)
+```mermaid
+flowchart TD
+    Start([Natural Language Query]) --> LoadSchema[Load Neo4j Schema<br/>Cached]
+    LoadSchema --> LLM[LLM Translation<br/>GraphCypherQAChain]
+    LLM --> Cypher[Generated Cypher Query]
+    Cypher --> Sanitize{Sanitize Query}
 
-**Responsibility**: Application entry point and MCP server lifecycle management
+    Sanitize -->|PASS| Execute[Execute on Neo4j]
+    Sanitize -->|FAIL| Block[Block & Log<br/>Security Event]
 
-**Key Functions**:
+    Execute --> Log[Audit Log]
+    Log --> Format[Format Results<br/>to JSON]
+    Format --> Return([Return to Client])
 
-```python
-async def main():
-    """
-    Main server initialization and startup
+    Block --> Error([Return Error<br/>Sanitized message])
 
-    Responsibilities:
-    1. Load and validate configuration
-    2. Initialize Neo4j connection
-    3. Initialize LLM provider
-    4. Register MCP tools
-    5. Start server based on transport mode
-    """
-
-    # Configuration validation
-    # Neo4j connection test
-    # LLM initialization
-    # MCP server startup
+    style Start fill:#e8f5e9
+    style Sanitize fill:#ffebee
+    style Block fill:#ff5252,color:#fff
+    style Execute fill:#e1f5ff
+    style Return fill:#e8f5e9
+    style Error fill:#ff5252,color:#fff
 ```
-
-**MCP Tool Implementations**:
-
-```python
-@mcp_server.tool()
-async def query_graph(query: str) -> str:
-    """
-    Execute natural language query
-
-    Pipeline:
-    1. Receive natural language query
-    2. Generate Cypher via GraphCypherQAChain
-    3. Sanitize Cypher (UTF-8, injection, read-only)
-    4. Execute on Neo4j
-    5. Log to audit trail
-    6. Return results (JSON)
-
-    Error Handling:
-    - Sanitization failures → Block and log
-    - Neo4j errors → Sanitize error message, log
-    - LLM errors → Fallback to error response
-    """
-
-@mcp_server.tool()
-async def get_schema() -> str:
-    """
-    Retrieve Neo4j schema
-
-    Returns:
-    - Node labels
-    - Relationship types
-    - Property keys
-    - Constraints
-    - Indexes
-    """
-
-@mcp_server.tool()
-async def estimate_tokens(text: str) -> str:
-    """
-    Estimate LLM token usage for cost planning
-
-    Uses: tiktoken (OpenAI) or provider-specific tokenizers
-    """
-```
-
-**Dependencies**:
-- `config.py`: LLM configuration
-- `utilities/sanitizer.py`: Query validation
-- `utilities/audit_logger.py`: Compliance logging
-- `fastmcp`: MCP server framework
-- `langchain`: GraphCypherQAChain
-- `neo4j`: Database driver
-
-#### 4.2.2 config.py (Configuration Module)
-
-**Responsibility**: LLM provider abstraction and server configuration
-
-**Key Components**:
-
-```python
-@dataclass
-class LLMConfig:
-    """LLM configuration data structure"""
-    provider: str       # Provider identifier
-    model: str          # Model name
-    temperature: float  # Randomness (0.0-1.0)
-    api_key: str        # Authentication
-    streaming: bool     # Token streaming
-
-def chatLLM(config: LLMConfig) -> BaseChatModel:
-    """
-    Factory function for LLM instances
-
-    Pattern: Factory + Strategy
-
-    Returns: LangChain ChatModel instance
-
-    Extensibility: Add new providers by adding elif branches
-    """
-    if config.provider == "openai":
-        return ChatOpenAI(...)
-    elif config.provider == "anthropic":
-        return ChatAnthropic(...)
-    elif config.provider == "google-genai":
-        return ChatGoogleGenerativeAI(...)
-    else:
-        raise ValueError(f"Unknown provider: {config.provider}")
-```
-
-**Utility Functions**:
-- `configure_logging()`: Setup logging based on environment
-- `find_available_port()`: Dynamic port allocation
-- `is_port_available()`: Port availability check
-
-#### 4.2.3 utilities/sanitizer.py (Security Module)
-
-**Responsibility**: Query sanitization and injection prevention
-
-**Security Checks**:
-
-1. **UTF-8 Attack Prevention**
-   ```python
-   # Remove zero-width characters
-   # Block homoglyph attacks
-   # Normalize Unicode
-   ```
-
-2. **Query Chaining Prevention**
-   ```python
-   # Block semicolons outside strings
-   # Detect newline-based chaining
-   # Prevent multi-statement injection
-   ```
-
-3. **APOC Privilege Escalation**
-   ```python
-   # Block apoc.cypher.run*
-   # Block apoc.periodic.iterate
-   # Allow safe APOC procedures only
-   ```
-
-4. **Read-Only Mode Enforcement** (optional)
-   ```python
-   # Block CREATE, DELETE, SET, REMOVE, MERGE
-   # Block LOAD CSV, CALL procedures (write)
-   # Allow MATCH, RETURN, WITH, UNWIND (read)
-   ```
-
-**Pattern**: Chain of Responsibility (each validator checks and passes to next)
-
-#### 4.2.4 utilities/audit_logger.py (Compliance Module)
-
-**Responsibility**: Audit trail generation with PII protection
-
-**Features**:
-
-1. **Structured Logging**
-   ```json
-   {
-     "timestamp": "2025-11-06T14:32:15Z",
-     "user": "analyst@company.com",
-     "action": "query_execution",
-     "query": "Show me customers in CA",
-     "cypher": "MATCH (c:Customer {state: 'CA'}) RETURN c",
-     "result_count": 47,
-     "execution_time_ms": 234,
-     "sanitization_passed": true
-   }
-   ```
-
-2. **PII Redaction**
-   - Email addresses → `***@***.com`
-   - SSNs → `***-**-****`
-   - Credit cards → `****-****-****-****`
-
-3. **Log Rotation**
-   - Daily files: `audit_2025-11-06.log`
-   - Automatic cleanup (configurable retention)
-
-4. **Security Events**
-   - Blocked queries
-   - Failed authentications (future)
-   - Configuration changes
 
 ---
 
@@ -585,176 +390,97 @@ def chatLLM(config: LLMConfig) -> BaseChatModel:
 
 ### 5.1 Query Execution Flow
 
-```
-┌─────────────┐
-│   Client    │
-│   (Human)   │
-└─────────────┘
-       │
-       │ (1) Natural Language Query
-       │     "Show me customers in California who bought products over $100"
-       ▼
-┌─────────────────────────────────────────────────────────┐
-│               MCP Server (server.py)                     │
-│                                                          │
-│  @mcp_server.tool()                                      │
-│  async def query_graph(query: str):                      │
-│      │                                                    │
-│      │ (2) Load Neo4j schema (cached)                    │
-│      ▼                                                    │
-│  ┌──────────────────────────────────────┐               │
-│  │   Neo4jGraph.get_schema()            │               │
-│  │   - Node labels: [Customer, Product] │               │
-│  │   - Relationships: [PURCHASED]       │               │
-│  │   - Properties: [state, price, ...]  │               │
-│  └──────────────────────────────────────┘               │
-│      │                                                    │
-│      │ (3) Generate Cypher via LLM                       │
-│      ▼                                                    │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │  GraphCypherQAChain.invoke()                      │   │
-│  │                                                    │   │
-│  │  Input:                                            │   │
-│  │  - Query: "Show me customers in CA..."            │   │
-│  │  - Schema: {...}                                   │   │
-│  │  - Temperature: 0.0 (deterministic)               │   │
-│  │                                                    │   │
-│  │  LLM generates:                                    │   │
-│  │  MATCH (c:Customer {state: 'CA'})-[:PURCHASED]->  │   │
-│  │        (p:Product)                                 │   │
-│  │  WHERE p.price > 100                              │   │
-│  │  RETURN c.name, p.name, p.price                   │   │
-│  └──────────────────────────────────────────────────┘   │
-│      │                                                    │
-│      │ (4) Sanitize Cypher                               │
-│      ▼                                                    │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │  sanitize_cypher_query(cypher)                    │   │
-│  │                                                    │   │
-│  │  Checks:                                           │   │
-│  │  ✓ No UTF-8 attacks                               │   │
-│  │  ✓ No query chaining (;)                          │   │
-│  │  ✓ No APOC escalation                             │   │
-│  │  ✓ Read-only compliant (if enabled)               │   │
-│  │                                                    │   │
-│  │  Result: PASS                                      │   │
-│  └──────────────────────────────────────────────────┘   │
-│      │                                                    │
-│      │ (5) Execute on Neo4j                              │
-│      ▼                                                    │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │  neo4j_graph.query(cypher)                        │   │
-│  │                                                    │   │
-│  │  Results:                                          │   │
-│  │  [                                                 │   │
-│  │    {c.name: "John Doe",                           │   │
-│  │     p.name: "Widget Pro",                         │   │
-│  │     p.price: 199.99},                             │   │
-│  │    {...}                                           │   │
-│  │  ]                                                 │   │
-│  └──────────────────────────────────────────────────┘   │
-│      │                                                    │
-│      │ (6) Log to audit trail                            │
-│      ▼                                                    │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │  audit_logger.log_query_execution(...)            │   │
-│  │                                                    │   │
-│  │  Logged:                                           │   │
-│  │  - Timestamp                                       │   │
-│  │  - User (future)                                   │   │
-│  │  - Query (natural language)                        │   │
-│  │  - Cypher (generated)                             │   │
-│  │  - Result count                                    │   │
-│  │  - Execution time                                  │   │
-│  └──────────────────────────────────────────────────┘   │
-│      │                                                    │
-│      │ (7) Format and return results                     │
-│      ▼                                                    │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │  return json.dumps(results)                       │   │
-│  └──────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────┘
-       │
-       │ (8) MCP response
-       │     JSON: [{c.name: "John Doe", ...}, ...]
-       ▼
-┌─────────────┐
-│   Client    │
-│  (Display)  │
-└─────────────┘
+```mermaid
+sequenceDiagram
+    actor User as Client (Human)
+    participant MCP as MCP Server
+    participant Schema as Neo4j Schema
+    participant LLM as LLM Provider
+    participant San as Sanitizer
+    participant Neo4j as Neo4j Database
+    participant Audit as Audit Logger
+
+    User->>MCP: (1) Natural Language Query<br/>"Show customers in CA who bought > $100"
+
+    Note over MCP,Schema: (2) Load Schema (cached)
+    MCP->>Schema: Get schema
+    Schema-->>MCP: Node labels, relationships, properties
+
+    Note over MCP,LLM: (3) Generate Cypher via LLM
+    MCP->>LLM: GraphCypherQAChain.invoke()<br/>Query + Schema + Temperature 0.0
+    LLM-->>MCP: MATCH (c:Customer {state:'CA'})-[:PURCHASED]->(p:Product)<br/>WHERE p.price > 100<br/>RETURN c.name, p.name, p.price
+
+    Note over MCP,San: (4) Sanitize Cypher
+    MCP->>San: sanitize_cypher_query(cypher)
+    San-->>MCP: ✓ PASS (No attacks detected)
+
+    Note over MCP,Neo4j: (5) Execute on Neo4j
+    MCP->>Neo4j: neo4j_graph.query(cypher)
+    Neo4j-->>MCP: [{c.name: "John Doe", p.name: "Widget Pro", p.price: 199.99}, ...]
+
+    Note over MCP,Audit: (6) Log to Audit Trail
+    MCP->>Audit: log_query_execution(query, cypher, results)
+    Audit-->>MCP: Logged with timestamp
+
+    Note over MCP,User: (7) Format and Return
+    MCP-->>User: JSON: [{c.name: "John Doe", ...}, ...]
+
+    rect rgb(255, 235, 238)
+        Note right of San: If sanitization fails:<br/>Block query, log security event,<br/>return sanitized error
+    end
 ```
 
 ### 5.2 Error Handling Flow
 
-```
-┌─────────────┐
-│   Client    │
-└─────────────┘
-       │
-       │ Malicious Query:
-       │ "Show me users; DROP TABLE users;"
-       ▼
-┌────────────────────────────────────────────┐
-│         MCP Server                          │
-│                                             │
-│  (1) LLM generates Cypher (may include ;)  │
-│      ↓                                      │
-│  (2) sanitize_cypher_query()               │
-│      ↓                                      │
-│      ✗ BLOCKED: Query chaining detected    │
-│      ↓                                      │
-│  (3) Log security event                    │
-│      ↓                                      │
-│  (4) Return sanitized error                │
-│      "Query validation failed"             │
-│      (No details exposed)                  │
-└────────────────────────────────────────────┘
-       │
-       │ Error response
-       ▼
-┌─────────────┐
-│   Client    │
-│  (Error)    │
-└─────────────┘
+```mermaid
+sequenceDiagram
+    actor User as Client
+    participant MCP as MCP Server
+    participant LLM as LLM Provider
+    participant San as Sanitizer
+    participant Audit as Audit Logger
+
+    User->>MCP: Malicious Query<br/>"Show users; DROP TABLE users;"
+
+    MCP->>LLM: Generate Cypher<br/>(may include semicolon)
+    LLM-->>MCP: Generated Cypher with ';'
+
+    MCP->>San: sanitize_cypher_query(cypher)
+
+    rect rgb(255, 205, 210)
+        San->>San: Detect query chaining (semicolon)
+        San-->>MCP: ✗ BLOCKED: Query chaining detected
+    end
+
+    MCP->>Audit: log_security_event(<br/>"query_blocked",<br/>"Query chaining detected"<br/>)
+    Audit-->>MCP: Event logged
+
+    MCP-->>User: Error: "Query validation failed"<br/>(No technical details exposed)
+
+    Note over User,MCP: Sanitized error message<br/>prevents information leakage
 ```
 
 ### 5.3 Schema Caching Flow
 
-```
-First Query:
-┌─────────────┐
-│  Client     │ ─── query ──> ┌──────────────┐
-└─────────────┘               │  MCP Server  │
-                              │              │
-                              │ (1) Check    │
-                              │     cache    │
-                              │     (empty)  │
-                              │              │
-                              │ (2) Fetch    │
-                              │     from     │
-                              │     Neo4j    │
-                              │              │
-                              │ (3) Cache    │
-                              │     schema   │
-                              │              │
-                              └──────────────┘
+```mermaid
+flowchart TD
+    Query1[First Query] --> CheckCache1{Check<br/>Schema Cache}
+    CheckCache1 -->|Cache Miss| FetchNeo4j[Fetch from Neo4j<br/>~50ms]
+    FetchNeo4j --> CacheStore[Store in Cache<br/>TTL: 1 hour]
+    CacheStore --> UseSchema1[Use Schema]
 
-Subsequent Queries:
-┌─────────────┐
-│  Client     │ ─── query ──> ┌──────────────┐
-└─────────────┘               │  MCP Server  │
-                              │              │
-                              │ (1) Check    │
-                              │     cache    │
-                              │     (hit!)   │
-                              │              │
-                              │ (2) Use      │
-                              │     cached   │
-                              │     schema   │
-                              │              │
-                              └──────────────┘
+    Query2[Subsequent Query] --> CheckCache2{Check<br/>Schema Cache}
+    CheckCache2 -->|Cache Hit| UseSchema2[Use Cached Schema<br/>~1ms]
 
-Result: 80% faster query generation, 50% lower LLM costs
+    UseSchema1 --> Result1[Query Result]
+    UseSchema2 --> Result2[Query Result<br/><b>80% faster</b><br/><b>50% lower cost</b>]
+
+    style CheckCache1 fill:#fff3e0
+    style CheckCache2 fill:#fff3e0
+    style FetchNeo4j fill:#ffebee
+    style CacheStore fill:#e8f5e9
+    style UseSchema2 fill:#c8e6c9
+    style Result2 fill:#a5d6a7
 ```
 
 ---
@@ -763,100 +489,111 @@ Result: 80% faster query generation, 50% lower LLM costs
 
 ### 6.1 Defense in Depth Strategy
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Layer 1: Network Security                     │
-│  - Firewall rules (port 7687 for Neo4j, 8000 for MCP)          │
-│  - TLS/SSL for Neo4j (neo4j+s://)                              │
-│  - VPC/network isolation (optional)                             │
-└─────────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                Layer 2: Authentication (Future)                  │
-│  - API key authentication                                        │
-│  - JWT tokens                                                    │
-│  - Role-based access control (RBAC)                             │
-└─────────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                 Layer 3: Input Validation                        │
-│  - LangChain allow_dangerous_requests flag                      │
-│  - Custom sanitizer (UTF-8, injection, chaining)                │
-│  - Query complexity limits (future)                             │
-└─────────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│               Layer 4: Query Execution Control                   │
-│  - Read-only mode enforcement (optional)                         │
-│  - APOC procedure whitelisting                                   │
-│  - Transaction timeout limits                                    │
-└─────────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                  Layer 5: Audit & Monitoring                     │
-│  - Comprehensive query logging                                   │
-│  - Security event logging                                        │
-│  - PII redaction                                                 │
-│  - Anomaly detection (future)                                    │
-└─────────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                 Layer 6: Data Protection                         │
-│  - Neo4j access control (database-level)                        │
-│  - Encryption at rest (Neo4j feature)                           │
-│  - Encryption in transit (TLS)                                   │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    Input[User Input] --> L1
+
+    subgraph DefenseInDepth["Defense in Depth (6 Layers)"]
+        L1["Layer 1: Network Security<br/>- Firewall rules (7687, 8000)<br/>- TLS/SSL (neo4j+s://)<br/>- VPC isolation"]
+        L2["Layer 2: Authentication (Future)<br/>- API key authentication<br/>- JWT tokens<br/>- Role-based access (RBAC)"]
+        L3["Layer 3: Input Validation<br/>- LangChain allow_dangerous_requests<br/>- Custom sanitizer<br/>- Query complexity limits"]
+        L4["Layer 4: Query Execution Control<br/>- Read-only mode enforcement<br/>- APOC whitelisting<br/>- Transaction timeouts"]
+        L5["Layer 5: Audit & Monitoring<br/>- Query logging<br/>- Security event logging<br/>- PII redaction"]
+        L6["Layer 6: Data Protection<br/>- Neo4j access control<br/>- Encryption at rest<br/>- Encryption in transit"]
+    end
+
+    Output[Neo4j Database]
+
+    L1 --> L2 --> L3 --> L4 --> L5 --> L6 --> Output
+
+    style L1 fill:#e3f2fd
+    style L2 fill:#f3e5f5
+    style L3 fill:#ffebee
+    style L4 fill:#fff3e0
+    style L5 fill:#e8f5e9
+    style L6 fill:#fce4ec
 ```
 
 ### 6.2 Threat Model
 
-| Threat | Attack Vector | Mitigation | Layer |
-|--------|--------------|------------|-------|
-| **Cypher Injection** | Malicious natural language → injected Cypher | Sanitizer blocks `;`, newlines, APOC | Layer 3 |
-| **UTF-8 Attacks** | Zero-width chars, homoglyphs | UTF-8 pattern detection | Layer 3 |
-| **Data Exfiltration** | Write large result sets | Query complexity limits (future) | Layer 4 |
-| **APOC Escalation** | `apoc.cypher.run*` for privilege escalation | Whitelist safe APOC only | Layers 3-4 |
-| **Schema Exposure** | Client gets full schema | Schema is required for LLM, mitigated by server-side | Accepted risk |
-| **LLM Prompt Injection** | "Ignore instructions and..." | LangChain prompt engineering | Layer 3 |
-| **Denial of Service** | High-complexity queries | Timeout + rate limiting (future) | Layer 4 |
-| **Information Leakage** | Detailed error messages | Error sanitization | Layer 3 |
-| **Unauthorized Access** | No authentication | API key auth (future) | Layer 2 |
+```mermaid
+graph LR
+    subgraph Threats["Security Threats"]
+        T1["Cypher Injection"]
+        T2["UTF-8 Attacks"]
+        T3["Data Exfiltration"]
+        T4["APOC Escalation"]
+        T5["Schema Exposure"]
+        T6["Prompt Injection"]
+        T7["Denial of Service"]
+        T8["Information Leakage"]
+        T9["Unauthorized Access"]
+    end
 
-### 6.3 Compliance Features
+    subgraph Mitigations["Mitigations (Layer)"]
+        M1["Sanitizer blocks ';', newlines (L3)"]
+        M2["UTF-8 pattern detection (L3)"]
+        M3["Query complexity limits (L4)"]
+        M4["APOC whitelist (L3-L4)"]
+        M5["Server-side only (Accepted Risk)"]
+        M6["LangChain prompt engineering (L3)"]
+        M7["Timeout + rate limiting (L4)"]
+        M8["Error sanitization (L3)"]
+        M9["API key auth (L2, Future)"]
+    end
 
-#### 6.3.1 GDPR Compliance
+    T1 -.->|Mitigated by| M1
+    T2 -.->|Mitigated by| M2
+    T3 -.->|Mitigated by| M3
+    T4 -.->|Mitigated by| M4
+    T5 -.->|Mitigated by| M5
+    T6 -.->|Mitigated by| M6
+    T7 -.->|Mitigated by| M7
+    T8 -.->|Mitigated by| M8
+    T9 -.->|Mitigated by| M9
 
-| Requirement | Implementation | Status |
-|-------------|----------------|--------|
-| **Right to be Forgotten** | Audit logs can be deleted per user | Manual process |
-| **Data Minimization** | Only query/result logged, no raw user data | ✅ Implemented |
-| **Encryption in Transit** | TLS for Neo4j, HTTPS for MCP | ✅ Configurable |
-| **Access Logging** | All queries logged with timestamp | ✅ Implemented |
-| **PII Protection** | Automatic redaction in logs | ✅ Implemented |
+    style Threats fill:#ffebee
+    style Mitigations fill:#e8f5e9
+```
 
-#### 6.3.2 HIPAA Compliance
+### 6.3 Compliance Architecture
 
-| Requirement | Implementation | Status |
-|-------------|----------------|--------|
-| **Audit Controls** | Comprehensive audit logging | ✅ Implemented |
-| **Access Control** | Read-only mode, authentication (future) | ⚠️ Partial |
-| **Encryption** | At-rest (Neo4j), in-transit (TLS) | ✅ Configurable |
-| **Integrity** | Sanitizer prevents data corruption | ✅ Implemented |
+```mermaid
+graph TB
+    subgraph Compliance["Compliance Requirements"]
+        GDPR["GDPR<br/>- Right to be Forgotten<br/>- Data Minimization<br/>- Encryption<br/>- Access Logging<br/>- PII Protection"]
 
-#### 6.3.3 SOC 2 Type II
+        HIPAA["HIPAA<br/>- Audit Controls<br/>- Access Control<br/>- Encryption<br/>- Integrity"]
 
-| Criterion | Implementation | Status |
-|-----------|----------------|--------|
-| **Security** | Multi-layer defense, audit logging | ✅ Implemented |
-| **Availability** | Connection pooling, retry logic | ✅ Implemented |
-| **Confidentiality** | PII redaction, TLS | ✅ Implemented |
-| **Processing Integrity** | Query sanitization, validation | ✅ Implemented |
-| **Privacy** | PII redaction, data minimization | ✅ Implemented |
+        SOC2["SOC 2 Type II<br/>- Security<br/>- Availability<br/>- Confidentiality<br/>- Processing Integrity<br/>- Privacy"]
+    end
+
+    subgraph Implementation["Implementation"]
+        AuditLog["Audit Logging<br/>✓ All queries logged<br/>✓ Timestamp tracking<br/>✓ User attribution"]
+
+        Encryption["Encryption<br/>✓ TLS in-transit<br/>✓ Neo4j at-rest<br/>✓ Configurable"]
+
+        PIIRedact["PII Redaction<br/>✓ Automatic<br/>✓ Email/SSN/CC<br/>✓ Configurable"]
+
+        ReadOnly["Access Control<br/>✓ Read-only mode<br/>⚠ Auth (future)<br/>✓ Sanitization"]
+    end
+
+    GDPR -.->|Satisfied by| AuditLog
+    GDPR -.->|Satisfied by| Encryption
+    GDPR -.->|Satisfied by| PIIRedact
+
+    HIPAA -.->|Satisfied by| AuditLog
+    HIPAA -.->|Satisfied by| Encryption
+    HIPAA -.->|Satisfied by| ReadOnly
+
+    SOC2 -.->|Satisfied by| AuditLog
+    SOC2 -.->|Satisfied by| Encryption
+    SOC2 -.->|Satisfied by| PIIRedact
+    SOC2 -.->|Satisfied by| ReadOnly
+
+    style Compliance fill:#fff3e0
+    style Implementation fill:#e8f5e9
+```
 
 ---
 
@@ -864,243 +601,187 @@ Result: 80% faster query generation, 50% lower LLM costs
 
 ### 7.1 Container Architecture (Docker)
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Docker Host Machine                          │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │          neo4j-yass-mcp Container                         │  │
-│  │                                                            │  │
-│  │  ┌─────────────────────────────────────────────────────┐ │  │
-│  │  │  Runtime Layer (python:3.11-slim)                    │ │  │
-│  │  │  - Python 3.11 runtime                               │ │  │
-│  │  │  - Virtual environment (/opt/venv)                   │ │  │
-│  │  │  - Application code (/app)                           │ │  │
-│  │  └─────────────────────────────────────────────────────┘ │  │
-│  │                                                            │  │
-│  │  User: mcp (UID 999, non-root)                           │  │
-│  │  Exposed Ports: 8000 (HTTP mode)                         │  │
-│  │                                                            │  │
-│  │  Volumes:                                                  │  │
-│  │  - ./data/logs:/app/logs (audit logs)                    │  │
-│  │  - ./.env:/app/.env:ro (configuration)                   │  │
-│  │                                                            │  │
-│  │  Networks:                                                 │  │
-│  │  - neo4j-stack (connects to Neo4j)                        │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │          Neo4j Container (Optional)                       │  │
-│  │                                                            │  │
-│  │  Image: neo4j:5.x                                         │  │
-│  │  Ports: 7687 (Bolt), 7474 (HTTP)                         │  │
-│  │  Volumes: ./neo4j/data, ./neo4j/logs, ./neo4j/plugins    │  │
-│  │  Networks: neo4j-stack                                    │  │
-│  └──────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph DockerHost["Docker Host Machine"]
+        subgraph MCPContainer["neo4j-yass-mcp Container"]
+            Runtime["Runtime Layer<br/>(python:3.11-slim)<br/>- Python 3.11<br/>- Virtual env (/opt/venv)<br/>- App code (/app)<br/><br/>User: mcp (UID 999)<br/>Ports: 8000"]
+
+            Volumes["Volumes:<br/>- ./data/logs:/app/logs<br/>- ./.env:/app/.env:ro"]
+
+            Networks["Networks:<br/>- neo4j-stack"]
+        end
+
+        subgraph Neo4jContainer["Neo4j Container (Optional)"]
+            Neo4jImage["Image: neo4j:5.x<br/>Ports: 7687, 7474<br/>Volumes: data, logs, plugins<br/>Networks: neo4j-stack"]
+        end
+    end
+
+    MCPContainer <-->|neo4j-stack network| Neo4jContainer
+
+    style MCPContainer fill:#e1f5ff
+    style Neo4jContainer fill:#e8f5e9
 ```
 
 ### 7.2 Multi-Stage Docker Build
 
-```dockerfile
-# Stage 1: Builder (larger image with build tools)
-FROM python:3.11-slim as builder
-WORKDIR /app
-RUN apt-get update && apt-get install -y gcc
-COPY pyproject.toml .
-RUN pip install --no-cache-dir -e ".[all]"
+```mermaid
+graph LR
+    subgraph Stage1["Stage 1: Builder"]
+        Base1["python:3.11-slim"]
+        BuildTools["Install:<br/>- gcc<br/>- build tools"]
+        Deps["Install Dependencies<br/>pyproject.toml"]
+    end
 
-# Stage 2: Runtime (minimal image)
-FROM python:3.11-slim
-WORKDIR /app
+    subgraph Stage2["Stage 2: Runtime"]
+        Base2["python:3.11-slim"]
+        Copy["Copy venv only<br/>(no build tools)"]
+        NonRoot["Non-root user<br/>(mcp:mcp)"]
+        AppCode["Application code"]
+    end
 
-# Copy only virtual environment (no build tools)
-COPY --from=builder /opt/venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+    Base1 --> BuildTools --> Deps
+    Base2 --> Copy --> NonRoot --> AppCode
+    Deps -.->|Copy /opt/venv| Copy
 
-# Non-root user
-RUN groupadd -r mcp && useradd -r -g mcp mcp
-USER mcp
+    Stage1 -.->|500MB| Discard[Discarded]
+    Stage2 -->|150MB| FinalImage["Final Image<br/><b>70% smaller</b>"]
 
-# Application code
-COPY --chown=mcp:mcp . .
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s \
-  CMD python -c "import sys; sys.exit(0)"
-
-# Run server
-CMD ["python", "server.py"]
+    style Stage1 fill:#ffebee
+    style Stage2 fill:#e8f5e9
+    style FinalImage fill:#a5d6a7
+    style Discard fill:#ffcdd2
 ```
-
-**Benefits**:
-- 70% smaller final image (~150MB vs ~500MB)
-- No build tools in production
-- Faster deployments
-- Better security (minimal attack surface)
 
 ### 7.3 Deployment Topologies
 
 #### 7.3.1 Single-Instance (Development)
 
-```
-┌──────────────┐
-│   Client     │
-└──────────────┘
-       │
-       │ HTTP (port 8000)
-       ▼
-┌──────────────────────┐
-│  Neo4j YASS MCP      │
-│  (Docker container)  │
-└──────────────────────┘
-       │
-       │ Bolt (port 7687)
-       ▼
-┌──────────────────────┐
-│  Neo4j Database      │
-│  (Docker/local)      │
-└──────────────────────┘
-```
+```mermaid
+graph TD
+    Client[Client] -->|HTTP :8000| MCP[Neo4j YASS MCP<br/>Docker Container]
+    MCP -->|Bolt :7687| Neo4j[Neo4j Database<br/>Docker/Local]
 
-**Use case**: Development, testing, single-user
+    style Client fill:#fff3e0
+    style MCP fill:#e1f5ff
+    style Neo4j fill:#e8f5e9
+```
 
 #### 7.3.2 Load-Balanced (Production)
 
-```
-                    ┌──────────────┐
-                    │   Client 1   │
-                    └──────────────┘
-                           │
-                    ┌──────────────┐
-                    │   Client 2   │
-                    └──────────────┘
-                           │
-                    ┌──────────────┐
-                    │   Client N   │
-                    └──────────────┘
-                           │
-                           ▼
-              ┌────────────────────────┐
-              │   Load Balancer        │
-              │   (nginx/HAProxy)      │
-              └────────────────────────┘
-                      │       │
-        ┌─────────────┴───────┴─────────────┐
-        │                                    │
-        ▼                                    ▼
-┌──────────────────┐              ┌──────────────────┐
-│  MCP Server 1    │              │  MCP Server 2    │
-│  (Container)     │              │  (Container)     │
-└──────────────────┘              └──────────────────┘
-        │                                    │
-        └────────────────┬───────────────────┘
-                         │
-                         ▼
-              ┌────────────────────────┐
-              │   Neo4j Cluster        │
-              │   (Causal Cluster)     │
-              └────────────────────────┘
+```mermaid
+graph TD
+    Client1[Client 1]
+    Client2[Client 2]
+    ClientN[Client N]
+
+    Client1 --> LB
+    Client2 --> LB
+    ClientN --> LB
+
+    LB[Load Balancer<br/>nginx/HAProxy]
+
+    LB --> MCP1[MCP Server 1<br/>Container]
+    LB --> MCP2[MCP Server 2<br/>Container]
+
+    MCP1 --> Cluster
+    MCP2 --> Cluster
+
+    Cluster[Neo4j Cluster<br/>Causal Cluster<br/>Read Replicas]
+
+    style Client1 fill:#fff3e0
+    style Client2 fill:#fff3e0
+    style ClientN fill:#fff3e0
+    style LB fill:#f3e5f5
+    style MCP1 fill:#e1f5ff
+    style MCP2 fill:#e1f5ff
+    style Cluster fill:#e8f5e9
 ```
 
-**Use case**: High availability, 100+ users, enterprise
-
-**Characteristics**:
-- Stateless MCP servers (horizontal scaling)
-- Shared audit logs (network volume)
-- Neo4j causal cluster (read replicas)
+**Characteristics:**
+- **Stateless MCP servers** (horizontal scaling)
+- **Shared audit logs** (network volume)
+- **Neo4j causal cluster** (read replicas)
+- **Capacity**: 30 queries/s per server, linear scaling
 
 #### 7.3.3 Multi-Tenant SaaS
 
-```
-┌────────────┐  ┌────────────┐  ┌────────────┐
-│ Customer A │  │ Customer B │  │ Customer C │
-└────────────┘  └────────────┘  └────────────┘
-      │               │               │
-      ▼               ▼               ▼
-┌──────────────────────────────────────────┐
-│          API Gateway / Router             │
-│     (tenant-based routing)                │
-└──────────────────────────────────────────┘
-      │               │               │
-      ▼               ▼               ▼
-┌──────────┐   ┌──────────┐   ┌──────────┐
-│ MCP      │   │ MCP      │   │ MCP      │
-│ Server A │   │ Server B │   │ Server C │
-└──────────┘   └──────────┘   └──────────┘
-      │               │               │
-      ▼               ▼               ▼
-┌──────────┐   ┌──────────┐   ┌──────────┐
-│ Neo4j    │   │ Neo4j    │   │ Neo4j    │
-│ DB A     │   │ DB B     │   │ DB C     │
-└──────────┘   └──────────┘   └──────────┘
+```mermaid
+graph TD
+    CustomerA[Customer A]
+    CustomerB[Customer B]
+    CustomerC[Customer C]
+
+    CustomerA --> Gateway
+    CustomerB --> Gateway
+    CustomerC --> Gateway
+
+    Gateway[API Gateway / Router<br/>Tenant-based routing]
+
+    Gateway --> MCPA[MCP Server A]
+    Gateway --> MCPB[MCP Server B]
+    Gateway --> MCPC[MCP Server C]
+
+    MCPA --> DBA[Neo4j DB A]
+    MCPB --> DBB[Neo4j DB B]
+    MCPC --> DBC[Neo4j DB C]
+
+    style CustomerA fill:#fff3e0
+    style CustomerB fill:#fff3e0
+    style CustomerC fill:#fff3e0
+    style Gateway fill:#f3e5f5
+    style MCPA fill:#e1f5ff
+    style MCPB fill:#e1f5ff
+    style MCPC fill:#e1f5ff
+    style DBA fill:#e8f5e9
+    style DBB fill:#e8f5e9
+    style DBC fill:#e8f5e9
 ```
 
-**Use case**: SaaS platform, tenant isolation
-
-**Characteristics**:
-- One MCP server instance per tenant
+**Characteristics:**
+- One MCP instance per tenant
 - Separate Neo4j databases per tenant
 - Centralized monitoring and logging
 
 ### 7.4 Network Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      External Network                            │
-│                                                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
-│  │   OpenAI     │  │  Anthropic   │  │   Google     │         │
-│  │   API        │  │   API        │  │   GenAI      │         │
-│  └──────────────┘  └──────────────┘  └──────────────┘         │
-│         │                  │                  │                 │
-│         └──────────────────┴──────────────────┘                 │
-│                            │                                     │
-│                            │ HTTPS (443)                         │
-└────────────────────────────┼─────────────────────────────────────┘
-                             │
-                             │
-┌────────────────────────────┼─────────────────────────────────────┐
-│                    DMZ / Public Subnet                           │
-│                            │                                     │
-│                            ▼                                     │
-│                  ┌─────────────────┐                            │
-│                  │  Load Balancer  │                            │
-│                  │  (nginx/ALB)    │                            │
-│                  └─────────────────┘                            │
-│                            │                                     │
-│                            │ HTTP/HTTPS (8000)                   │
-└────────────────────────────┼─────────────────────────────────────┘
-                             │
-                             │
-┌────────────────────────────┼─────────────────────────────────────┐
-│                  Application Subnet (Private)                    │
-│                            │                                     │
-│                            ▼                                     │
-│              ┌─────────────────────────────┐                    │
-│              │   Neo4j YASS MCP Servers    │                    │
-│              │   (Containers/K8s Pods)     │                    │
-│              └─────────────────────────────┘                    │
-│                            │                                     │
-│                            │ Bolt (7687)                         │
-└────────────────────────────┼─────────────────────────────────────┘
-                             │
-                             │
-┌────────────────────────────┼─────────────────────────────────────┐
-│                  Database Subnet (Private)                       │
-│                            │                                     │
-│                            ▼                                     │
-│              ┌─────────────────────────────┐                    │
-│              │   Neo4j Database Cluster    │                    │
-│              │   (No internet access)      │                    │
-│              └─────────────────────────────┘                    │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph External["External Network (Internet)"]
+        OpenAI[OpenAI API]
+        Anthropic[Anthropic API]
+        Google[Google GenAI]
+    end
 
-Security Rules:
-- DMZ: Allow inbound 443 (HTTPS), 8000 (MCP)
-- App Subnet: Allow inbound from DMZ only
-- DB Subnet: Allow inbound from App Subnet only, no internet
+    subgraph DMZ["DMZ / Public Subnet"]
+        LB[Load Balancer<br/>nginx/ALB<br/>HTTPS :443, :8000]
+    end
+
+    subgraph AppSubnet["Application Subnet (Private)"]
+        MCP1[MCP Server 1]
+        MCP2[MCP Server 2]
+        MCPN[MCP Server N]
+    end
+
+    subgraph DBSubnet["Database Subnet (Private)"]
+        Neo4jCluster[Neo4j Database Cluster<br/>No internet access]
+    end
+
+    External -.->|HTTPS :443| DMZ
+    DMZ -->|HTTP :8000| AppSubnet
+    AppSubnet -->|Bolt :7687| DBSubnet
+    AppSubnet -.->|HTTPS :443| External
+
+    style External fill:#fce4ec
+    style DMZ fill:#fff3e0
+    style AppSubnet fill:#e1f5ff
+    style DBSubnet fill:#e8f5e9
 ```
+
+**Security Rules:**
+- **DMZ**: Allow inbound 443 (HTTPS), 8000 (MCP)
+- **App Subnet**: Allow inbound from DMZ only
+- **DB Subnet**: Allow inbound from App Subnet only, **no internet access**
 
 ---
 
@@ -1108,73 +789,86 @@ Security Rules:
 
 ### 8.1 Core Technologies
 
-| Layer | Technology | Version | Purpose |
-|-------|-----------|---------|---------|
-| **Runtime** | Python | 3.11+ | Application runtime |
-| **MCP Framework** | FastMCP | 0.1.3+ | MCP server implementation |
-| **LLM Framework** | LangChain | 0.3.7+ | Natural language to Cypher |
-| **Database Driver** | neo4j-python-driver | 5.15+ | Neo4j connectivity |
-| **Database** | Neo4j | 5.x | Graph database |
-| **Containerization** | Docker | 20.10+ | Deployment packaging |
-| **Orchestration** | Docker Compose | 2.0+ | Multi-container management |
+```mermaid
+graph LR
+    subgraph Stack["Technology Stack"]
+        Runtime["Python 3.11+<br/>Application Runtime"]
+        FastMCP["FastMCP 0.1.3+<br/>MCP Server"]
+        LangChain["LangChain 0.3.7+<br/>NL to Cypher"]
+        Neo4jDriver["neo4j-driver 5.15+<br/>Database Connectivity"]
+        Neo4jDB["Neo4j 5.x<br/>Graph Database"]
+        Docker["Docker 20.10+<br/>Containerization"]
+        Compose["Docker Compose 2.0+<br/>Orchestration"]
+    end
+
+    Runtime --> FastMCP
+    Runtime --> LangChain
+    Runtime --> Neo4jDriver
+    Neo4jDriver --> Neo4jDB
+    Docker --> Runtime
+    Compose --> Docker
+
+    style Runtime fill:#e1f5ff
+    style FastMCP fill:#f3e5f5
+    style LangChain fill:#fff3e0
+    style Neo4jDriver fill:#e8f5e9
+    style Neo4jDB fill:#c8e6c9
+    style Docker fill:#e3f2fd
+    style Compose fill:#bbdefb
+```
 
 ### 8.2 LLM Provider Libraries
 
-```python
-# Installed via pyproject.toml [all] extra
-langchain-openai>=0.2.8       # OpenAI (GPT-4o, o3, o4-mini)
-langchain-anthropic>=0.3.0    # Anthropic (Claude Sonnet 4.5, etc.)
-langchain-google-genai>=2.0.3 # Google (Gemini 2.5 Pro/Flash)
+```mermaid
+graph TD
+    subgraph Providers["LLM Provider Libraries"]
+        OpenAILib["langchain-openai >= 0.2.8<br/>OpenAI (GPT-4o, o3, o4-mini)"]
+        AnthropicLib["langchain-anthropic >= 0.3.0<br/>Anthropic (Claude Sonnet 4.5, etc.)"]
+        GoogleLib["langchain-google-genai >= 2.0.3<br/>Google (Gemini 2.5 Pro/Flash)"]
+        Extensible["600+ more providers<br/>via LangChain"]
+    end
+
+    Core["Neo4j YASS MCP Core"]
+
+    Core --> OpenAILib
+    Core --> AnthropicLib
+    Core --> GoogleLib
+    Core -.-> Extensible
+
+    style Core fill:#e1f5ff
+    style Providers fill:#e8f5e9
 ```
 
-### 8.3 Development Tools
+### 8.3 Dependency Tree
 
-| Tool | Purpose | Version |
-|------|---------|---------|
-| **uv** | Fast Python package manager | Latest |
-| **pytest** | Unit testing | 7.x |
-| **ruff** | Linting and formatting | Latest |
-| **mypy** | Type checking | 1.x |
-| **black** | Code formatting | 23.x |
+```mermaid
+graph TB
+    Root["neo4j-yass-mcp"]
 
-### 8.4 Dependency Tree
+    Root --> FastMCP["fastmcp >= 0.1.3"]
+    FastMCP --> Pydantic["pydantic"]
+    FastMCP --> Uvicorn["uvicorn (HTTP mode)"]
 
+    Root --> LangChain["langchain >= 0.3.7"]
+    LangChain --> LCCore["langchain-core"]
+    LangChain --> LCComm["langchain-community"]
+    LangChain --> LCText["langchain-text-splitters"]
+
+    Root --> LCNeo4j["langchain-neo4j >= 0.2.0"]
+    LCNeo4j --> Neo4jPy["neo4j >= 5.15.0"]
+
+    Root --> LCOpenAI["langchain-openai >= 0.2.8"]
+    LCOpenAI --> Tiktoken["tiktoken"]
+
+    Root --> LCAnthropic["langchain-anthropic >= 0.3.0"]
+    Root --> LCGoogle["langchain-google-genai >= 2.0.3"]
+    Root --> DotEnv["python-dotenv >= 1.0.0"]
+
+    style Root fill:#e1f5ff
+    style FastMCP fill:#f3e5f5
+    style LangChain fill:#fff3e0
+    style LCNeo4j fill:#e8f5e9
 ```
-neo4j-yass-mcp
-├── fastmcp>=0.1.3
-│   ├── pydantic
-│   └── uvicorn (HTTP mode)
-├── langchain>=0.3.7
-│   ├── langchain-core
-│   ├── langchain-community
-│   └── langchain-text-splitters
-├── langchain-neo4j>=0.2.0
-│   └── neo4j>=5.15.0
-├── langchain-openai>=0.2.8
-│   └── tiktoken (tokenization)
-├── langchain-anthropic>=0.3.0
-├── langchain-google-genai>=2.0.3
-└── python-dotenv>=1.0.0
-```
-
-### 8.5 System Requirements
-
-#### Minimum (Development)
-- **CPU**: 2 cores
-- **RAM**: 4GB
-- **Disk**: 10GB
-- **Network**: 10 Mbps
-
-#### Recommended (Production)
-- **CPU**: 4+ cores
-- **RAM**: 8GB+
-- **Disk**: 50GB SSD
-- **Network**: 100 Mbps+
-
-#### Neo4j Requirements
-- **RAM**: 4GB minimum, 16GB+ recommended
-- **Disk**: SSD strongly recommended (10x performance)
-- **Heap Size**: 4GB (configurable)
 
 ---
 
@@ -1184,132 +878,149 @@ neo4j-yass-mcp
 
 #### 9.1.1 Layered Architecture
 
-```
-Presentation Layer (MCP API)
-         ↓
-Business Logic Layer (Query Processing)
-         ↓
-Data Access Layer (Neo4j Driver)
-         ↓
-Database Layer (Neo4j)
+```mermaid
+graph TD
+    Presentation["Presentation Layer<br/>(MCP API)"]
+    Business["Business Logic Layer<br/>(Query Processing)"]
+    DataAccess["Data Access Layer<br/>(Neo4j Driver)"]
+    Database["Database Layer<br/>(Neo4j)"]
+
+    Presentation --> Business
+    Business --> DataAccess
+    DataAccess --> Database
+
+    style Presentation fill:#e3f2fd
+    style Business fill:#f3e5f5
+    style DataAccess fill:#fff3e0
+    style Database fill:#e8f5e9
 ```
 
-**Benefits**:
+**Benefits:**
 - Clear separation of concerns
 - Easy to test each layer independently
-- Swappable components (e.g., switch LLM providers)
+- Swappable components
 
 #### 9.1.2 Pipe and Filter
 
-Query processing pipeline:
+```mermaid
+graph LR
+    NL[Natural Language] -->|Filter: Schema Injection| NLSchema[NL + Schema]
+    NLSchema -->|Filter: LLM Translation| Cypher[Cypher Query]
+    Cypher -->|Filter: Sanitization| SafeCypher[Safe Cypher]
+    SafeCypher -->|Filter: Execution| RawResults[Raw Results]
+    RawResults -->|Filter: Formatting| JSON[JSON Response]
 
+    style NL fill:#fff3e0
+    style Cypher fill:#e1f5ff
+    style SafeCypher fill:#c8e6c9
+    style JSON fill:#e8f5e9
 ```
-Natural Language
-      ↓ (Filter: Schema Injection)
-Natural Language + Schema
-      ↓ (Filter: LLM Translation)
-Cypher Query
-      ↓ (Filter: Sanitization)
-Safe Cypher Query
-      ↓ (Filter: Execution)
-Raw Results
-      ↓ (Filter: Formatting)
-JSON Response
-```
-
-**Benefits**:
-- Easy to add new filters (e.g., query optimization)
-- Clear data transformations
-- Testable in isolation
 
 ### 9.2 Creational Patterns
 
 #### 9.2.1 Factory Pattern
 
-```python
-def chatLLM(config: LLMConfig) -> BaseChatModel:
-    """Factory for creating LLM instances"""
-    if config.provider == "openai":
-        return ChatOpenAI(...)
-    elif config.provider == "anthropic":
-        return ChatAnthropic(...)
-    elif config.provider == "google-genai":
-        return ChatGoogleGenerativeAI(...)
-    else:
-        raise ValueError(f"Unknown provider: {config.provider}")
-```
+```mermaid
+graph TD
+    Config["LLMConfig<br/>provider, model, temperature, api_key"]
 
-**Benefits**:
-- Centralized LLM creation logic
-- Easy to add new providers
-- Configuration-driven instantiation
+    Factory["chatLLM(config)<br/>Factory Function"]
+
+    Config --> Factory
+
+    Factory -->|provider='openai'| OpenAI["ChatOpenAI(...)"]
+    Factory -->|provider='anthropic'| Anthropic["ChatAnthropic(...)"]
+    Factory -->|provider='google-genai'| Google["ChatGoogleGenerativeAI(...)"]
+    Factory -.->|Extensible| Others["Other Providers..."]
+
+    style Config fill:#fff3e0
+    style Factory fill:#e1f5ff
+    style OpenAI fill:#e8f5e9
+    style Anthropic fill:#e8f5e9
+    style Google fill:#e8f5e9
+```
 
 ### 9.3 Structural Patterns
 
 #### 9.3.1 Adapter Pattern
 
-LangChain acts as an adapter between different LLM APIs:
+```mermaid
+graph TD
+    OurCode["Our Code<br/>(Unified Interface)"]
 
-```
-Our Code
-   ↓
-LangChain (Adapter)
-   ↓
-┌──────────┬──────────┬──────────┐
-│ OpenAI   │ Anthropic│  Google  │
-│ API      │ API      │  API     │
-└──────────┴──────────┴──────────┘
-```
+    Adapter["LangChain<br/>(Adapter)"]
 
-**Benefits**:
-- Unified interface across providers
-- Easy to switch providers
-- Hides provider-specific details
+    OpenAI["OpenAI API"]
+    Anthropic["Anthropic API"]
+    Google["Google API"]
+
+    OurCode --> Adapter
+    Adapter --> OpenAI
+    Adapter --> Anthropic
+    Adapter --> Google
+
+    style OurCode fill:#e1f5ff
+    style Adapter fill:#fff3e0
+    style OpenAI fill:#e8f5e9
+    style Anthropic fill:#e8f5e9
+    style Google fill:#e8f5e9
+```
 
 ### 9.4 Behavioral Patterns
 
 #### 9.4.1 Chain of Responsibility
 
-Sanitization chain:
+```mermaid
+graph LR
+    Query[Query] --> UTF8[UTF-8 Attack<br/>Check]
+    UTF8 -->|Pass| Chaining[Query Chaining<br/>Check]
+    Chaining -->|Pass| APOC[APOC Escalation<br/>Check]
+    APOC -->|Pass| ReadOnly[Read-Only<br/>Check]
+    ReadOnly -->|Pass| Safe[Safe Query]
 
-```python
-query
-  → UTF-8 Attack Check
-    → Query Chaining Check
-      → APOC Escalation Check
-        → Read-Only Check
-          → Safe Query
+    UTF8 -.->|Block| Error[Error]
+    Chaining -.->|Block| Error
+    APOC -.->|Block| Error
+    ReadOnly -.->|Block| Error
+
+    style Query fill:#fff3e0
+    style Safe fill:#c8e6c9
+    style Error fill:#ffcdd2
 ```
-
-Each validator can:
-- Pass to next validator
-- Block and return error
-- Modify and pass on
 
 #### 9.4.2 Strategy Pattern
 
-LLM provider selection:
+```mermaid
+classDiagram
+    class LLMStrategy {
+        <<interface>>
+        +generate_cypher(query, schema) str
+    }
 
-```python
-class LLMStrategy:
-    def generate_cypher(self, query: str, schema: Dict) -> str:
-        pass
+    class OpenAIStrategy {
+        +generate_cypher(query, schema) str
+    }
 
-class OpenAIStrategy(LLMStrategy):
-    def generate_cypher(self, query: str, schema: Dict) -> str:
-        # Use OpenAI API
-        pass
+    class AnthropicStrategy {
+        +generate_cypher(query, schema) str
+    }
 
-class AnthropicStrategy(LLMStrategy):
-    def generate_cypher(self, query: str, schema: Dict) -> str:
-        # Use Anthropic API
-        pass
+    class GoogleStrategy {
+        +generate_cypher(query, schema) str
+    }
+
+    LLMStrategy <|-- OpenAIStrategy
+    LLMStrategy <|-- AnthropicStrategy
+    LLMStrategy <|-- GoogleStrategy
+
+    class Context {
+        -strategy: LLMStrategy
+        +set_strategy(strategy)
+        +execute_query(query)
+    }
+
+    Context --> LLMStrategy
 ```
-
-**Benefits**:
-- Runtime provider selection
-- Easy A/B testing
-- Provider-specific optimizations
 
 ---
 
@@ -1317,139 +1028,98 @@ class AnthropicStrategy(LLMStrategy):
 
 ### 10.1 Performance Characteristics
 
-| Operation | Latency (avg) | Throughput | Bottleneck |
-|-----------|---------------|------------|------------|
-| **Schema Retrieval** | 50ms (cached: 1ms) | 1000 req/s | Neo4j query (uncached) |
-| **Query Generation** | 1-3s | 10-30 req/s | LLM API latency |
-| **Query Execution** | 100-500ms | 50-200 req/s | Neo4j complexity |
-| **End-to-End Query** | 1.5-4s | 10-30 req/s | LLM API |
+```mermaid
+graph LR
+    subgraph Operations["Operations & Performance"]
+        Schema["Schema Retrieval<br/>Latency: 50ms (uncached)<br/>1ms (cached)<br/>Throughput: 1000 req/s"]
 
-### 10.2 Scalability Strategies
+        QueryGen["Query Generation<br/>Latency: 1-3s<br/>Throughput: 10-30 req/s<br/>Bottleneck: LLM API"]
 
-#### 10.2.1 Horizontal Scaling
+        QueryExec["Query Execution<br/>Latency: 100-500ms<br/>Throughput: 50-200 req/s<br/>Bottleneck: Neo4j complexity"]
 
-```
-Load Balancer
-    ↓
-┌──────┬──────┬──────┬──────┐
-│ MCP  │ MCP  │ MCP  │ MCP  │
-│ Srv 1│ Srv 2│ Srv 3│ Srv N│
-└──────┴──────┴──────┴──────┘
-    ↓       ↓       ↓       ↓
-┌────────────────────────────┐
-│   Neo4j Cluster            │
-│   (Read Replicas)          │
-└────────────────────────────┘
+        E2E["End-to-End<br/>Latency: 1.5-4s<br/>Throughput: 10-30 req/s<br/>Bottleneck: LLM API"]
+    end
+
+    style Schema fill:#c8e6c9
+    style QueryGen fill:#fff3e0
+    style QueryExec fill:#e1f5ff
+    style E2E fill:#f3e5f5
 ```
 
-**Capacity Planning**:
-- Each MCP server: 30 queries/second
-- 10 servers = 300 queries/second
-- Linear scaling (stateless design)
+### 10.2 Horizontal Scaling
 
-#### 10.2.2 Caching Strategy
+```mermaid
+graph TB
+    LB[Load Balancer]
 
-```python
-# Schema caching (in-memory)
-schema_cache: Optional[Dict] = None
-schema_cache_time: Optional[datetime] = None
-SCHEMA_CACHE_TTL = 3600  # 1 hour
+    LB --> S1[MCP Server 1<br/>30 queries/s]
+    LB --> S2[MCP Server 2<br/>30 queries/s]
+    LB --> S3[MCP Server 3<br/>30 queries/s]
+    LB --> SN[MCP Server N<br/>30 queries/s]
 
-# Query result caching (future: Redis)
-@cache(ttl=300)  # 5 minutes
-async def execute_query(cypher: str) -> List[Dict]:
-    return await neo4j_graph.query(cypher)
+    S1 --> Cluster
+    S2 --> Cluster
+    S3 --> Cluster
+    SN --> Cluster
+
+    Cluster[Neo4j Cluster<br/>Read Replicas]
+
+    Capacity["Total Capacity:<br/>N servers × 30 req/s<br/><b>Linear Scaling</b><br/>(Stateless Design)"]
+
+    style LB fill:#f3e5f5
+    style S1 fill:#e1f5ff
+    style S2 fill:#e1f5ff
+    style S3 fill:#e1f5ff
+    style SN fill:#e1f5ff
+    style Cluster fill:#e8f5e9
+    style Capacity fill:#fff3e0
 ```
 
-**Impact**:
-- Schema caching: 80% latency reduction for query generation
-- Result caching: 70% cost reduction for repeated queries
+### 10.3 Caching Strategy
 
-#### 10.2.3 Connection Pooling
+```mermaid
+graph TB
+    subgraph Caching["Caching Layers"]
+        SchemaCache["Schema Cache<br/>(In-memory)<br/>TTL: 1 hour<br/><b>Impact:</b> 80% latency reduction"]
 
-```python
-driver = GraphDatabase.driver(
-    uri=NEO4J_URI,
-    auth=(username, password),
-    max_connection_pool_size=50,  # Shared across all requests
-    connection_acquisition_timeout=60,
-    max_transaction_retry_time=30
-)
+        ResultCache["Query Result Cache<br/>(Future: Redis)<br/>TTL: 5 minutes<br/><b>Impact:</b> 70% cost reduction"]
+
+        ConnectionPool["Connection Pool<br/>(Neo4j Driver)<br/>Pool size: 50<br/><b>Impact:</b> No handshake overhead"]
+    end
+
+    style SchemaCache fill:#c8e6c9
+    style ResultCache fill:#e1f5ff
+    style ConnectionPool fill:#fff3e0
 ```
-
-**Benefits**:
-- Reuse connections (no handshake overhead)
-- Handle concurrent requests efficiently
-- Automatic retry on transient failures
-
-### 10.3 Performance Optimization
-
-#### 10.3.1 Async I/O
-
-```python
-# Async executor for sync operations
-executor = ThreadPoolExecutor(max_workers=10)
-
-async def query_graph(query: str) -> str:
-    # Run sync LangChain call in thread pool
-    result = await asyncio.get_event_loop().run_in_executor(
-        executor,
-        lambda: cypher_chain.invoke({"query": query})
-    )
-    return result
-```
-
-**Impact**: Non-blocking I/O, handle 100+ concurrent requests
-
-#### 10.3.2 Query Optimization (Future)
-
-```python
-# Analyze and optimize Cypher
-class QueryOptimizer:
-    def optimize(self, cypher: str) -> str:
-        # 1. Use indexes (MATCH (n:Label {prop: $value}) → indexed)
-        # 2. Limit results early (MATCH ... LIMIT 100)
-        # 3. Avoid Cartesian products
-        # 4. Use WITH for pipeline optimization
-        return optimized_cypher
-```
-
-**Expected Impact**: 3x faster for complex queries
 
 ### 10.4 Monitoring & Observability
 
-#### 10.4.1 Metrics to Track
+```mermaid
+graph TD
+    subgraph Metrics["Key Metrics to Track"]
+        Latency["Query Latency<br/>Alert: >5s (p95)"]
+        ErrorRate["Error Rate<br/>Alert: >5%"]
+        LLMLatency["LLM API Latency<br/>Alert: >10s"]
+        ConnPool["Connection Pool<br/>Alert: >80% usage"]
+        Security["Sanitization Blocks<br/>Alert: >10/hour"]
+        AuditSize["Audit Log Size<br/>Alert: >1GB/day"]
+    end
 
-| Metric | Purpose | Alert Threshold |
-|--------|---------|-----------------|
-| **Query Latency** | User experience | > 5s (p95) |
-| **Error Rate** | Reliability | > 5% |
-| **LLM API Latency** | Provider SLA | > 10s |
-| **Neo4j Connection Pool** | Resource exhaustion | > 80% usage |
-| **Sanitization Blocks** | Security events | > 10/hour |
-| **Audit Log Size** | Compliance | > 1GB/day |
+    Monitor[Monitoring System] --> Latency
+    Monitor --> ErrorRate
+    Monitor --> LLMLatency
+    Monitor --> ConnPool
+    Monitor --> Security
+    Monitor --> AuditSize
 
-#### 10.4.2 Logging Strategy
-
-```python
-# Structured logging
-logging.info(
-    "Query executed",
-    extra={
-        "query": query,
-        "cypher": cypher,
-        "latency_ms": latency,
-        "result_count": len(results),
-        "llm_provider": config.provider,
-        "llm_model": config.model
-    }
-)
+    style Monitor fill:#e1f5ff
+    style Latency fill:#fff3e0
+    style ErrorRate fill:#ffebee
+    style LLMLatency fill:#f3e5f5
+    style ConnPool fill:#e8f5e9
+    style Security fill:#ffcdd2
+    style AuditSize fill:#c8e6c9
 ```
-
-**Benefits**:
-- Queryable logs (JSON format)
-- Performance debugging
-- Cost attribution
 
 ---
 
@@ -1457,200 +1127,198 @@ logging.info(
 
 ### 11.1 Conversational Query Refinement (Q1 2026)
 
-**Architectural Changes**:
+```mermaid
+sequenceDiagram
+    actor User
+    participant CM as Conversation Manager<br/>(New Component)
+    participant MCP as MCP Server
+    participant LLM as LLM Provider
+    participant Neo4j
 
-```
-┌────────────────────────────────────────┐
-│  New Component: Conversation Manager   │
-│                                         │
-│  - Session management                   │
-│  - Context tracking                     │
-│  - Multi-turn dialogue state           │
-└────────────────────────────────────────┘
-           ↓
-┌────────────────────────────────────────┐
-│  Enhanced MCP Tool: query_graph_v2     │
-│                                         │
-│  @mcp_server.tool()                     │
-│  async def query_graph_v2(              │
-│      query: str,                        │
-│      session_id: Optional[str] = None   │
-│  ):                                     │
-│      # Load conversation context        │
-│      # Generate query with history      │
-│      # Suggest refinements              │
-│      # Update session state             │
-└────────────────────────────────────────┘
-```
+    User->>MCP: "Show me customers"
+    MCP->>CM: Load session context
+    CM-->>MCP: New session created
 
-**Data Structures**:
+    MCP->>LLM: Generate query with history
+    LLM-->>MCP: Generated Cypher
+    MCP->>Neo4j: Execute
+    Neo4j-->>MCP: 10,000 results
 
-```python
-@dataclass
-class ConversationContext:
-    session_id: str
-    query_history: List[str]
-    cypher_history: List[str]
-    schema_context: Dict[str, Any]
-    user_preferences: Dict[str, Any]
-    created_at: datetime
-    last_updated: datetime
+    MCP->>CM: Analyze results, suggest refinements
+    CM-->>User: "Found 10,000 customers. Filter by:<br/>1. Location?<br/>2. Purchase history?<br/>3. Registration date?"
 
-# Storage: Redis or in-memory with TTL
-conversation_store: Dict[str, ConversationContext] = {}
+    User->>MCP: "Last 30 days, in California"
+    MCP->>CM: Load previous context
+    CM-->>MCP: Previous query + new refinement
+
+    MCP->>LLM: Generate refined query
+    LLM-->>MCP: Refined Cypher
+    MCP->>Neo4j: Execute
+    Neo4j-->>MCP: 47 results
+
+    MCP->>CM: Update session state
+    MCP-->>User: 47 customers (refined results)
+
+    rect rgb(255, 243, 224)
+        Note over CM: ConversationContext:<br/>- session_id<br/>- query_history<br/>- cypher_history<br/>- schema_context<br/>- user_preferences
+    end
 ```
 
-**Impact on Architecture**:
-- Add stateful session layer (breaks current stateless design)
-- Mitigation: Use Redis for shared session storage across instances
-- Performance: Minimal (session lookup < 10ms)
+**Architectural Impact:**
+- Add stateful session layer (breaks stateless design)
+- **Mitigation**: Use Redis for shared session storage
+- **Performance**: Minimal (<10ms session lookup)
 
 ### 11.2 Multi-Database Support (Q2 2026)
 
-**Architectural Changes**:
+```mermaid
+graph TB
+    User[User Query:<br/>"Show customer orders for product XYZ"]
 
-```
-Current Architecture:
-┌──────────────┐
-│  MCP Server  │ ────> Neo4j Database (single)
-└──────────────┘
+    MCP[MCP Server]
 
-Future Architecture:
-┌──────────────┐        ┌──────────┐
-│  MCP Server  │ ────> │ Neo4j DB1│
-│              │        └──────────┘
-│  - Database  │        ┌──────────┐
-│    Router    │ ────> │ Neo4j DB2│
-│  - Query     │        └──────────┘
-│    Federator │        ┌──────────┐
-│              │ ────> │ Neo4j DB3│
-└──────────────┘        └──────────┘
-```
+    subgraph NewComponents["New Components"]
+        Router[Database Router<br/>LLM analyzes query intent]
+        Federator[Query Federator<br/>Cross-DB join orchestration]
+    end
 
-**New Components**:
+    User --> MCP
+    MCP --> Router
 
-```python
-@dataclass
-class DatabaseConfig:
-    name: str
-    uri: str
-    database: str
-    credentials: Tuple[str, str]
-    schema_cache: Optional[Dict] = None
+    Router -->|Entities: customers, products| Decision{Single or<br/>Multiple DBs?}
 
-class DatabaseRouter:
-    """Routes queries to appropriate database(s)"""
-    def determine_target_databases(
-        self, query: str, databases: Dict[str, DatabaseConfig]
-    ) -> List[str]:
-        # LLM analyzes query to determine which DB(s) to use
-        pass
+    Decision -->|Single DB| DB1Direct[Execute on DB1]
+    Decision -->|Multiple DBs| Federator
 
-class QueryFederator:
-    """Executes cross-database queries"""
-    async def execute_federated_query(
-        self, query: str, target_dbs: List[str]
-    ) -> Dict:
-        # Execute on multiple DBs and join results
-        pass
+    Federator --> DB1[Neo4j DB1<br/>Customer Data]
+    Federator --> DB2[Neo4j DB2<br/>Product Catalog]
+
+    DB1 --> Join[Join Results]
+    DB2 --> Join
+
+    Join --> Response[Unified Response]
+
+    style NewComponents fill:#fff3e0
+    style Router fill:#e1f5ff
+    style Federator fill:#f3e5f5
+    style DB1 fill:#e8f5e9
+    style DB2 fill:#e8f5e9
 ```
 
-**Impact on Architecture**:
-- Add database routing layer (new responsibility)
-- Performance overhead: +100-200ms for DB selection
-- Complexity: Cross-database joins (manual implementation)
+**Configuration:**
+
+```mermaid
+classDiagram
+    class DatabaseConfig {
+        +str name
+        +str uri
+        +str database
+        +tuple credentials
+        +dict schema_cache
+    }
+
+    class DatabaseRouter {
+        +determine_target_databases(query, databases) List~str~
+    }
+
+    class QueryFederator {
+        +execute_federated_query(query, target_dbs) Dict
+    }
+
+    DatabaseRouter --> DatabaseConfig
+    QueryFederator --> DatabaseConfig
+```
+
+**Architectural Impact:**
+- Add database routing layer
+- **Performance**: +100-200ms for DB selection
+- **Complexity**: Manual cross-database joins
 
 ### 11.3 GraphQL Federation (Q3 2026)
 
-**Architectural Changes**:
+```mermaid
+graph TB
+    Client[Client]
 
-```
-New Mode: GraphQL Gateway Mode
+    subgraph MCPServer["Neo4j YASS MCP Server"]
+        Mode{Mode Selection}
 
-┌─────────────────────────────────────────┐
-│         Neo4j YASS MCP Server            │
-│                                          │
-│  ┌────────────────────────────────────┐ │
-│  │  GraphQL Mode (MCP_MODE=graphql)   │ │
-│  │                                     │ │
-│  │  - Auto-generate schema from Neo4j │ │
-│  │  - Dual interface:                  │ │
-│  │    1. Traditional GraphQL           │ │
-│  │    2. Natural language resolver     │ │
-│  └────────────────────────────────────┘ │
-│                                          │
-│  ┌────────────────────────────────────┐ │
-│  │  GraphQL Resolver Layer             │ │
-│  │  - Field resolvers → Cypher         │ │
-│  │  - queryGraph resolver → LLM        │ │
-│  └────────────────────────────────────┘ │
-└─────────────────────────────────────────┘
-```
+        subgraph MCPMode["MCP Mode (Current)"]
+            FastMCP[FastMCP Server<br/>MCP Tools API]
+        end
 
-**New Dependencies**:
+        subgraph GraphQLMode["GraphQL Mode (New)"]
+            GQLServer[GraphQL Server<br/>Port 4000]
+            AutoSchema[Auto-generate schema<br/>from Neo4j]
+            DualInterface[Dual Interface:<br/>1. Traditional GraphQL<br/>2. NL resolver]
+        end
+    end
 
-```python
-# GraphQL server
-graphene>=3.0
-strawberry-graphql>=0.200  # Alternative
+    LLM[LLM Provider]
+    Neo4j[Neo4j Database]
 
-# Neo4j GraphQL integration
-neo4j-graphql-py>=0.5
-```
+    Client -->|MCP Protocol| Mode
+    Mode --> MCPMode
+    Mode --> GraphQLMode
 
-**Dual Operation**:
+    FastMCP --> LLM
+    FastMCP --> Neo4j
 
-```
-Mode 1: MCP Server (current)
-- FastMCP server
-- MCP tools API
+    GQLServer --> AutoSchema
+    AutoSchema --> Neo4j
+    DualInterface --> LLM
+    DualInterface --> Neo4j
 
-Mode 2: GraphQL Gateway (future)
-- GraphQL server (port 4000)
-- REST API fallback
-- MCP tools still available
+    style MCPMode fill:#e1f5ff
+    style GraphQLMode fill:#e8f5e9
 ```
 
-**Impact on Architecture**:
-- Add GraphQL layer (parallel to MCP)
-- Schema auto-generation from Neo4j
-- Potential for code reuse (same LLM/sanitizer logic)
+**Dual Interface Example:**
+
+```mermaid
+graph LR
+    subgraph Developers["For Developers"]
+        Traditional["Traditional GraphQL<br/>query {<br/>  customer(id: '123') {<br/>    name<br/>    orders { total }<br/>  }<br/>}"]
+    end
+
+    subgraph Everyone["For Everyone"]
+        NaturalLang["Natural Language<br/>query {<br/>  queryGraph(<br/>    question: 'Show customer 123 orders'<br/>  )<br/>}"]
+    end
+
+    Traditional --> SameData[Same Data]
+    NaturalLang --> SameData
+
+    style Developers fill:#e1f5ff
+    style Everyone fill:#e8f5e9
+    style SameData fill:#c8e6c9
+```
 
 ### 11.4 Migration Path
 
-```
-Version 1.0 (Current)
-- MCP server only
-- Single database
-- Single-turn queries
+```mermaid
+graph LR
+    V1["Version 1.0<br/>(Current)<br/><br/>- MCP server<br/>- Single database<br/>- Single-turn queries"]
 
-    ↓ (Backward compatible update)
+    V2["Version 2.0<br/>(Q1 2026)<br/><br/>- MCP server<br/>- Single database<br/>- Multi-turn queries<br/>(+session_id param)"]
 
-Version 2.0 (Q1 2026)
-- MCP server
-- Single database
-- Multi-turn queries (optional session_id parameter)
+    V3["Version 3.0<br/>(Q2 2026)<br/><br/>- MCP server<br/>- Multi-database<br/>(+database param)<br/>- Multi-turn queries"]
 
-    ↓ (Backward compatible update)
+    V4["Version 4.0<br/>(Q3 2026)<br/><br/>- MCP server (mode=mcp)<br/>- GraphQL (mode=graphql)<br/>- Multi-database<br/>- Multi-turn queries"]
 
-Version 3.0 (Q2 2026)
-- MCP server
-- Multi-database (optional database parameter)
-- Multi-turn queries
+    V1 -->|Backward<br/>Compatible| V2
+    V2 -->|Backward<br/>Compatible| V3
+    V3 -->|Parallel<br/>Modes| V4
 
-    ↓ (Parallel mode)
-
-Version 4.0 (Q3 2026)
-- MCP server (mode=mcp)
-- GraphQL server (mode=graphql)
-- Multi-database
-- Multi-turn queries
+    style V1 fill:#e3f2fd
+    style V2 fill:#e1f5ff
+    style V3 fill:#bbdefb
+    style V4 fill:#90caf9
 ```
 
-**Backward Compatibility Strategy**:
+**Backward Compatibility Strategy:**
 - Optional parameters (default to v1.0 behavior)
-- Feature flags (enable new features via environment variables)
-- Deprecation warnings (12-month notice before removal)
+- Feature flags (environment variables)
+- Deprecation warnings (12-month notice)
 
 ---
 
@@ -1660,7 +1328,7 @@ Version 4.0 (Q3 2026)
 
 See [.env.example](../.env.example) for complete configuration options.
 
-**Critical Settings**:
+**Critical Settings:**
 
 ```bash
 # Neo4j Connection
@@ -1694,7 +1362,7 @@ MCP_SERVER_PORT=8000
 
 ### Appendix B: API Reference
 
-**MCP Tools**:
+**MCP Tools:**
 
 ```python
 @mcp_server.tool()
@@ -1740,69 +1408,153 @@ async def estimate_tokens(text: str) -> str:
 
 ### Appendix C: Security Checklist
 
-Production deployment checklist:
+```mermaid
+graph TD
+    Start([Production Deployment]) --> Check1{Strong Neo4j<br/>Password?}
 
-- [ ] Strong Neo4j password (20+ chars, mixed case, special chars)
-- [ ] TLS enabled for Neo4j (neo4j+s://)
-- [ ] `ALLOW_WEAK_PASSWORDS=false`
-- [ ] `LANGCHAIN_ALLOW_DANGEROUS_REQUESTS=false`
-- [ ] `DEBUG_MODE=false` in production
-- [ ] Audit logging enabled (`AUDIT_ENABLED=true`)
-- [ ] PII redaction enabled (`AUDIT_PII_REDACTION=true`)
-- [ ] Read-only mode for public access (`READ_ONLY_MODE=true`)
-- [ ] Firewall rules configured (ports 7687, 8000)
-- [ ] Regular security updates (`docker pull` monthly)
-- [ ] Backup audit logs regularly
-- [ ] Monitor for blocked queries (security events)
+    Check1 -->|No| Fix1[Set 20+ char password<br/>Mixed case, special chars]
+    Check1 -->|Yes| Check2{TLS Enabled<br/>for Neo4j?}
+
+    Fix1 --> Check2
+
+    Check2 -->|No| Fix2[Use neo4j+s:// URI]
+    Check2 -->|Yes| Check3{Weak Passwords<br/>Disabled?}
+
+    Fix2 --> Check3
+
+    Check3 -->|No| Fix3[ALLOW_WEAK_PASSWORDS=false]
+    Check3 -->|Yes| Check4{Debug Mode<br/>Disabled?}
+
+    Fix3 --> Check4
+
+    Check4 -->|No| Fix4[DEBUG_MODE=false]
+    Check4 -->|Yes| Check5{Audit Logging<br/>Enabled?}
+
+    Fix4 --> Check5
+
+    Check5 -->|No| Fix5[AUDIT_ENABLED=true<br/>AUDIT_PII_REDACTION=true]
+    Check5 -->|Yes| Check6{Firewall<br/>Configured?}
+
+    Fix5 --> Check6
+
+    Check6 -->|No| Fix6[Configure ports 7687, 8000]
+    Check6 -->|Yes| Ready([Production Ready!])
+
+    Fix6 --> Ready
+
+    style Start fill:#e3f2fd
+    style Ready fill:#c8e6c9
+    style Check1 fill:#fff3e0
+    style Check2 fill:#fff3e0
+    style Check3 fill:#fff3e0
+    style Check4 fill:#fff3e0
+    style Check5 fill:#fff3e0
+    style Check6 fill:#fff3e0
+    style Fix1 fill:#ffebee
+    style Fix2 fill:#ffebee
+    style Fix3 fill:#ffebee
+    style Fix4 fill:#ffebee
+    style Fix5 fill:#ffebee
+    style Fix6 fill:#ffebee
+```
 
 ### Appendix D: Troubleshooting Guide
 
-Common issues and solutions:
+```mermaid
+graph TD
+    Issue[Common Issue]
 
-| Issue | Symptom | Solution |
-|-------|---------|----------|
-| **Cannot connect to Neo4j** | "Failed to establish connection" | Check NEO4J_URI, password, Neo4j is running |
-| **Weak password detected** | Server exits on startup | Set strong password or ALLOW_WEAK_PASSWORDS=true (dev only) |
-| **LLM API error** | "API key invalid" | Verify LLM_API_KEY format (sk- for OpenAI, sk-ant- for Anthropic) |
-| **Query blocked** | "Query validation failed" | Check audit logs for sanitization failure reason |
-| **High latency** | Queries take > 10s | Check LLM provider status, Neo4j indexes, network latency |
-| **Port already in use** | "Address already in use" | Change MCP_SERVER_PORT or kill conflicting process |
+    Issue --> I1{Cannot connect<br/>to Neo4j}
+    Issue --> I2{Weak password<br/>detected}
+    Issue --> I3{LLM API<br/>error}
+    Issue --> I4{Query<br/>blocked}
+    Issue --> I5{High<br/>latency}
+
+    I1 --> S1[Solution:<br/>- Check NEO4J_URI<br/>- Verify password<br/>- Ensure Neo4j running]
+
+    I2 --> S2[Solution:<br/>- Set strong password<br/>- Or ALLOW_WEAK_PASSWORDS=true<br/>(dev only)]
+
+    I3 --> S3[Solution:<br/>- Verify API key format<br/>sk- for OpenAI<br/>sk-ant- for Anthropic]
+
+    I4 --> S4[Solution:<br/>- Check audit logs<br/>- Review sanitization failure<br/>- Adjust query]
+
+    I5 --> S5[Solution:<br/>- Check LLM provider status<br/>- Verify Neo4j indexes<br/>- Check network latency]
+
+    style Issue fill:#e3f2fd
+    style I1 fill:#fff3e0
+    style I2 fill:#fff3e0
+    style I3 fill:#fff3e0
+    style I4 fill:#fff3e0
+    style I5 fill:#fff3e0
+    style S1 fill:#e8f5e9
+    style S2 fill:#e8f5e9
+    style S3 fill:#e8f5e9
+    style S4 fill:#e8f5e9
+    style S5 fill:#e8f5e9
+```
 
 ### Appendix E: Performance Tuning
 
-Optimization checklist:
+```mermaid
+graph TB
+    subgraph Neo4j["Neo4j Optimization"]
+        N1[Create indexes on<br/>frequently queried properties]
+        N2[Enable APOC plugin]
+        N3[Tune heap size<br/>4GB min, 16GB+ recommended]
+        N4[Use SSD storage<br/>10x faster than HDD]
+    end
 
-**Neo4j**:
-- [ ] Create indexes on frequently queried properties
-- [ ] Enable APOC plugin for utilities
-- [ ] Tune heap size (4GB minimum, 16GB+ recommended)
-- [ ] Use SSD storage (10x performance vs HDD)
+    subgraph MCP["MCP Server Optimization"]
+        M1[Enable schema caching<br/>(automatic)]
+        M2[Use HTTP transport<br/>(better concurrency)]
+        M3[Increase connection pool<br/>for high load]
+        M4[Monitor thread pool<br/>utilization]
+    end
 
-**MCP Server**:
-- [ ] Enable schema caching (automatic)
-- [ ] Use HTTP transport (better than stdio for concurrency)
-- [ ] Increase connection pool size for high load
-- [ ] Monitor thread pool utilization
+    subgraph LLM["LLM Provider Optimization"]
+        L1[Use temperature=0.0<br/>(deterministic)]
+        L2[Enable streaming<br/>LLM_STREAMING=true]
+        L3[Choose cost-effective models<br/>Gemini 2.5 Flash, GPT-4o-mini]
+        L4[Monitor API usage<br/>and costs]
+    end
 
-**LLM Provider**:
-- [ ] Use temperature=0.0 for deterministic queries
-- [ ] Enable streaming for better UX (`LLM_STREAMING=true`)
-- [ ] Choose cost-effective models (Gemini 2.5 Flash, GPT-4o-mini)
-- [ ] Monitor API usage and costs
+    Perf[Performance Tuning] --> Neo4j
+    Perf --> MCP
+    Perf --> LLM
+
+    style Perf fill:#e1f5ff
+    style Neo4j fill:#e8f5e9
+    style MCP fill:#fff3e0
+    style LLM fill:#f3e5f5
+```
 
 ### Appendix F: Related Documents
 
-- [README.md](../README.md) - Project overview and features
-- [QUICK_START.md](../QUICK_START.md) - 5-minute setup guide
-- [DOCKER.md](../DOCKER.md) - Docker deployment guide
-- [SECURITY.md](../SECURITY.md) - Security best practices
-- [BUSINESS_CASE.md](../BUSINESS_CASE.md) - Business value and ROI
-- [docs/LLM_PROVIDERS.md](LLM_PROVIDERS.md) - LLM configuration guide
-- [docs/ADDING_LLM_PROVIDERS.md](ADDING_LLM_PROVIDERS.md) - Add new providers
+```mermaid
+graph TB
+    SAD[Software Architecture<br/>Document SAD]
+
+    SAD --> README[README.md<br/>Project overview]
+    SAD --> QS[QUICK_START.md<br/>5-minute setup]
+    SAD --> Docker[DOCKER.md<br/>Deployment guide]
+    SAD --> Security[SECURITY.md<br/>Security practices]
+    SAD --> Business[BUSINESS_CASE.md<br/>ROI & value]
+    SAD --> Providers[LLM_PROVIDERS.md<br/>LLM configuration]
+    SAD --> Adding[ADDING_LLM_PROVIDERS.md<br/>Add new providers]
+
+    style SAD fill:#e1f5ff
+    style README fill:#e8f5e9
+    style QS fill:#fff3e0
+    style Docker fill:#f3e5f5
+    style Security fill:#ffebee
+    style Business fill:#c8e6c9
+    style Providers fill:#e3f2fd
+    style Adding fill:#bbdefb
+```
 
 ---
 
-**Document Metadata**:
+**Document Metadata:**
 - **Version**: 1.0
 - **Last Updated**: November 2025
 - **Maintained By**: Neo4j YASS MCP Team
@@ -1810,4 +1562,4 @@ Optimization checklist:
 
 ---
 
-*This document describes the production architecture as of v1.0. For future architecture evolution, see Section 11.*
+*This document describes the production architecture as of v1.0 with Mermaid diagrams for better visualization. For future architecture evolution, see Section 11.*
