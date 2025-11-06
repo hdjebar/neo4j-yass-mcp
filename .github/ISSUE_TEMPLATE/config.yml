@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security Disclosure (Private)
+    url: mailto:hdjebar@gmail.com
+    about: For critical security vulnerabilities, please report privately via email
+  - name: Documentation
+    url: https://github.com/hdjebar/neo4j-yass-mcp/tree/main/docs
+    about: Check the documentation for guides and references
+  - name: Discussions
+    url: https://github.com/hdjebar/neo4j-yass-mcp/discussions
+    about: Ask questions and discuss ideas with the community
