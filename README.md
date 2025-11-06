@@ -1,469 +1,860 @@
-# Neo4j YASS MCP Server
+# Neo4j YASS MCP
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Neo4j](https://img.shields.io/badge/Neo4j-5.x-green.svg)](https://neo4j.com/)
-[![MCP](https://img.shields.io/badge/MCP-Compatible-00ADD8)](https://modelcontextprotocol.io/)
-[![Security](https://img.shields.io/badge/Security-Hardened-red.svg)](docs/SECURITY_FIXES.md)
+**Yet Another Simple/Smart MCP Server** - A secure Model Context Protocol (MCP) server that provides Neo4j graph database querying capabilities using LangChain's GraphCypherQAChain for natural language to Cypher query translation.
 
-**YASS** (Yet Another Secure Server) - A production-ready, security-enhanced Model Context Protocol (MCP) server for Neo4j graph databases with LLM integration.
+## Features
 
----
+### Core Capabilities
+- 🔍 **Natural Language Queries**: Ask questions in plain English and get answers from your Neo4j graph
+- ⚡ **Async & Parallel Execution**: Handle multiple concurrent queries with async/await support
+- 🔌 **Multiple Transports**: stdio (local), HTTP (modern network), or SSE (legacy) modes
+- 🎯 **Automatic Port Allocation**: Intelligently finds available ports to avoid conflicts
 
-## 🎯 Overview
+### Security & Compliance
+- 🛡️ **Query Sanitization (SISO Prevention)**: Blocks Cypher injection, UTF-8 attacks, and malicious patterns
+- 🔒 **Read-Only Access Control**: Restrict to read-only queries for maximum security
+- 📝 **Comprehensive Audit Logging**: Full compliance logging for GDPR, HIPAA, SOC 2, PCI-DSS
+- 🚫 **UTF-8 Attack Prevention**: Blocks homographs, zero-width chars, directional overrides
 
-Neo4j YASS MCP Server enables Large Language Models (LLMs) to interact with Neo4j graph databases through natural language queries. It combines **LangChain's GraphCypherQAChain** with **enterprise-grade security features** including query sanitization, audit logging, and comprehensive access controls.
+### Performance & Scale
+- 📊 **Response Size Limiting**: Automatic truncation to manage LLM context limits
+- 🎛️ **Token-Based Truncation**: Smart response sizing for optimal LLM performance
+- 🔄 **Connection Pooling**: Efficient Neo4j connection management
 
-### Why YASS?
+### Developer Experience
+- 🤖 **Multiple LLM Providers**: OpenAI, Anthropic (Claude), Google Generative AI
+- 🚀 **FastMCP Framework**: Built with modern FastMCP using decorators
+- 📦 **UV Package Manager**: Fast, modern Python package management
+- 📚 **MCP Resources**: Access database schema and connection information
+- 🛠️ **MCP Tools**: Query with natural language, execute raw Cypher, refresh schema
 
-- 🔒 **Security First**: Query sanitization, UTF-8 attack prevention, weak password detection
-- 📝 **Compliance Ready**: Comprehensive audit logging with PII redaction
-- ⚡ **High Performance**: Async architecture with connection pooling and parallelization
-- 🛡️ **Defense in Depth**: Multiple security layers (sanitizer + LangChain validation + read-only mode)
-- 🎛️ **Production Ready**: Configurable, tested, and documented for enterprise deployments
-
----
-
-## ✨ Key Features
-
-### Security Features
-
-- **Query Sanitization** (SISO Prevention)
-  - Cypher injection blocking
-  - SQL injection pattern detection
-  - UTF-8/Unicode attack prevention (zero-width chars, homographs, directional overrides)
-  - Dangerous APOC procedure filtering
-  - Schema change protection
-
-- **Access Control**
-  - Read-only mode enforcement
-  - Weak password detection and blocking
-  - Configurable LangChain safety controls
-
-- **Error Handling**
-  - Sanitized error messages (prevents information leakage)
-  - Debug mode for development
-  - Full error logging to audit logs
-
-### Compliance Features
-
-- **Audit Logging**
-  - JSON/text format logs
-  - Automatic rotation (daily, weekly, size-based)
-  - Configurable retention policies
-  - Optional PII redaction
-  - Complete query/response/error tracking
-
-### Performance Features
-
-- **Async Architecture**
-  - Non-blocking I/O with asyncio
-  - ThreadPoolExecutor for sync operations
-  - Configurable worker pool size
-
-- **Connection Management**
-  - Neo4j driver connection pooling
-  - Query timeout configuration
-  - Response size limiting
-
-### LLM Integration
-
-- **Multi-Provider Support**
-  - OpenAI (GPT-4, GPT-3.5)
-  - Anthropic (Claude)
-  - Google (Gemini)
-
-- **Natural Language Queries**
-  - Automatic Cypher query generation
-  - Schema-aware query construction
-  - Response token limiting for cost control
-
----
-
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
-- Python 3.11+
-- Neo4j 5.x (Community or Enterprise)
-- Docker (optional, for containerized deployment)
+**Required:**
+- Python 3.10+ (for Python mode) OR Docker (for containerized mode)
+- **Neo4j 5.x database** (separate instance - see [Neo4j Setup](#neo4j-setup) below)
+  - **APOC plugin installed and enabled** (required for advanced operations)
+  - Bolt protocol accessible (default port 7687)
+- API key for your chosen LLM provider (OpenAI, Anthropic, or Google)
 
-### Installation
+**Optional:**
+- [UV package manager](https://github.com/astral-sh/uv) (for Python mode, recommended)
 
-#### Option 1: UV (Recommended)
+### Neo4j Setup
+
+This MCP server requires a **separate Neo4j instance** with **APOC plugin** (mandatory) and **GDS plugin** (recommended) enabled.
+
+#### Required Plugins
+
+| Plugin | Status | Purpose | Installation |
+|--------|--------|---------|--------------|
+| **APOC Core** | ✅ **MANDATORY** | Schema introspection, utilities (required by LangChain) | See options below |
+| **GDS** | ⚠️ Recommended | Graph algorithms, machine learning | See options below |
+
+#### Why These Plugins Are Required
+
+##### APOC Core (Mandatory)
+
+This MCP server uses **LangChain's Neo4jGraph** for schema introspection and query generation. LangChain internally calls APOC procedures to retrieve the graph schema:
+
+- `apoc.meta.nodeTypeProperties()` - Retrieves node labels and their properties
+- `apoc.meta.relTypeProperties()` - Retrieves relationship types and their properties
+- Schema information is essential for LLM-generated Cypher queries
+
+**What happens without APOC:**
+
+```text
+❌ Neo4jError: There is no procedure with the name `apoc.meta.nodeTypeProperties`
+❌ Schema retrieval fails → LLM cannot generate accurate Cypher queries
+❌ MCP server tools will fail to execute
+```
+
+##### GDS - Graph Data Science (Recommended)
+
+The GDS plugin enables advanced graph algorithms that enhance query capabilities:
+
+- **Pathfinding**: Shortest path, all simple paths, A* algorithm
+- **Centrality**: PageRank, betweenness, closeness (identify important nodes)
+- **Community Detection**: Louvain, Label Propagation (discover clusters)
+- **Similarity**: Node similarity, cosine similarity (recommendations)
+- **Graph Embeddings**: Node2Vec, GraphSAGE (machine learning features)
+
+**What happens without GDS:**
+
+```text
+⚠️  Advanced graph algorithms are unavailable
+⚠️  Limited to basic Cypher pattern matching
+✅  Basic MCP server functionality still works
+```
+
+##### Installation Priority
+
+1. **APOC Core** - Install first (mandatory for server operation)
+2. **GDS** - Install second (recommended for advanced analytics)
+
+---
+
+#### Option 1: Use neo4j-stack with NEO4J_PLUGINS ⭐ **RECOMMENDED**
+
+The `neo4j-stack/neo4j` service automatically downloads APOC and GDS plugins using the built-in `NEO4J_PLUGINS` environment variable:
 
 ```bash
-# Install UV package manager
+# Navigate to neo4j-stack directory
+cd ../neo4j
+
+# Start Neo4j (plugins download automatically on first startup)
+docker-compose up -d
+
+# Verify plugins are installed (wait 30-60s for Neo4j to start)
+docker-compose exec neo4j cypher-shell -u neo4j -p password123 \
+  "RETURN apoc.version() AS apoc, gds.version() AS gds;"
+```
+
+**How it works:**
+- Uses `NEO4J_PLUGINS='["apoc", "graph-data-science"]'` in [docker-compose.yml](../neo4j/docker-compose.yml#L28)
+- Plugins download automatically from Neo4j's official repository on container startup
+- Downloads are cached in `./plugins` volume for faster restarts
+- No custom Dockerfile or manual downloads needed
+
+**Configuration in docker-compose.yml:**
+```yaml
+environment:
+  NEO4J_PLUGINS: '["apoc", "graph-data-science"]'
+volumes:
+  - ./plugins:/plugins  # Persists downloaded plugins
+```
+
+**Benefits:**
+- ✅ Zero configuration - works out of the box
+- ✅ Official Neo4j feature (maintained by Neo4j Labs)
+- ✅ Automatic version matching (downloads compatible plugin versions)
+- ✅ Plugins cached in volume (no re-download on container restart)
+- ✅ No custom image build required
+- ✅ Works offline after first download (plugins persisted in `./plugins` volume)
+
+**When it needs internet:**
+- ⚠️ First container creation (downloads plugins once)
+- ⚠️ After deleting `./plugins` folder
+- ✅ No internet needed after plugins are cached in volume
+
+---
+
+#### Option 2: Manual Plugin Download to plugins/ Folder
+
+If you prefer manual control, download plugins to the `plugins/` directory:
+
+```bash
+# Navigate to neo4j-stack/neo4j directory
+cd ../neo4j
+
+# Create plugins directory
+mkdir -p plugins
+
+# Download APOC Core (MANDATORY)
+curl -L https://github.com/neo4j/apoc/releases/download/5.25.1/apoc-5.25.1-core.jar \
+  -o plugins/apoc-5.25.1-core.jar
+
+# Download GDS (RECOMMENDED)
+curl -L https://graphdatascience.ninja/neo4j-graph-data-science-2.12.1.jar \
+  -o plugins/neo4j-graph-data-science-2.12.1.jar
+
+# Start Neo4j (will mount plugins/ folder)
+docker-compose up -d
+```
+
+**Plugin Sources:**
+- APOC Core: [github.com/neo4j/apoc/releases](https://github.com/neo4j/apoc/releases)
+- GDS: [graphdatascience.ninja](https://graphdatascience.ninja/)
+
+**When to use:**
+- You need specific plugin versions (not latest compatible)
+- You want full control over plugin downloads
+- You're working offline or in air-gapped environments
+
+---
+
+#### Option 3: Custom Docker Build with Baked-In Plugins
+
+Build a custom Neo4j image with plugins pre-installed (alternative to `NEO4J_PLUGINS`):
+
+```bash
+# Navigate to neo4j-stack directory
+cd ../neo4j
+
+# Update docker-compose.yml to use the custom Dockerfile:
+# Uncomment the 'build' section and comment out 'image' line
+# See Dockerfile.custom-build-alternative for details
+
+# Build custom image
+docker-compose build
+
+# Start Neo4j (plugins already in image)
+docker-compose up -d
+```
+
+**Configuration reference:** See [Dockerfile.custom-build-alternative](../neo4j/Dockerfile.custom-build-alternative)
+
+**When to use:**
+- You need specific plugin versions (not latest compatible)
+- You want plugins baked into image (immutable infrastructure)
+- You're building for air-gapped environments (no internet at runtime)
+- You want faster container startup (plugins pre-downloaded)
+
+**Trade-offs:**
+- ✅ Faster startup (plugins pre-installed in image)
+- ✅ Works offline (no download on startup)
+- ❌ Requires custom image build step
+- ❌ More complex updates (rebuild image for new plugin versions)
+
+---
+
+#### Option 4: Standalone Neo4j with Docker
+
+```bash
+docker run -d \
+  --name neo4j \
+  -p 7474:7474 -p 7687:7687 \
+  -e NEO4J_AUTH=neo4j/password \
+  -e NEO4J_PLUGINS='["apoc", "graph-data-science"]' \
+  -v $PWD/data/neo4j/data:/data \
+  neo4j:5.25-community
+```
+
+**What `NEO4J_PLUGINS` does:**
+
+The `NEO4J_PLUGINS` environment variable is a **built-in Neo4j Docker feature** that automatically downloads and installs plugins during container startup.
+
+- **Format**: JSON array of plugin names: `'["plugin1", "plugin2"]'`
+- **When it runs**: On container startup (before Neo4j starts)
+- **Where it downloads from**: Neo4j's official plugin repository
+- **Supported plugins**: `apoc`, `apoc-core`, `graph-data-science`, `bloom`, `streams`, `n10s`
+- **Version matching**: Automatically downloads the plugin version matching your Neo4j version
+
+**How it works internally:**
+
+1. Container starts → checks `NEO4J_PLUGINS` environment variable
+2. Downloads each plugin JAR from `https://dist.neo4j.org/` (official repository)
+3. Places JAR files in `/var/lib/neo4j/plugins/` directory
+4. Configures Neo4j to enable these plugins
+5. Starts Neo4j with plugins loaded
+
+**Pros:**
+- Zero manual download required
+- Version compatibility guaranteed (matches Neo4j version)
+- Simple one-line configuration
+- Official Neo4j feature (maintained by Neo4j Labs)
+
+**Cons:**
+- Requires internet connection on container startup
+- Downloads happen every time container is created (not persisted if no volume mount)
+- Limited to plugins available in Neo4j's official repository
+- Cannot specify specific plugin versions (always uses latest compatible)
+
+**Persistence tip:**
+```bash
+# Mount plugins directory to persist downloads across container restarts
+docker run -d \
+  --name neo4j \
+  -e NEO4J_PLUGINS='["apoc", "graph-data-science"]' \
+  -v $PWD/data/neo4j/data:/data \
+  -v $PWD/data/neo4j/plugins:/plugins \  # ⭐ Persist plugins
+  neo4j:5.25-community
+```
+
+---
+
+#### Option 5: Neo4j Desktop
+
+1. Download from [neo4j.com/download](https://neo4j.com/download/)
+2. Create database
+3. Install plugins via Desktop UI:
+   - Go to database → Plugins tab
+   - Click "Install" for APOC and Graph Data Science
+
+---
+
+#### Option 6: Neo4j AuraDB (Cloud)
+
+- Sign up at [neo4j.com/cloud/aura](https://neo4j.com/cloud/aura/)
+- APOC is **pre-installed** in AuraDB
+- GDS available in Enterprise tier
+- Set `NEO4J_URI=neo4j+s://xxxxx.databases.neo4j.io` in .env
+
+---
+
+#### Verify Plugin Installation
+
+```cypher
+// Check APOC version (should return 5.25.1 or similar)
+RETURN apoc.version() AS apoc_version;
+
+// Check GDS version (should return 2.12.1 or similar)
+RETURN gds.version() AS gds_version;
+
+// List all APOC procedures (should return 100+ procedures)
+SHOW PROCEDURES YIELD name WHERE name STARTS WITH 'apoc' RETURN count(name);
+
+// List all GDS procedures (should return 50+ procedures)
+SHOW PROCEDURES YIELD name WHERE name STARTS WITH 'gds' RETURN count(name);
+```
+
+**Expected output:**
+```
+╒══════════════╕
+│apoc_version  │
+╞══════════════╡
+│"5.25.1"      │
+└──────────────┘
+
+╒═════════════╕
+│gds_version  │
+╞═════════════╡
+│"2.12.1"     │
+└─────────────┘
+```
+
+### Automated Setup (Recommended)
+
+The fastest way to get started:
+
+```bash
+# Run the automated startup script
+./run-server.sh
+
+# This will:
+# 1. Create/configure .env automatically
+# 2. Allocate free port
+# 3. Let you choose: Python/UV or Docker
+# 4. Start the server
+```
+
+### Manual Installation
+
+#### Option 1: Python/UV
+
+```bash
+# 1. Install UV
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Clone repository
-git clone https://github.com/yourusername/neo4j-yass-mcp.git
+# 2. Setup environment
 cd neo4j-yass-mcp
+cp .env.example .env
+nano .env  # Edit configuration
 
-# Create virtual environment and install
+# 3. Allocate port (optional)
+./utilities/setup-port.sh
+
+# 4. Create virtual environment
 uv venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install -e ".[all]"
-```
 
-#### Option 2: pip
+# 5. Install dependencies
+uv pip install -e .
 
-```bash
-git clone https://github.com/yourusername/neo4j-yass-mcp.git
-cd neo4j-yass-mcp
-
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install -e ".[all]"
-```
-
-#### Option 3: Docker
-
-```bash
-git clone https://github.com/yourusername/neo4j-yass-mcp.git
-cd neo4j-yass-mcp
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your settings
-
-# Start with Docker Compose
-docker compose up -d
-```
-
-### Configuration
-
-1. **Copy environment template**:
-   ```bash
-   cp .env.example .env
-   ```
-
-2. **Configure Neo4j connection**:
-   ```bash
-   NEO4J_URI=bolt://localhost:7687
-   NEO4J_USERNAME=neo4j
-   NEO4J_PASSWORD=your-strong-password  # Change this!
-   NEO4J_DATABASE=neo4j
-   ```
-
-3. **Configure LLM provider**:
-   ```bash
-   LLM_PROVIDER=openai  # or anthropic, google-genai
-   LLM_MODEL=gpt-4
-   LLM_API_KEY=sk-your-api-key-here
-   LLM_TEMPERATURE=0.0
-   ```
-
-4. **Security settings** (Production):
-   ```bash
-   # Password security
-   ALLOW_WEAK_PASSWORDS=false
-
-   # LangChain safety
-   LANGCHAIN_ALLOW_DANGEROUS_REQUESTS=false
-
-   # Error messages
-   DEBUG_MODE=false
-
-   # Query sanitization
-   SANITIZER_ENABLED=true
-   SANITIZER_STRICT_MODE=true
-
-   # Audit logging
-   AUDIT_LOG_ENABLED=true
-   AUDIT_LOG_FORMAT=json
-   AUDIT_LOG_RETENTION_DAYS=90
-   ```
-
-### Running the Server
-
-#### Stdio Mode (for Claude Desktop, local CLI)
-
-```bash
+# 6. Run server
 python server.py
 ```
 
-#### HTTP Mode (for network access)
+#### Option 2: Docker Compose
 
 ```bash
-MCP_TRANSPORT=http MCP_SERVER_HOST=0.0.0.0 MCP_SERVER_PORT=8000 python server.py
+# 1. Setup environment
+cd neo4j-yass-mcp
+cp .env.example .env
+nano .env  # Edit configuration
+
+# 2. Allocate port (optional)
+./utilities/setup-port.sh
+
+# 3. Start with Docker
+docker-compose up -d
+
+# 4. View logs
+docker-compose logs -f
 ```
 
-#### Docker
+### Essential Configuration
 
 ```bash
-docker compose up -d
-docker compose logs -f
+# Neo4j Connection
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=your-password
+
+# LLM Provider
+LLM_PROVIDER=openai  # or "anthropic", "google-genai"
+LLM_MODEL=gpt-4
+LLM_API_KEY=your-api-key-here
+
+# Security (Recommended)
+SANITIZER_ENABLED=true           # Query injection protection
+NEO4J_READ_ONLY=false            # Set to 'true' for read-only mode
+AUDIT_LOG_ENABLED=true           # Compliance logging
 ```
 
----
+### Running the Server
 
-## 📖 Usage
+**For Claude Desktop (stdio):**
+```bash
+# .env configuration
+MCP_TRANSPORT=stdio
 
-### MCP Tools
-
-The server provides the following MCP tools:
-
-#### `query_graph(query: str)`
-Query the Neo4j graph using natural language.
-
-```python
-# Example
-query_graph("Who starred in Top Gun?")
+# Run
+python server.py
 ```
 
-#### `execute_cypher(cypher_query: str, parameters: dict)`
-Execute a raw Cypher query (requires write permissions if not read-only).
+**For HTTP Mode (recommended for network):**
+```bash
+# .env configuration
+MCP_TRANSPORT=http
+MCP_SERVER_PORT=8000
+MCP_SERVER_PATH=/mcp/
 
+# Run
+python server.py
+# Server will start at http://127.0.0.1:8000/mcp/
+```
+
+**For SSE Mode (legacy):**
+```bash
+# .env configuration
+MCP_TRANSPORT=sse
+MCP_SERVER_PORT=8000
+
+# Run
+python server.py
+# Server will start at http://127.0.0.1:8000
+```
+
+## Available Tools
+
+### 1. `query_graph(query: str)`
+
+Query the Neo4j graph using natural language. The LLM automatically translates your question into Cypher.
+
+**Example:**
 ```python
-# Example
+query_graph(query="Who starred in Top Gun?")
+```
+
+**Response:**
+```json
+{
+  "question": "Who starred in Top Gun?",
+  "answer": "Tom Cruise starred in Top Gun",
+  "generated_cypher": "MATCH (a:Actor)-[:ACTED_IN]->(m:Movie {title: 'Top Gun'}) RETURN a.name",
+  "success": true
+}
+```
+
+### 2. `execute_cypher(cypher_query: str, parameters: Optional[Dict])`
+
+Execute raw Cypher queries with full control. **Hidden in read-only mode.**
+
+**Example:**
+```python
 execute_cypher(
-    "MATCH (n:Person {name: $name}) RETURN n",
-    {"name": "Tom Cruise"}
+  cypher_query="MATCH (n:Person {name: $name}) RETURN n",
+  parameters={"name": "Tom Cruise"}
 )
 ```
 
-#### `refresh_schema()`
-Refresh the cached database schema.
+### 3. `refresh_schema()`
 
-```python
-refresh_schema()
+Refresh the cached Neo4j schema after structural changes.
+
+## Available Resources
+
+### 1. `neo4j://schema`
+
+Access the current Neo4j database schema (node labels, relationships, properties).
+
+### 2. `neo4j://database-info`
+
+Get database connection information and server details.
+
+## Security Features
+
+> **SISO: "Shit In, Shit Out"** - If you accept malicious input, you get compromised output.
+
+### Query Sanitization
+
+Comprehensive protection against injection attacks:
+
+```bash
+# Enable (highly recommended!)
+SANITIZER_ENABLED=true
+SANITIZER_STRICT_MODE=false
+SANITIZER_BLOCK_NON_ASCII=false
 ```
 
-### MCP Resources
+**Protection Layers:**
+- ✅ Cypher injection detection
+- ✅ Dangerous pattern blocking (file ops, system commands)
+- ✅ Parameter validation
+- ✅ UTF-8/Unicode attack prevention (homographs, zero-width chars)
+- ✅ Query complexity limits
 
-#### `neo4j://schema`
-Get the complete Neo4j database schema.
+**📖 Detailed Documentation:** [docs/architecture/security.md](docs/architecture/security.md)
 
-#### `neo4j://database-info`
-Get database connection information.
+### Audit Logging
 
----
+Full compliance logging for regulatory requirements:
 
-## 🔒 Security
+```bash
+# Enable
+AUDIT_LOG_ENABLED=true
+AUDIT_LOG_FORMAT=json
+AUDIT_LOG_ROTATION=daily
+AUDIT_LOG_RETENTION_DAYS=90
+AUDIT_LOG_PII_REDACTION=false
+```
 
-### Security Layers
+**Use Cases:**
+- GDPR, HIPAA, SOC 2, PCI-DSS compliance
+- Security forensics and incident response
+- Performance monitoring
+- Usage analytics
 
-1. **Query Sanitizer** - Blocks malicious queries before execution
-2. **LangChain Validation** - Optional secondary validation (configurable)
-3. **Read-Only Mode** - Enforces read-only access at query level
-4. **Password Validation** - Prevents weak/default passwords
-5. **Error Sanitization** - Prevents information leakage
+**📖 Detailed Documentation:** [docs/architecture/audit-logging.md](docs/architecture/audit-logging.md)
 
-### Security Best Practices
+### Read-Only Mode
 
-✅ **Do**:
-- Use strong passwords (12+ characters, mix of types)
-- Enable audit logging in production
-- Keep `SANITIZER_ENABLED=true`
-- Set `DEBUG_MODE=false` in production
-- Review audit logs regularly
+Prevent write operations by hiding write-capable tools:
 
-❌ **Don't**:
-- Use default passwords (`password`, `password123`, `neo4j`)
-- Disable the sanitizer without additional controls
-- Set `LANGCHAIN_ALLOW_DANGEROUS_REQUESTS=true` without understanding risks
-- Expose debug error messages in production
+```bash
+NEO4J_READ_ONLY=true
+```
 
-See [SECURITY_FIXES.md](docs/SECURITY_FIXES.md) for complete security documentation.
+- `execute_cypher` tool hidden from MCP clients
+- LLM-generated write queries blocked
+- Maximum safety for production environments
 
----
+## Configuration
 
-## 🧪 Testing
+### Transport Modes
+
+**stdio (Default for local)** - For Claude Desktop and CLI tools:
+```bash
+MCP_TRANSPORT=stdio
+```
+
+**HTTP (Recommended for network)** ⭐ - Modern Streamable HTTP (MCP 2025):
+```bash
+MCP_TRANSPORT=http
+MCP_SERVER_HOST=127.0.0.1
+MCP_SERVER_PORT=8000
+MCP_SERVER_PATH=/mcp/
+MCP_SERVER_ALLOWED_HOSTS=localhost,127.0.0.1
+```
+- Full bidirectional communication
+- Multiple concurrent clients
+- Load balancing and auto-scaling support
+- Production-ready for Docker deployments
+
+**SSE (Legacy)** - Server-Sent Events for backward compatibility:
+```bash
+MCP_TRANSPORT=sse
+MCP_SERVER_HOST=127.0.0.1
+MCP_SERVER_PORT=8000
+MCP_SERVER_ALLOWED_HOSTS=localhost,127.0.0.1
+```
+- Unidirectional (server → client)
+- Consider migrating to HTTP for new deployments
+
+### LLM Providers
+
+**OpenAI:**
+```bash
+LLM_PROVIDER=openai
+LLM_MODEL=gpt-4
+LLM_API_KEY=sk-...
+```
+
+**Anthropic (Claude):**
+```bash
+LLM_PROVIDER=anthropic
+LLM_MODEL=claude-3-5-sonnet-20241022
+LLM_API_KEY=sk-ant-...
+```
+
+**Google Generative AI:**
+```bash
+LLM_PROVIDER=google-genai
+LLM_MODEL=gemini-1.5-flash
+LLM_API_KEY=...
+```
+
+### Multi-Database Support
+
+Neo4j **Enterprise Edition** supports multiple named databases. Connect to specific databases using the `NEO4J_DATABASE` environment variable.
+
+**⚠️ Note:** Neo4j Community Edition supports only ONE user database (`neo4j`).
+
+#### Single Database Selection
+
+Connect to a specific database at startup:
+
+```bash
+# Default database (works in both Community & Enterprise)
+NEO4J_DATABASE=neo4j
+
+# Custom database (Enterprise Edition only)
+NEO4J_DATABASE=analytics
+NEO4J_DATABASE=production
+```
+
+#### Multi-Instance Pattern (Recommended)
+
+Run multiple MCP server instances, each connected to a different database:
+
+**Using docker-compose.multi-instance.yml:**
+```bash
+# Start all instances (analytics, production, dev)
+docker-compose -f docker-compose.multi-instance.yml up -d
+
+# Access different databases:
+# - Analytics:  http://localhost:8001/mcp/
+# - Production: http://localhost:8002/mcp/ (read-only)
+# - Development: http://localhost:8003/mcp/
+```
+
+**Manual multi-instance:**
+```bash
+# Instance 1: Analytics database
+NEO4J_DATABASE=analytics MCP_SERVER_PORT=8001 python server.py
+
+# Instance 2: Production database (read-only)
+NEO4J_DATABASE=production NEO4J_READ_ONLY=true MCP_SERVER_PORT=8002 python server.py
+
+# Instance 3: Development database
+NEO4J_DATABASE=dev MCP_SERVER_PORT=8003 python server.py
+```
+
+#### Community Edition Workarounds
+
+##### Option 1: Label-Based Separation (within single database)
+
+```cypher
+// Separate data using labels
+CREATE (:Analytics:Product {name: "Widget"})
+CREATE (:Production:Product {name: "Gadget"})
+
+// Query specific domain
+MATCH (p:Analytics:Product) RETURN p
+```
+
+##### Option 2: DozerDB Plugin
+
+- Adds multi-database support to Community Edition
+- Install: Add `dozerdb` to Neo4j plugins
+- See: [DozerDB Documentation](https://github.com/dozerdb/dozerdb-community)
+
+### Performance Tuning
+
+```bash
+# Response size limiting
+NEO4J_RESPONSE_TOKEN_LIMIT=10000  # Truncate large responses
+
+# Async workers
+MCP_MAX_WORKERS=10  # Concurrent query execution threads
+
+# Neo4j timeout
+NEO4J_READ_TIMEOUT=30  # Query timeout in seconds
+```
+
+### Logging
+
+```bash
+LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+LOG_FORMAT=%(asctime)s - %(name)s - %(levelname)s - %(message)s
+```
+
+## Complete Configuration Reference
+
+See [.env.example](.env.example) for all available configuration options with detailed comments.
+
+## Architecture
+
+### High-Level Overview
+
+```
+MCP Client (Claude Desktop, web apps, etc.)
+    ↓
+FastMCP Server (stdio/HTTP/SSE transport)
+    ↓
+Security Layer (Sanitizer + Read-Only Check)
+    ↓
+Audit Logger (Compliance)
+    ↓
+LangChain GraphCypherQAChain (NL → Cypher)
+    ↓
+Neo4j Graph Database
+```
+
+### Key Components
+
+- **FastMCP**: MCP protocol implementation with decorators
+- **LangChain**: Natural language to Cypher translation (GraphCypherQAChain)
+- **Query Sanitizer**: Multi-layer injection prevention ([utilities/sanitizer.py](utilities/sanitizer.py))
+- **Audit Logger**: Compliance logging ([utilities/audit_logger.py](utilities/audit_logger.py))
+- **Async Executor**: Thread pool for parallel Neo4j queries
+- **Response Limiter**: Token-based truncation for LLM context management
+
+### Security Architecture
+
+**📖 Detailed Documentation:** [docs/architecture/security.md](docs/architecture/security.md)
+
+**Defense in Depth:**
+1. Input sanitization (injection prevention)
+2. Access control (read-only mode)
+3. Runtime validation (Cypher analysis)
+4. Audit logging (forensics)
+5. Response limiting (data exfiltration prevention)
+
+## Example Workflows
+
+### Natural Language Query
+
+```
+User: "Show me all actors who worked with Tom Cruise"
+    ↓
+query_graph() tool
+    ↓
+Sanitizer validates query
+    ↓
+LangChain generates: MATCH (a:Actor)-[:ACTED_IN]->(:Movie)<-[:ACTED_IN]-(tc:Actor {name: 'Tom Cruise'}) RETURN a.name
+    ↓
+Sanitizer validates generated Cypher
+    ↓
+Execute in Neo4j
+    ↓
+Return results + generated Cypher
+```
+
+### Direct Cypher Execution
+
+```
+User: Execute custom Cypher with parameters
+    ↓
+execute_cypher(query, parameters)
+    ↓
+Sanitizer validates query + parameters
+    ↓
+Read-only check (if enabled)
+    ↓
+Execute in Neo4j
+    ↓
+Audit log: query + response + execution time
+    ↓
+Return results
+```
+
+## Development
+
+### Install Development Dependencies
+
+```bash
+uv pip install -e ".[dev]"
+```
 
 ### Run Tests
 
 ```bash
-# All tests
-make test
-
-# With coverage
-make test-cov
-
-# Specific tests
-pytest tests/test_utf8_attacks.py -v
+pytest tests/
 ```
 
-### Security Testing
+### Format Code
 
 ```bash
-# Test UTF-8 attack prevention
-python tests/test_utf8_attacks.py
-
-# Test weak password detection
-NEO4J_PASSWORD=password123 python server.py  # Should fail
-
-# Test read-only mode
-NEO4J_READ_ONLY=true python server.py
+black .
+ruff check .
 ```
 
----
+## Troubleshooting
 
-## 🛠️ Development
+### Neo4j Connection Issues
 
-### Development Setup
+1. Verify Neo4j is running: `neo4j status`
+2. Check URI format: `bolt://localhost:7687`
+3. Verify credentials in `.env`
+4. Check firewall settings
 
-```bash
-# Install with development dependencies
-uv pip install -e ".[dev]"
+### LLM API Issues
 
-# Run linters
-make lint
+1. Verify API key is set correctly
+2. Check provider and model names
+3. Review LLM provider quotas/limits
+4. Check network connectivity
 
-# Auto-fix linting issues
-make lint-fix
+### Schema Not Loading
 
-# Format code
-make format
+1. Run `refresh_schema()` tool
+2. Check Neo4j database has data
+3. Verify database name in `NEO4J_DATABASE`
+4. Check Neo4j user permissions
 
-# Security checks
-make security
-```
+### Sanitizer Blocking Valid Queries
 
-### Available Make Commands
+1. Review blocked pattern in error message
+2. Adjust `SANITIZER_STRICT_MODE` if too restrictive
+3. Enable specific features: `SANITIZER_ALLOW_APOC=true`
+4. Check audit logs for details
 
-```bash
-make install-dev    # Install all dev dependencies
-make test           # Run all tests
-make test-cov       # Run tests with coverage
-make lint           # Run linters (ruff + mypy)
-make lint-fix       # Auto-fix linting issues
-make format         # Format code
-make security       # Run security checks
-make docker-up      # Start Docker services
-make docker-logs    # View Docker logs
-make clean          # Clean build artifacts
-```
-
----
-
-## 📊 Configuration Reference
-
-### Environment Variables
-
-#### Core Settings
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MCP_TRANSPORT` | `stdio` | Transport mode: `stdio`, `http`, `sse` |
-| `MCP_SERVER_HOST` | `127.0.0.1` | Server host (for http/sse) |
-| `MCP_SERVER_PORT` | `8000` | Server port (for http/sse) |
-
-#### Neo4j Connection
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `NEO4J_URI` | `bolt://localhost:7687` | Neo4j connection URI |
-| `NEO4J_USERNAME` | `neo4j` | Database username |
-| `NEO4J_PASSWORD` | `password` | Database password (change this!) |
-| `NEO4J_DATABASE` | `neo4j` | Database name |
-| `NEO4J_READ_TIMEOUT` | `30` | Query timeout (seconds) |
-
-#### Security
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ALLOW_WEAK_PASSWORDS` | `false` | Allow weak passwords (dev only) |
-| `LANGCHAIN_ALLOW_DANGEROUS_REQUESTS` | `false` | Bypass LangChain safety |
-| `DEBUG_MODE` | `false` | Detailed error messages |
-| `SANITIZER_ENABLED` | `true` | Enable query sanitization |
-| `SANITIZER_STRICT_MODE` | `false` | Block suspicious patterns |
-| `NEO4J_READ_ONLY` | `false` | Read-only mode |
-
-#### LLM
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `LLM_PROVIDER` | `openai` | Provider: `openai`, `anthropic`, `google-genai` |
-| `LLM_MODEL` | `gpt-4` | Model name |
-| `LLM_API_KEY` | - | API key (required) |
-| `LLM_TEMPERATURE` | `0.0` | Temperature (0.0-1.0) |
-
-See [.env.example](.env.example) for complete configuration options.
-
----
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 neo4j-yass-mcp/
-├── server.py              # Main MCP server
-├── config.py              # Configuration and LLM setup
-├── utilities/             # Security and logging utilities
-│   ├── __init__.py
-│   ├── sanitizer.py       # Query sanitization
-│   └── audit_logger.py    # Audit logging
-├── tests/                 # Test suite
-│   ├── __init__.py
-│   └── test_utf8_attacks.py
-├── docs/                  # Documentation
-│   ├── SECURITY_FIXES.md
-│   └── FIXES_APPLIED.md
-├── .env.example           # Environment template
-├── docker-compose.yml     # Docker deployment
-├── pyproject.toml         # Python package config
-├── Makefile               # Development commands
-└── README.md              # This file
+├── server.py                    # Main MCP server
+├── config.py                    # Configuration and LLM setup
+├── utilities/
+│   ├── sanitizer.py             # Query sanitization (SISO prevention)
+│   ├── audit_logger.py          # Audit logging (compliance)
+│   └── setup-port.sh            # Automatic port allocation
+├── docs/
+│   └── architecture/
+│       ├── security.md          # Security architecture
+│       ├── audit-logging.md     # Audit logging details
+│       └── docker-deployment.md # Docker deployment guide
+├── Dockerfile                   # Container image definition
+├── docker-compose.yml           # Multi-container orchestration
+├── .dockerignore                # Docker build exclusions
+├── run-server.sh                # Automated startup script
+├── .env.example                 # Configuration template
+├── pyproject.toml               # Package dependencies
+└── README.md                    # This file
 ```
 
----
+## Contributing
 
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these guidelines:
-
+Contributions welcome! Please:
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Follow existing code style
-4. Add tests for new functionality
-5. Update documentation
-6. Commit with clear messages
-7. Push to your branch
-8. Open a Pull Request
+2. Create a feature branch
+3. Add tests for new features
+4. Ensure all tests pass
+5. Submit a pull request
 
-See our [Code of Conduct](CODE_OF_CONDUCT.md) and [Contributing Guide](CONTRIBUTING.md).
+## License
 
----
+MIT License - See LICENSE file for details
 
-## 📝 License
+## Resources
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+- [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
+- [FastMCP Documentation](https://github.com/jlowin/fastmcp)
+- [Neo4j Documentation](https://neo4j.com/docs/)
+- [LangChain Documentation](https://python.langchain.com/)
 
----
+## Security Disclosure
 
-## 🙏 Acknowledgments
-
-- [Neo4j](https://neo4j.com/) - Graph database platform
-- [LangChain](https://python.langchain.com/) - LLM integration framework
-- [FastMCP](https://github.com/jlowin/fastmcp) - MCP server framework
-- [Model Context Protocol](https://modelcontextprotocol.io/) - MCP specification
+For security issues, please email security@[your-domain] instead of using the public issue tracker.
 
 ---
 
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/yourusername/neo4j-yass-mcp/issues)
-- **Documentation**: [docs/](docs/)
-- **Security**: See [SECURITY.md](SECURITY.md) for reporting vulnerabilities
-
----
-
-## 🗺️ Roadmap
-
-### Short Term
-- [ ] Rate limiting for API endpoints
-- [ ] Query timeout configuration
-- [ ] Connection pool size limits
-- [ ] Integration tests
-
-### Medium Term
-- [ ] Query result caching
-- [ ] Prometheus metrics
-- [ ] Automated security scanning
-- [ ] Performance benchmarking
-
-### Long Term
-- [ ] JWT authentication
-- [ ] OAuth2/OIDC support
-- [ ] Role-based access control (RBAC)
-- [ ] Multi-tenancy support
-
----
-
-**Built with ❤️ for secure LLM-powered graph database applications**
+**📖 For detailed documentation:**
+- Security Architecture: [docs/architecture/security.md](docs/architecture/security.md)
+- Audit Logging: [docs/architecture/audit-logging.md](docs/architecture/audit-logging.md)
+- Docker Deployment: [docs/architecture/docker-deployment.md](docs/architecture/docker-deployment.md)
+- Configuration Reference: [.env.example](.env.example)
