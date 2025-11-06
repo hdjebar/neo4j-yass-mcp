@@ -21,6 +21,7 @@ class LLMConfig:
     model: str
     temperature: float
     api_key: str
+    streaming: bool = False  # Enable token-by-token streaming
 
 
 def configure_logging():
@@ -167,7 +168,8 @@ def chatLLM(config: LLMConfig) -> Any:
         return ChatOpenAI(
             model=config.model,
             temperature=config.temperature,
-            openai_api_key=config.api_key
+            openai_api_key=config.api_key,
+            streaming=config.streaming
         )
 
     elif config.provider == "anthropic":
@@ -175,7 +177,8 @@ def chatLLM(config: LLMConfig) -> Any:
         return ChatAnthropic(
             model=config.model,
             temperature=config.temperature,
-            anthropic_api_key=config.api_key
+            anthropic_api_key=config.api_key,
+            streaming=config.streaming
         )
 
     elif config.provider == "google-genai":
@@ -183,7 +186,8 @@ def chatLLM(config: LLMConfig) -> Any:
         return ChatGoogleGenerativeAI(
             model=config.model,
             temperature=config.temperature,
-            google_api_key=config.api_key
+            google_api_key=config.api_key,
+            streaming=config.streaming
         )
 
     else:

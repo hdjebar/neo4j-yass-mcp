@@ -343,7 +343,8 @@ def initialize_neo4j():
         provider=os.getenv("LLM_PROVIDER", "openai"),
         model=os.getenv("LLM_MODEL", "gpt-4"),
         temperature=float(os.getenv("LLM_TEMPERATURE", "0")),
-        api_key=os.getenv("LLM_API_KEY", "")
+        api_key=os.getenv("LLM_API_KEY", ""),
+        streaming=os.getenv("LLM_STREAMING", "false").lower() == "true"
     )
 
     logger.info(f"Initializing LLM: {llm_config.provider}/{llm_config.model}")
