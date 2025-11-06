@@ -1,0 +1,324 @@
+version: '3.8'
+
+# Multi-Instance Deployment Example
+#
+# This configuration demonstrates how to run multiple Neo4j YASS MCP server instances,
+# each connected to a different Neo4j database (Enterprise Edition required for multiple databases).
+#
+# Use Cases:
+# - Separate databases for different environments (dev, staging, prod)
+# - Different databases for different data domains (analytics, transactional, archive)
+# - Multi-tenant architecture with database-per-tenant
+#
+# Prerequisites:
+# - Neo4j Enterprise Edition with multiple databases configured
+# - Each database must exist in Neo4j before starting MCP servers
+# - APOC plugin installed in Neo4j
+#
+# Usage:
+#   docker-compose -f docker-compose.multi-instance.yml up -d
+
+services:
+  # =============================================================================
+  # MCP Server Instance 1: Analytics Database
+  # =============================================================================
+  mcp-analytics:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: neo4j-yass-mcp-analytics
+    restart: unless-stopped
+
+    ports:
+      - "8001:8001"
+
+    environment:
+      # Transport Configuration
+      MCP_TRANSPORT: http
+      MCP_SERVER_HOST: 0.0.0.0
+      MCP_SERVER_PORT: 8001
+      MCP_SERVER_PATH: /mcp/
+
+      # Security
+      MCP_SERVER_ALLOWED_HOSTS: localhost,127.0.0.1
+      MCP_SERVER_ALLOW_ORIGINS: ""
+
+      # Logging
+      LOG_LEVEL: INFO
+      LOG_FORMAT: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+      # Neo4j Connection - Analytics Database
+      NEO4J_URI: ${NEO4J_URI:-bolt://neo4j:7687}
+      NEO4J_USERNAME: ${NEO4J_USERNAME:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-password}
+      NEO4J_DATABASE: analytics                      # ⭐ Analytics database
+      NEO4J_READ_TIMEOUT: 30
+      NEO4J_READ_ONLY: false
+
+      # LLM Provider
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4}
+      LLM_TEMPERATURE: 0.0
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_STREAMING: false
+
+      # Performance
+      MCP_MAX_WORKERS: 10
+
+      # Security - Sanitization
+      SANITIZER_ENABLED: true
+      SANITIZER_STRICT_MODE: false
+      SANITIZER_ALLOW_APOC: false
+      SANITIZER_ALLOW_SCHEMA_CHANGES: false
+
+      # Compliance - Audit Logging
+      AUDIT_LOG_ENABLED: true
+      AUDIT_LOG_DIR: ./logs/audit
+      AUDIT_LOG_FORMAT: json
+      AUDIT_LOG_RETENTION_DAYS: 90
+
+    volumes:
+      - ./data/logs/analytics:/app/logs
+      - ./.env:/app/.env:ro
+
+    networks:
+      - mcp-network
+      - neo4j-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import sys,os; sys.exit(0 if any(\"server.py\" in str(p) for p in os.popen(\"ps aux\").readlines()) else 1)' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+    labels:
+      com.neo4j-stack.service: "mcp-server"
+      com.neo4j-stack.instance: "analytics"
+      com.neo4j-stack.database: "analytics"
+
+  # =============================================================================
+  # MCP Server Instance 2: Production Database
+  # =============================================================================
+  mcp-production:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: neo4j-yass-mcp-production
+    restart: unless-stopped
+
+    ports:
+      - "8002:8002"
+
+    environment:
+      # Transport Configuration
+      MCP_TRANSPORT: http
+      MCP_SERVER_HOST: 0.0.0.0
+      MCP_SERVER_PORT: 8002
+      MCP_SERVER_PATH: /mcp/
+
+      # Security
+      MCP_SERVER_ALLOWED_HOSTS: localhost,127.0.0.1
+      MCP_SERVER_ALLOW_ORIGINS: ""
+
+      # Logging
+      LOG_LEVEL: INFO
+      LOG_FORMAT: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+      # Neo4j Connection - Production Database
+      NEO4J_URI: ${NEO4J_URI:-bolt://neo4j:7687}
+      NEO4J_USERNAME: ${NEO4J_USERNAME:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-password}
+      NEO4J_DATABASE: production                     # ⭐ Production database
+      NEO4J_READ_TIMEOUT: 30
+      NEO4J_READ_ONLY: true                          # 🔒 Read-only for safety
+
+      # LLM Provider
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4}
+      LLM_TEMPERATURE: 0.0
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_STREAMING: false
+
+      # Performance
+      MCP_MAX_WORKERS: 10
+
+      # Security - Sanitization (strict mode for production)
+      SANITIZER_ENABLED: true
+      SANITIZER_STRICT_MODE: true                    # 🔒 Strict mode enabled
+      SANITIZER_ALLOW_APOC: false
+      SANITIZER_ALLOW_SCHEMA_CHANGES: false
+
+      # Compliance - Audit Logging
+      AUDIT_LOG_ENABLED: true
+      AUDIT_LOG_DIR: ./logs/audit
+      AUDIT_LOG_FORMAT: json
+      AUDIT_LOG_RETENTION_DAYS: 90
+
+    volumes:
+      - ./data/logs/production:/app/logs
+      - ./.env:/app/.env:ro
+
+    networks:
+      - mcp-network
+      - neo4j-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import sys,os; sys.exit(0 if any(\"server.py\" in str(p) for p in os.popen(\"ps aux\").readlines()) else 1)' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+    labels:
+      com.neo4j-stack.service: "mcp-server"
+      com.neo4j-stack.instance: "production"
+      com.neo4j-stack.database: "production"
+
+  # =============================================================================
+  # MCP Server Instance 3: Development Database
+  # =============================================================================
+  mcp-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: neo4j-yass-mcp-dev
+    restart: unless-stopped
+
+    ports:
+      - "8003:8003"
+
+    environment:
+      # Transport Configuration
+      MCP_TRANSPORT: http
+      MCP_SERVER_HOST: 0.0.0.0
+      MCP_SERVER_PORT: 8003
+      MCP_SERVER_PATH: /mcp/
+
+      # Security
+      MCP_SERVER_ALLOWED_HOSTS: localhost,127.0.0.1
+      MCP_SERVER_ALLOW_ORIGINS: ""
+
+      # Logging
+      LOG_LEVEL: DEBUG                               # 🐛 Debug logging for dev
+      LOG_FORMAT: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+      # Neo4j Connection - Development Database
+      NEO4J_URI: ${NEO4J_URI:-bolt://neo4j:7687}
+      NEO4J_USERNAME: ${NEO4J_USERNAME:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-password}
+      NEO4J_DATABASE: dev                            # ⭐ Development database
+      NEO4J_READ_TIMEOUT: 30
+      NEO4J_READ_ONLY: false                         # ✅ Write access for development
+
+      # LLM Provider
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4}
+      LLM_TEMPERATURE: 0.0
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_STREAMING: false
+
+      # Performance
+      MCP_MAX_WORKERS: 10
+
+      # Security - Sanitization (relaxed for development)
+      SANITIZER_ENABLED: true
+      SANITIZER_STRICT_MODE: false                   # ⚠️ Relaxed for dev
+      SANITIZER_ALLOW_APOC: true                     # ✅ APOC allowed in dev
+      SANITIZER_ALLOW_SCHEMA_CHANGES: true           # ✅ Schema changes allowed in dev
+
+      # Compliance - Audit Logging (optional in dev)
+      AUDIT_LOG_ENABLED: false                       # Disabled in dev for simplicity
+      AUDIT_LOG_DIR: ./logs/audit
+      AUDIT_LOG_FORMAT: json
+
+    volumes:
+      - ./data/logs/dev:/app/logs
+      - ./.env:/app/.env:ro
+
+    networks:
+      - mcp-network
+      - neo4j-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import sys,os; sys.exit(0 if any(\"server.py\" in str(p) for p in os.popen(\"ps aux\").readlines()) else 1)' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+    labels:
+      com.neo4j-stack.service: "mcp-server"
+      com.neo4j-stack.instance: "dev"
+      com.neo4j-stack.database: "dev"
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  mcp-network:
+    driver: bridge
+    name: mcp-network
+
+  neo4j-network:
+    external: true
+    name: neo4j-stack
+    # This network must exist (created by ../neo4j/docker-compose.yml)
+    # Or create manually: docker network create neo4j-stack
+
+# =============================================================================
+# USAGE INSTRUCTIONS
+# =============================================================================
+#
+# 1. Prerequisites:
+#    - Neo4j Enterprise Edition running with multiple databases
+#    - Create databases in Neo4j:
+#      CREATE DATABASE analytics;
+#      CREATE DATABASE production;
+#      CREATE DATABASE dev;
+#
+# 2. Start all instances:
+#    docker-compose -f docker-compose.multi-instance.yml up -d
+#
+# 3. Access different databases:
+#    - Analytics:  http://localhost:8001/mcp/
+#    - Production: http://localhost:8002/mcp/
+#    - Development: http://localhost:8003/mcp/
+#
+# 4. Check status:
+#    docker-compose -f docker-compose.multi-instance.yml ps
+#
+# 5. View logs:
+#    docker-compose -f docker-compose.multi-instance.yml logs -f mcp-analytics
+#    docker-compose -f docker-compose.multi-instance.yml logs -f mcp-production
+#    docker-compose -f docker-compose.multi-instance.yml logs -f mcp-dev
+#
+# 6. Stop all instances:
+#    docker-compose -f docker-compose.multi-instance.yml down
+#
+# =============================================================================
+# CONFIGURATION DIFFERENCES BY INSTANCE
+# =============================================================================
+#
+# Analytics Instance (Port 8001):
+#   - Database: analytics
+#   - Read-only: false (write access for data loading)
+#   - Sanitizer: enabled, normal mode
+#   - Audit logging: enabled
+#   - Log level: INFO
+#
+# Production Instance (Port 8002):
+#   - Database: production
+#   - Read-only: true (🔒 READ-ONLY for safety)
+#   - Sanitizer: enabled, STRICT MODE
+#   - Audit logging: enabled
+#   - Log level: INFO
+#
+# Development Instance (Port 8003):
+#   - Database: dev
+#   - Read-only: false (full write access)
+#   - Sanitizer: enabled, relaxed (allows APOC, schema changes)
+#   - Audit logging: disabled
+#   - Log level: DEBUG
+#
+# =============================================================================

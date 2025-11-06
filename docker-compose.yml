@@ -1,0 +1,167 @@
+version: '3.8'
+
+# Neo4j YASS MCP Server
+# Separation of Concerns: Neo4j should be managed separately
+# See README.md for Neo4j prerequisites
+
+services:
+  neo4j-yass-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: neo4j-yass-mcp
+    restart: unless-stopped
+
+    ports:
+      - "${MCP_SERVER_PORT:-8000}:8000"
+
+    environment:
+      # Transport Configuration
+      # Default: http (modern Streamable HTTP - recommended for Docker/production)
+      # Options: stdio (local), http (modern network), sse (legacy network)
+      MCP_TRANSPORT: ${MCP_TRANSPORT:-http}
+      MCP_SERVER_HOST: ${MCP_SERVER_HOST:-0.0.0.0}
+      MCP_SERVER_PORT: ${MCP_SERVER_PORT:-8000}
+      MCP_SERVER_PATH: ${MCP_SERVER_PATH:-/mcp/}
+
+      # Security
+      MCP_SERVER_ALLOWED_HOSTS: ${MCP_SERVER_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      MCP_SERVER_ALLOW_ORIGINS: ${MCP_SERVER_ALLOW_ORIGINS:-}
+
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-%(asctime)s - %(name)s - %(levelname)s - %(message)s}
+
+      # Neo4j Connection (External Instance Required)
+      # Default: bolt://neo4j:7687 (Docker service name in neo4j-stack network)
+      # For host Neo4j: bolt://host.docker.internal:7687
+      NEO4J_URI: ${NEO4J_URI:-bolt://neo4j:7687}
+      NEO4J_USERNAME: ${NEO4J_USERNAME:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-password}
+      NEO4J_DATABASE: ${NEO4J_DATABASE:-neo4j}
+      NEO4J_READ_TIMEOUT: ${NEO4J_READ_TIMEOUT:-30}
+      NEO4J_READ_ONLY: ${NEO4J_READ_ONLY:-false}
+      NEO4J_RESPONSE_TOKEN_LIMIT: ${NEO4J_RESPONSE_TOKEN_LIMIT:-}
+
+      # LLM Provider
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.0}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_STREAMING: ${LLM_STREAMING:-false}
+
+      # Performance
+      MCP_MAX_WORKERS: ${MCP_MAX_WORKERS:-10}
+
+      # Security - Query Sanitization (SISO Prevention)
+      SANITIZER_ENABLED: ${SANITIZER_ENABLED:-true}
+      SANITIZER_STRICT_MODE: ${SANITIZER_STRICT_MODE:-false}
+      SANITIZER_ALLOW_APOC: ${SANITIZER_ALLOW_APOC:-false}
+      SANITIZER_ALLOW_SCHEMA_CHANGES: ${SANITIZER_ALLOW_SCHEMA_CHANGES:-false}
+      SANITIZER_MAX_QUERY_LENGTH: ${SANITIZER_MAX_QUERY_LENGTH:-10000}
+      SANITIZER_BLOCK_NON_ASCII: ${SANITIZER_BLOCK_NON_ASCII:-false}
+
+      # Compliance - Audit Logging
+      AUDIT_LOG_ENABLED: ${AUDIT_LOG_ENABLED:-false}
+      AUDIT_LOG_DIR: ${AUDIT_LOG_DIR:-./logs/audit}
+      AUDIT_LOG_FORMAT: ${AUDIT_LOG_FORMAT:-json}
+      AUDIT_LOG_ROTATION: ${AUDIT_LOG_ROTATION:-daily}
+      AUDIT_LOG_MAX_SIZE_MB: ${AUDIT_LOG_MAX_SIZE_MB:-100}
+      AUDIT_LOG_RETENTION_DAYS: ${AUDIT_LOG_RETENTION_DAYS:-90}
+      AUDIT_LOG_QUERIES: ${AUDIT_LOG_QUERIES:-true}
+      AUDIT_LOG_RESPONSES: ${AUDIT_LOG_RESPONSES:-true}
+      AUDIT_LOG_ERRORS: ${AUDIT_LOG_ERRORS:-true}
+      AUDIT_LOG_PII_REDACTION: ${AUDIT_LOG_PII_REDACTION:-false}
+
+    volumes:
+      # Mount logs directory for persistence (bind mount)
+      - ./data/logs:/app/logs
+
+      # Optional: Mount .env for dynamic config (read-only)
+      - ./.env:/app/.env:ro
+
+    networks:
+      - neo4j-stack
+
+    # Note: Use host network mode if Neo4j is on localhost (disables custom networks)
+    # network_mode: "host"  # Uncomment for localhost Neo4j access
+
+    healthcheck:
+      # Check if server process is running using Python (always available)
+      # For http/sse modes: verifies port is listening
+      # For stdio mode: verifies process exists
+      test: ["CMD-SHELL", "python -c 'import sys,os; sys.exit(0 if any(\"server.py\" in str(p) for p in os.popen(\"ps aux\").readlines()) else 1)' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+    labels:
+      com.neo4j-stack.service: "mcp-server"
+      com.neo4j-stack.description: "Neo4j YASS MCP Server"
+
+networks:
+  neo4j-stack:
+    external: true
+
+# IMPORTANT: Neo4j Database Setup (Separate Instance Required)
+#
+# This docker-compose.yml does NOT include Neo4j (separation of concerns).
+# You must run Neo4j separately with the following requirements:
+#
+# Prerequisites:
+# 1. Neo4j 5.x instance running (local, Docker, or cloud)
+# 2. APOC plugin installed (required for advanced operations)
+# 3. Network access from MCP server to Neo4j
+# 4. Bolt protocol enabled (default port 7687)
+#
+# Quick Setup Options:
+#
+# Option 1: Use existing neo4j-stack
+#   cd ../neo4j && docker-compose up -d
+#
+# Option 2: Standalone Neo4j with Docker
+#   docker run -d \
+#     --name neo4j \
+#     -p 7474:7474 -p 7687:7687 \
+#     -e NEO4J_AUTH=neo4j/password \
+#     -e NEO4J_PLUGINS='["apoc"]' \
+#     -v $PWD/data/neo4j/data:/data \
+#     neo4j:5.15
+#
+# Option 3: Neo4j Desktop
+#   Download from https://neo4j.com/download/
+#   Create database with APOC plugin
+#
+# Option 4: Neo4j AuraDB (Cloud)
+#   https://neo4j.com/cloud/aura/
+#   Set NEO4J_URI=neo4j+s://xxxxx.databases.neo4j.io
+#
+# Configuration:
+# Update .env with your Neo4j connection details:
+#   NEO4J_URI=bolt://localhost:7687  # or your Neo4j URI
+#   NEO4J_USERNAME=neo4j
+#   NEO4J_PASSWORD=your-password
+#
+# Network Configuration:
+#
+# 1. Neo4j on localhost (host machine):
+#    - Uncomment network_mode: "host" in the service
+#    - Set NEO4J_URI=bolt://localhost:7687
+#
+# 2. Neo4j in external docker-compose stack:
+#    - Uncomment neo4j-network in networks section
+#    - Uncomment "- neo4j-network" under service networks
+#    - Set NEO4J_URI=bolt://neo4j:7687 (use container name)
+#    - Update neo4j-network name to match your Neo4j stack
+#
+# 3. Neo4j in separate Docker container (same bridge):
+#    - Use docker network connect to add MCP container to Neo4j network
+#    - Set NEO4J_URI=bolt://neo4j:7687
+#
+# 4. Neo4j AuraDB (cloud):
+#    - No network changes needed (uses internet)
+#    - Set NEO4J_URI=neo4j+s://xxxxx.databases.neo4j.io
+#
+# Verify APOC Installation:
+#   RETURN apoc.version()  # Should return version number
