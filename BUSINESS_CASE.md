@@ -553,6 +553,477 @@ curl http://localhost:8000/health
 
 ---
 
+## Future Roadmap
+
+### 🔄 Conversational Query Refinement (Q1 2026)
+
+**Current State:** Single-turn query execution
+```
+User: "Show me customers"
+  ↓
+Server: [Returns results]
+```
+
+**Future State:** Multi-turn conversational refinement
+```
+User: "Show me customers"
+  ↓
+Server: "I found 10,000 customers. Would you like to filter by:
+         - Location?
+         - Purchase history?
+         - Registration date?"
+  ↓
+User: "Last 30 days, in California"
+  ↓
+Server: [Refined query with context from previous turn]
+  ↓
+Results: 47 customers
+```
+
+**Technical Approach:**
+```python
+# Stateful conversation tracking
+@dataclass
+class ConversationContext:
+    session_id: str
+    query_history: List[str]
+    cypher_history: List[str]
+    schema_context: Dict[str, Any]
+    user_preferences: Dict[str, Any]
+
+# Multi-turn refinement
+async def query_with_refinement(query: str, context: ConversationContext):
+    # 1. Generate initial Cypher with conversation history
+    # 2. Execute and analyze results
+    # 3. Suggest refinements based on result patterns
+    # 4. Allow user to refine with natural language
+    # 5. Update context for next turn
+```
+
+**Benefits:**
+- ✅ Better query accuracy through iteration
+- ✅ Natural exploration workflow
+- ✅ Learn user preferences over time
+- ✅ Context-aware suggestions
+- ✅ Reduced cognitive load (no need to be precise first time)
+
+**Use Case Example:**
+```
+Analyst: "Show me fraud patterns"
+Server: "Found 3 pattern types. Most common is multi-account transfers (342 cases).
+         Would you like to:
+         1. See geographic distribution
+         2. Filter by amount threshold
+         3. Show temporal patterns"
+
+Analyst: "Show temporal patterns"
+Server: "Spike detected on weekends. 78% of cases occur Friday-Sunday.
+         Dig deeper into weekend patterns?"
+
+Analyst: "Yes, focus on amounts over $10k"
+Server: [Refined query combining all context]
+```
+
+---
+
+### 🗄️ Multi-Database Support (Q2 2026)
+
+**Current State:** One MCP server instance per Neo4j database
+
+**Future State:** Single server managing multiple databases
+
+#### Architecture
+
+```python
+# Multi-database configuration
+@dataclass
+class DatabaseConfig:
+    name: str              # Logical name (e.g., "customers", "products")
+    uri: str               # bolt://neo4j-customers:7687
+    database: str          # Neo4j database name
+    credentials: Tuple[str, str]
+    schema_cache: Optional[Dict] = None
+
+# Server configuration
+databases = {
+    "customers": DatabaseConfig(
+        uri="bolt://neo4j-prod-1:7687",
+        database="customer_db"
+    ),
+    "products": DatabaseConfig(
+        uri="bolt://neo4j-prod-2:7687",
+        database="product_catalog"
+    ),
+    "analytics": DatabaseConfig(
+        uri="bolt://neo4j-analytics:7687",
+        database="metrics"
+    )
+}
+```
+
+#### Query Routing
+
+```python
+# Intelligent database selection
+User: "Show me customer orders for product XYZ"
+  ↓
+LLM analyzes query intent:
+  - Entities: customers, orders, products
+  - Required databases: customers + products
+  ↓
+Server orchestrates:
+  1. Query products DB for product XYZ details
+  2. Query customers DB for orders referencing product
+  3. Join results
+  ↓
+Return unified response
+```
+
+#### Configuration
+
+```bash
+# .env.example
+# Database 1: Customer Data
+NEO4J_DB1_NAME=customers
+NEO4J_DB1_URI=bolt://neo4j-customers:7687
+NEO4J_DB1_DATABASE=customer_db
+NEO4J_DB1_PASSWORD=password1
+
+# Database 2: Product Catalog
+NEO4J_DB2_NAME=products
+NEO4J_DB2_URI=bolt://neo4j-products:7687
+NEO4J_DB2_DATABASE=product_catalog
+NEO4J_DB2_PASSWORD=password2
+
+# Database 3: Analytics
+NEO4J_DB3_NAME=analytics
+NEO4J_DB3_URI=bolt://aura.neo4j.io:7687  # Cloud database
+NEO4J_DB3_DATABASE=analytics
+NEO4J_DB3_PASSWORD=password3
+```
+
+#### MCP Tool Enhancement
+
+```python
+@mcp_server.tool()
+async def query_graph(query: str, database: Optional[str] = None) -> str:
+    """
+    Execute natural language query against Neo4j graph database(s).
+
+    Args:
+        query: Natural language question about the graph
+        database: Target database name (auto-detected if not specified)
+    """
+    if database:
+        # Direct query to specific database
+        return await execute_on_database(query, databases[database])
+    else:
+        # LLM decides which database(s) to use
+        target_dbs = await determine_target_databases(query)
+        if len(target_dbs) == 1:
+            return await execute_on_database(query, databases[target_dbs[0]])
+        else:
+            # Cross-database query
+            return await execute_federated_query(query, target_dbs)
+```
+
+**Benefits:**
+- ✅ Single server for multiple data sources
+- ✅ Reduced infrastructure costs
+- ✅ Cross-database queries
+- ✅ Centralized governance across all databases
+- ✅ Unified audit trail
+
+**Use Cases:**
+1. **Multi-tenant SaaS:** One database per customer
+2. **Microservices:** One database per domain (users, orders, inventory)
+3. **Hybrid Cloud:** On-prem + cloud databases
+4. **Data Federation:** Combine multiple graph sources
+
+---
+
+### 🌐 GraphQL Federation Support (Q3 2026)
+
+**Vision:** Expose Neo4j data through GraphQL with LLM-powered schema generation
+
+#### Architecture
+
+```
+┌─────────────┐         ┌─────────────────────────────┐         ┌─────────────┐
+│   Client    │         │   Neo4j YASS MCP Server     │         │   Neo4j     │
+│             │ GraphQL │  ┌──────────┐  ┌─────────┐ │ Cypher  │  Database   │
+│ GraphQL     │ ──────> │  │ GraphQL  │->│ LLM     │ │ ──────> │             │
+│ Client      │         │  │ Resolver │  │ to      │ │         │             │
+│             │         │  │          │  │ Cypher  │ │         │             │
+│             │ <────── │  └──────────┘  └─────────┘ │ <────── │             │
+└─────────────┘         └─────────────────────────────┘         └─────────────┘
+```
+
+#### Auto-Generated GraphQL Schema
+
+```graphql
+# Generated from Neo4j schema
+type Customer {
+  id: ID!
+  name: String!
+  email: String!
+  orders: [Order!]! @relation(type: "PLACED_ORDER")
+  address: Address @relation(type: "LIVES_AT")
+}
+
+type Order {
+  id: ID!
+  total: Float!
+  status: String!
+  customer: Customer! @relation(type: "PLACED_ORDER", direction: IN)
+  items: [Product!]! @relation(type: "CONTAINS")
+}
+
+type Query {
+  # Auto-generated from graph schema
+  customer(id: ID!): Customer
+  customers(limit: Int = 10, offset: Int = 0): [Customer!]!
+
+  # Natural language query (powered by LLM)
+  queryGraph(question: String!): JSON!
+}
+```
+
+#### Dual Query Interface
+
+```graphql
+# Option 1: Traditional GraphQL (for developers)
+query {
+  customer(id: "123") {
+    name
+    orders(limit: 5) {
+      total
+      items {
+        name
+        price
+      }
+    }
+  }
+}
+
+# Option 2: Natural language (for everyone)
+query {
+  queryGraph(question: "Show me customer 123's last 5 orders with items")
+}
+
+# Both return the same data!
+```
+
+#### LLM-Powered Resolver
+
+```python
+# GraphQL resolver with LLM fallback
+class QueryResolver:
+    async def resolve_query_graph(self, info, question: str):
+        """
+        Natural language query resolver
+        """
+        # 1. LLM generates Cypher from question
+        cypher = await llm_to_cypher(question, self.schema)
+
+        # 2. Execute Cypher
+        results = await neo4j_driver.execute_query(cypher)
+
+        # 3. Transform to GraphQL response format
+        return transform_to_graphql(results, info.return_type)
+
+    async def resolve_customer(self, info, id: str):
+        """
+        Traditional resolver (optimized)
+        """
+        cypher = "MATCH (c:Customer {id: $id}) RETURN c"
+        result = await neo4j_driver.execute_query(cypher, id=id)
+        return result[0]
+```
+
+#### Federation Configuration
+
+```yaml
+# docker-compose.yml
+services:
+  neo4j-graphql-gateway:
+    image: neo4j-yass-mcp:latest
+    environment:
+      # Enable GraphQL mode
+      MCP_MODE: graphql
+      GRAPHQL_PLAYGROUND: true
+      GRAPHQL_INTROSPECTION: true
+
+      # Neo4j connection
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_PASSWORD: password
+
+      # LLM for natural language queries
+      LLM_PROVIDER: anthropic
+      LLM_MODEL: claude-sonnet-4-5
+    ports:
+      - "4000:4000"  # GraphQL endpoint
+```
+
+#### Benefits
+
+**For Developers:**
+- ✅ Standard GraphQL API
+- ✅ Auto-generated schema from Neo4j
+- ✅ Type-safe queries
+- ✅ GraphQL tooling (Apollo, Relay)
+
+**For Non-Technical Users:**
+- ✅ Natural language queries via GraphQL
+- ✅ No Cypher knowledge needed
+- ✅ Accessible via GraphQL clients
+
+**For Organizations:**
+- ✅ Unified API layer (REST/GraphQL/MCP)
+- ✅ Better frontend integration
+- ✅ Apollo Federation compatible
+- ✅ Microservices-friendly
+
+#### Use Case: Federated GraphQL
+
+```graphql
+# Combine Neo4j graph with other services
+type Customer @source(name: "neo4j") {
+  id: ID!
+  name: String!
+  orders: [Order!]!
+
+  # Federated from external service
+  stripeCustomer: StripeCustomer @source(name: "stripe")
+  hubspotContact: Contact @source(name: "hubspot")
+}
+
+# Query across all sources
+query {
+  customer(id: "123") {
+    name                    # From Neo4j
+    orders { total }        # From Neo4j
+    stripeCustomer {        # From Stripe API
+      paymentMethods
+    }
+    hubspotContact {        # From HubSpot API
+      lastContacted
+    }
+  }
+}
+```
+
+---
+
+### 🎯 Additional Future Enhancements
+
+#### 1. Query Result Caching (Q4 2025)
+```python
+# Cache frequent queries
+@cache(ttl=300)  # 5 minutes
+async def execute_query(cypher: str, params: Dict):
+    return await neo4j_driver.execute(cypher, params)
+```
+
+**Impact:** 80% faster for repeated queries, 70% cost reduction
+
+---
+
+#### 2. Query Plan Optimization (Q1 2026)
+```python
+# LLM learns optimal Cypher patterns
+class QueryOptimizer:
+    def optimize(self, cypher: str) -> str:
+        # Analyze execution plan
+        # Rewrite for better performance
+        # Learn from past queries
+```
+
+**Impact:** 3x faster complex queries
+
+---
+
+#### 3. Visual Query Builder (Q2 2026)
+
+```
+┌─────────────────────────────────┐
+│  "Show me customers in CA       │
+│   who bought products > $100"   │
+└─────────────────────────────────┘
+           ↓ (LLM generates)
+┌─────────────────────────────────┐
+│  ┌──────────┐                   │
+│  │ Customer │─[PLACED_ORDER]──> │
+│  │  state:  │                   │
+│  │   "CA"   │                   │
+│  └──────────┘                   │
+│       ↓                          │
+│  ┌──────────┐                   │
+│  │  Order   │─[CONTAINS]──>     │
+│  │ total>   │                   │
+│  │  $100    │                   │
+│  └──────────┘                   │
+└─────────────────────────────────┘
+```
+
+**Benefit:** Visual learners can see query structure
+
+---
+
+#### 4. Streaming Results (Q3 2026)
+
+```python
+# For large result sets
+@mcp_server.tool()
+async def query_graph_stream(query: str) -> AsyncIterator[str]:
+    """Stream results as they're found"""
+    async for batch in execute_streaming(query):
+        yield json.dumps(batch)
+```
+
+**Impact:** Handle million-node queries without memory issues
+
+---
+
+#### 5. Natural Language Mutations (Q4 2026)
+
+**Current:** Read-only queries
+
+**Future:** Safe, audited writes
+
+```python
+User: "Mark order #12345 as shipped"
+  ↓
+LLM generates:
+  MATCH (o:Order {id: '12345'})
+  SET o.status = 'shipped', o.shippedAt = datetime()
+  ↓
+Sanitizer validates:
+  ✅ Single node update
+  ✅ No DELETE operations
+  ✅ No CREATE new relationships
+  ✅ Audit logged
+  ↓
+Execute with approval workflow
+```
+
+---
+
+### 📊 Roadmap Summary
+
+| Quarter | Feature | Impact |
+|---------|---------|--------|
+| **Q4 2025** | Query result caching | 70% cost reduction |
+| **Q1 2026** | Conversational refinement | 50% better accuracy |
+| **Q1 2026** | Query plan optimization | 3x performance boost |
+| **Q2 2026** | Multi-database support | Single server for all DBs |
+| **Q2 2026** | Visual query builder | Better UX for non-technical users |
+| **Q3 2026** | GraphQL federation | Frontend integration |
+| **Q3 2026** | Streaming results | Handle massive datasets |
+| **Q4 2026** | Natural language mutations | Safe write operations |
+
+---
+
 ## Contact & Resources
 
 - **GitHub**: [neo4j-yass-mcp](https://github.com/yourusername/neo4j-yass-mcp)
