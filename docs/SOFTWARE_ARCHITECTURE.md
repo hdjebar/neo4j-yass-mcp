@@ -325,10 +325,14 @@ graph TB
         Init["FastMCP Server Init<br/>- Load config from env<br/>- Initialize Neo4j driver<br/>- Initialize LLM<br/>- Register MCP tools<br/>- Start server"]
     end
 
-    subgraph Config["config.py"]
+    subgraph Config["llm_config.py"]
         LLMConfigClass["LLMConfig (dataclass)"]
         chatLLMFunc["chatLLM(config) → ChatModel<br/>Factory for OpenAI/Anthropic/Google"]
-        Utils["Utility Functions<br/>- configure_logging()<br/>- find_available_port()"]
+    end
+
+    subgraph Utils["utils.py"]
+        ConfigLog["configure_logging()"]
+        PortFuncs["Port Management<br/>- is_port_available()<br/>- find_available_port()<br/>- get_preferred_ports_from_env()"]
     end
 
     subgraph Security["utilities/sanitizer.py"]
@@ -347,12 +351,14 @@ graph TB
     end
 
     Main -->|uses| Config
+    Main -->|uses| Utils
     Main -->|uses| Security
     Main -->|uses| Audit
     Main -->|uses| LangChain
 
     style Main fill:#e1f5ff
     style Config fill:#fff3e0
+    style Utils fill:#e3f2fd
     style Security fill:#ffebee
     style Audit fill:#f3e5f5
     style LangChain fill:#e8f5e9

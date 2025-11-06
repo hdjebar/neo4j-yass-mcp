@@ -1,6 +1,14 @@
 # Neo4j YASS MCP
 
-**Yet Another Simple/Smart MCP Server** - A secure Model Context Protocol (MCP) server that provides Neo4j graph database querying capabilities using LangChain's GraphCypherQAChain for natural language to Cypher query translation.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Neo4j 5.x](https://img.shields.io/badge/neo4j-5.x-green.svg)](https://neo4j.com/)
+[![FastMCP](https://img.shields.io/badge/framework-FastMCP-orange.svg)](https://github.com/jlowin/fastmcp)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+
+**Yet Another Secure Server (YASS)** - A production-ready, security-enhanced Model Context Protocol (MCP) server that provides Neo4j graph database querying capabilities using LangChain's GraphCypherQAChain for natural language to Cypher query translation.
+
+> Transform natural language into graph insights with enterprise-grade security and compliance.
 
 ## Features
 
@@ -341,12 +349,9 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # 2. Setup environment
 cd neo4j-yass-mcp
 cp .env.example .env
-nano .env  # Edit configuration
+nano .env  # Edit configuration (set MCP_SERVER_PORT if needed)
 
-# 3. Allocate port (optional)
-./utilities/setup-port.sh
-
-# 4. Create virtual environment
+# 3. Create virtual environment
 uv venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
@@ -363,12 +368,9 @@ python server.py
 # 1. Setup environment
 cd neo4j-yass-mcp
 cp .env.example .env
-nano .env  # Edit configuration
+nano .env  # Edit configuration (set MCP_SERVER_PORT if needed)
 
-# 2. Allocate port (optional)
-./utilities/setup-port.sh
-
-# 3. Start with Docker
+# 2. Start with Docker
 docker-compose up -d
 
 # 4. View logs
@@ -698,8 +700,8 @@ Neo4j Graph Database
 
 - **FastMCP**: MCP protocol implementation with decorators
 - **LangChain**: Natural language to Cypher translation (GraphCypherQAChain)
-- **Query Sanitizer**: Multi-layer injection prevention ([utilities/sanitizer.py](utilities/sanitizer.py))
-- **Audit Logger**: Compliance logging ([utilities/audit_logger.py](utilities/audit_logger.py))
+- **Query Sanitizer**: Multi-layer injection prevention ([src/neo4j_yass_mcp/security/sanitizer.py](src/neo4j_yass_mcp/security/sanitizer.py))
+- **Audit Logger**: Compliance logging ([src/neo4j_yass_mcp/security/audit_logger.py](src/neo4j_yass_mcp/security/audit_logger.py))
 - **Async Executor**: Thread pool for parallel Neo4j queries
 - **Response Limiter**: Token-based truncation for LLM context management
 
@@ -807,17 +809,17 @@ ruff check .
 
 ```
 neo4j-yass-mcp/
-├── server.py                    # Main MCP server
-├── config.py                    # Configuration and LLM setup
-├── utilities/
-│   ├── sanitizer.py             # Query sanitization (SISO prevention)
-│   ├── audit_logger.py          # Audit logging (compliance)
-│   └── setup-port.sh            # Automatic port allocation
-├── docs/
-│   └── architecture/
-│       ├── security.md          # Security architecture
-│       ├── audit-logging.md     # Audit logging details
-│       └── docker-deployment.md # Docker deployment guide
+├── src/
+│   └── neo4j_yass_mcp/          # Main package
+│       ├── server.py            # MCP server entry point
+│       ├── config/              # Configuration modules
+│       │   ├── llm_config.py    # LLM provider configuration
+│       │   └── utils.py         # General utilities
+│       └── security/            # Security & compliance
+│           ├── sanitizer.py     # Query sanitization
+│           └── audit_logger.py  # Audit logging
+├── tests/                       # Test suite
+├── docs/                        # Documentation
 ├── Dockerfile                   # Container image definition
 ├── docker-compose.yml           # Multi-container orchestration
 ├── .dockerignore                # Docker build exclusions

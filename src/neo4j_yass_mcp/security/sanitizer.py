@@ -354,7 +354,8 @@ def initialize_sanitizer(
     strict_mode: bool = False,
     allow_apoc: bool = False,
     allow_schema_changes: bool = False,
-    block_non_ascii: bool = False
+    block_non_ascii: bool = False,
+    max_query_length: int = 10000
 ) -> QuerySanitizer:
     """
     Initialize global query sanitizer.
@@ -364,6 +365,7 @@ def initialize_sanitizer(
         allow_apoc: Allow APOC procedures
         allow_schema_changes: Allow schema modifications
         block_non_ascii: Block non-ASCII characters (UTF-8 attack prevention)
+        max_query_length: Maximum allowed query length (default: 10000)
 
     Returns:
         Configured QuerySanitizer instance
@@ -373,7 +375,8 @@ def initialize_sanitizer(
         strict_mode=strict_mode,
         allow_apoc=allow_apoc,
         allow_schema_changes=allow_schema_changes,
-        block_non_ascii=block_non_ascii
+        block_non_ascii=block_non_ascii,
+        max_query_length=max_query_length
     )
     return _sanitizer
 

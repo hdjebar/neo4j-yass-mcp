@@ -20,13 +20,13 @@ install-dev: ## Install all dependencies (dev + test + security + docs)
 	uv pip install -e ".[all]"
 
 install-test: ## Install test dependencies only
-	uv pip install -e ".[test]"
+	uv pip install -e ".[dev]"
 
 ##@ Development
 
 run: ## Run MCP server locally (Python/UV mode)
 	@echo "Starting YASS MCP server..."
-	@source .env 2>/dev/null || true && python server.py
+	@source .env 2>/dev/null || true && python -m neo4j_yass_mcp.server
 
 run-interactive: ## Run server with interactive script
 	@./run-server.sh
@@ -50,7 +50,7 @@ test-security: ## Run security tests only
 	pytest -m security
 
 test-cov: ## Run tests with coverage report
-	pytest --cov=utilities --cov=server --cov-report=html --cov-report=term
+	pytest --cov=src/neo4j_yass_mcp --cov-report=html --cov-report=term
 
 test-watch: ## Run tests in watch mode
 	pytest-watch
@@ -67,7 +67,7 @@ lint: ## Run all linters (ruff + mypy)
 	@echo "Running ruff..."
 	ruff check .
 	@echo "Running mypy..."
-	mypy utilities/ server.py
+	mypy src/neo4j_yass_mcp/
 
 lint-fix: ## Run linters and auto-fix issues
 	ruff check --fix .
@@ -83,22 +83,34 @@ check: lint test ## Run linters and tests
 
 security: ## Run security checks (bandit + safety + pip-audit)
 	@echo "Running bandit..."
-	bandit -r utilities/ server.py
+	bandit -r src/neo4j_yass_mcp/
 	@echo "Running safety..."
 	safety check
 	@echo "Running pip-audit..."
 	pip-audit
 
 security-bandit: ## Run bandit security scanner
-	bandit -r utilities/ server.py -f json -o bandit-report.json
+	bandit -r src/neo4j_yass_mcp/ -f json -o bandit-report.json
 
 ##@ Docker
 
-docker-build: ## Build Docker image
-	docker compose build
+docker-network: ## Create neo4j-stack network (required for first run)
+	@echo "Creating neo4j-stack network..."
+	@docker network inspect neo4j-stack >/dev/null 2>&1 || \
+		docker network create neo4j-stack && echo "✓ Network created" || echo "✓ Network already exists"
 
-docker-up: ## Start services with Docker Compose
+docker-build: ## Build Docker image with uv and BuildKit cache
+	@echo "Building with uv and BuildKit cache..."
+	DOCKER_BUILDKIT=1 docker compose build
+	@echo "✓ Build complete"
+
+docker-up: docker-network ## Start services with Docker Compose (creates network)
+	@echo "Starting services..."
 	docker compose up -d
+	@echo "✓ Services started"
+	@echo ""
+	@echo "Check logs: make docker-logs"
+	@echo "Check health: docker inspect neo4j-yass-mcp | grep -A5 Health"
 
 docker-down: ## Stop Docker services
 	docker compose down
@@ -109,8 +121,32 @@ docker-logs: ## Show Docker logs
 docker-restart: ## Restart Docker services
 	docker compose restart
 
+docker-shell: ## Open bash shell in MCP container
+	docker compose exec neo4j-yass-mcp bash
+
+docker-test-neo4j: ## Test connection to Neo4j from container
+	@echo "Testing Neo4j connection..."
+	@docker compose exec neo4j-yass-mcp python -c "\
+		from neo4j import GraphDatabase; \
+		import os; \
+		uri = os.getenv('NEO4J_URI', 'bolt://neo4j:7687'); \
+		user = os.getenv('NEO4J_USERNAME', 'neo4j'); \
+		pwd = os.getenv('NEO4J_PASSWORD', 'password'); \
+		driver = GraphDatabase.driver(uri, auth=(user, pwd)); \
+		driver.verify_connectivity(); \
+		print('✓ Connected to Neo4j at', uri)" || echo "✗ Connection failed"
+
 docker-clean: ## Stop and remove Docker containers and volumes
 	docker compose down -v
+
+docker-clean-cache: ## Clean BuildKit cache (use sparingly)
+	@echo "Cleaning BuildKit cache..."
+	docker builder prune -f
+	@echo "✓ Cache cleaned"
+
+docker-cache-size: ## Show BuildKit cache size
+	@echo "BuildKit cache usage:"
+	@docker system df | grep -A1 "Build Cache"
 
 ##@ Cleanup
 
@@ -140,11 +176,11 @@ docs-build: ## Build documentation
 ##@ CI/CD
 
 ci-test: ## Run CI test suite
-	pytest --cov=utilities --cov=server --cov-report=xml --cov-report=term -m "not slow"
+	pytest --cov=src/neo4j_yass_mcp --cov-report=xml --cov-report=term -m "not slow"
 
 ci-lint: ## Run CI linting
 	ruff check .
-	mypy utilities/ server.py
+	mypy src/neo4j_yass_mcp/
 
 ci: ci-lint ci-test security ## Run full CI pipeline
 
@@ -160,8 +196,6 @@ env: ## Show environment variables
 	@echo "Environment file:"
 	@cat .env 2>/dev/null || echo "No .env file found"
 
-setup-ports: ## Run port allocation utility
-	../utilities/setup-ports.sh .env.example
-
-init-data-dirs: ## Initialize data directories
-	./utilities/init-data-dirs.sh
+# Note: setup-ports and init-data-dirs utilities have been deprecated
+# Port configuration is now handled via environment variables in .env
+# Data directories are created automatically by the application

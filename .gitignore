@@ -82,13 +82,18 @@ neo4j/plugins/
 mcp-logs/
 audit/
 
-# Secrets
+# Secrets (CRITICAL - never commit!)
 .env.local
 .env.production
+.env.development
 *.key
 *.pem
 *.crt
+*.p12
+*.pfx
 secrets/
+credentials.json
+config.local.json
 
 # OS
 .DS_Store

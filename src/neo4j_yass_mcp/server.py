@@ -13,23 +13,28 @@ Features:
 """
 
 import asyncio
+import json
 import logging
 import os
+import re
+import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
 from fastmcp import FastMCP
-from langchain.neo4j import GraphCypherQAChain, Neo4jGraph
+from langchain_neo4j import GraphCypherQAChain, Neo4jGraph
+from tokenizers import Tokenizer
 
-from config import (
+from neo4j_yass_mcp.config import (
     chatLLM,
     LLMConfig,
     configure_logging,
     find_available_port,
     get_preferred_ports_from_env,
 )
-from utilities import (
+from neo4j_yass_mcp.config.security_config import WEAK_PASSWORDS
+from neo4j_yass_mcp.security import (
     initialize_audit_logger,
     get_audit_logger,
     initialize_sanitizer,
@@ -53,7 +58,8 @@ if sanitizer_enabled:
         strict_mode=os.getenv("SANITIZER_STRICT_MODE", "false").lower() == "true",
         allow_apoc=os.getenv("SANITIZER_ALLOW_APOC", "false").lower() == "true",
         allow_schema_changes=os.getenv("SANITIZER_ALLOW_SCHEMA_CHANGES", "false").lower() == "true",
-        block_non_ascii=os.getenv("SANITIZER_BLOCK_NON_ASCII", "false").lower() == "true"
+        block_non_ascii=os.getenv("SANITIZER_BLOCK_NON_ASCII", "false").lower() == "true",
+        max_query_length=int(os.getenv("SANITIZER_MAX_QUERY_LENGTH", "10000"))
     )
     logger.info("Query sanitizer enabled (injection + UTF-8 attack protection active)")
 else:
@@ -78,136 +84,28 @@ _response_token_limit: Optional[int] = None
 # Debug mode for detailed error messages (disable in production)
 _debug_mode: bool = False
 
+# Hugging Face tokenizers for accurate token counting
+_tokenizer: Optional[Tokenizer] = None
 
-def sanitize_error_message(error: Exception) -> str:
+
+def get_tokenizer() -> Tokenizer:
     """
-    Sanitize error messages to prevent information leakage.
+    Get or create Hugging Face tokenizer.
 
-    In production, returns generic error messages.
-    In debug mode, returns full error details.
-
-    Args:
-        error: The exception to sanitize
-
-    Returns:
-        Sanitized error message
+    Uses GPT-2 tokenizer which provides similar token counts to cl100k_base
+    and works well for general text estimation.
     """
-    if _debug_mode:
-        return str(error)
-
-    # Map exception types to safe error messages
-    error_type = type(error).__name__
-
-    safe_messages = {
-        "AuthError": "Authentication failed. Please check credentials.",
-        "ServiceUnavailable": "Database service is unavailable. Please try again later.",
-        "CypherSyntaxError": "Invalid query syntax.",
-        "ConstraintError": "Database constraint violation.",
-        "TransientError": "Temporary database error. Please retry.",
-        "ClientError": "Invalid request.",
-        "DatabaseError": "Database operation failed.",
-    }
-
-    # Return safe message or generic fallback
-    return safe_messages.get(error_type, "An error occurred while processing your request.")
-
-
-def get_executor() -> ThreadPoolExecutor:
-    """Get or create thread pool executor for async operations"""
-    global _executor
-    if _executor is None:
-        max_workers = int(os.getenv("MCP_MAX_WORKERS", "10"))
-        _executor = ThreadPoolExecutor(max_workers=max_workers)
-    return _executor
-
-
-def is_read_only_query(cypher_query: str) -> bool:
-    """
-    Check if a Cypher query is read-only.
-
-    Uses a comprehensive blocklist approach to detect write operations.
-    Improved to catch additional write patterns and edge cases.
-
-    Args:
-        cypher_query: The Cypher query to check
-
-    Returns:
-        True if the query is read-only, False if it contains write operations
-    """
-    # Normalize query: lowercase and remove extra whitespace
-    normalized = " ".join(cypher_query.lower().split())
-
-    # Write operation keywords (comprehensive list)
-    write_keywords = [
-        # Data modification
-        "create ", "merge ", "set ", "delete ", "remove ",
-        "detach delete",
-
-        # Schema modifications
-        "drop ", "create constraint", "drop constraint",
-        "create index", "drop index",
-
-        # Control flow that can write
-        "foreach",
-
-        # Subquery patterns that can write
-        "call {",
-
-        # APOC procedures that write (common ones)
-        "apoc.create.", "apoc.merge.", "apoc.refactor.",
-        "apoc.periodic.iterate", "apoc.periodic.commit",
-
-        # LOAD CSV (can trigger writes)
-        "load csv",
-
-        # Additional write patterns
-        "on create set", "on match set",
-    ]
-
-    # Check for write operations
-    for keyword in write_keywords:
-        if keyword in normalized:
-            return False
-
-    # Additional regex-based checks for edge cases
-    import re
-
-    # Check for UNWIND ... CREATE/MERGE patterns
-    if re.search(r'\bunwind\b.*\b(create|merge)\b', normalized):
-        return False
-
-    # Check for WITH ... CREATE/MERGE patterns (multi-clause writes)
-    if re.search(r'\bwith\b.*\b(create|merge|delete)\b', normalized):
-        return False
-
-    return True
-
-
-def check_read_only_access(cypher_query: str) -> Optional[Dict[str, Any]]:
-    """
-    Check if query is allowed in read-only mode.
-
-    Args:
-        cypher_query: The Cypher query to check
-
-    Returns:
-        None if allowed, error dict if blocked
-    """
-    if _read_only_mode and not is_read_only_query(cypher_query):
-        logger.warning(f"Blocked write operation in read-only mode: {cypher_query[:100]}")
-        return {
-            "error": "Write operations are disabled in read-only mode",
-            "query": cypher_query,
-            "read_only_mode": True,
-            "success": False
-        }
-    return None
+    global _tokenizer
+    if _tokenizer is None:
+        logger.info("Initializing Hugging Face tokenizer (gpt2)")
+        # Use GPT-2 tokenizer as a reasonable approximation
+        _tokenizer = Tokenizer.from_pretrained("gpt2")
+    return _tokenizer
 
 
 def estimate_tokens(text: str) -> int:
     """
-    Rough estimation of token count for a text string.
-    Uses approximation: 1 token ≈ 4 characters.
+    Estimate token count for a text string using Hugging Face tokenizers.
 
     Args:
         text: The text to estimate tokens for
@@ -219,7 +117,56 @@ def estimate_tokens(text: str) -> int:
         return 0
     if not isinstance(text, str):
         text = str(text)
-    return len(text) // 4
+
+    tokenizer = get_tokenizer()
+    encoding = tokenizer.encode(text)
+    return len(encoding.ids)
+
+
+def sanitize_error_message(error: Exception) -> str:
+    """
+    Sanitize error messages for security.
+
+    In production mode (DEBUG_MODE=false), removes sensitive information
+    from error messages while preserving enough context for debugging.
+
+    Args:
+        error: The exception to sanitize
+
+    Returns:
+        Sanitized error message safe for client exposure
+    """
+    global _debug_mode
+
+    error_str = str(error)
+    error_type = type(error).__name__
+
+    # In debug mode, return full error details
+    if _debug_mode:
+        return error_str
+
+    # Production mode: sanitize error messages
+    # Remove potential sensitive information (paths, credentials, IPs)
+
+    # Known safe error patterns that can be shown as-is
+    safe_patterns = [
+        "Query exceeds maximum length",
+        "Empty query not allowed",
+        "Blocked: Query contains dangerous pattern",
+        "authentication failed",
+        "connection refused",
+        "timeout",
+        "not found",
+        "unauthorized",
+    ]
+
+    error_lower = error_str.lower()
+    for pattern in safe_patterns:
+        if pattern in error_lower:
+            return error_str
+
+    # For other errors, return generic message with error type
+    return f"{error_type}: An error occurred. Enable DEBUG_MODE for details."
 
 
 def truncate_response(data: Any, max_tokens: Optional[int] = None) -> tuple[Any, bool]:
@@ -238,7 +185,6 @@ def truncate_response(data: Any, max_tokens: Optional[int] = None) -> tuple[Any,
         return data, False
 
     # Convert to JSON string for token estimation
-    import json
     try:
         json_str = json.dumps(data, ensure_ascii=False, default=str)
     except (TypeError, ValueError):
@@ -290,14 +236,10 @@ def initialize_neo4j():
     neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")
     neo4j_timeout = int(os.getenv("NEO4J_READ_TIMEOUT", "30"))
 
-    # Security: Check for default/weak passwords
-    weak_passwords = [
-        "password", "password123", "neo4j", "admin", "test",
-        "CHANGE_ME", "CHANGE_ME_STRONG_PASSWORD", "changeme"
-    ]
-    if neo4j_password.lower() in [p.lower() for p in weak_passwords]:
+    # Security: Check for default/weak passwords using centralized list
+    if neo4j_password.lower() in [p.lower() for p in WEAK_PASSWORDS]:
         logger.error("🚨 SECURITY ERROR: Default or weak password detected!")
-        logger.error(f"   Password '{neo4j_password}' is not secure for production use")
+        logger.error("   The provided password matches a known weak/default password")
         logger.error("   Set a strong password in NEO4J_PASSWORD environment variable")
 
         # Allow in development, but warn heavily
@@ -462,7 +404,6 @@ async def query_graph(query: str) -> Dict[str, Any]:
         logger.info(f"Processing natural language query: {query}")
 
         # Run LangChain's GraphCypherQAChain in thread pool (it's sync)
-        import time
         start_time = time.time()
 
         loop = asyncio.get_event_loop()
@@ -674,7 +615,6 @@ async def _execute_cypher_impl(cypher_query: str, parameters: Optional[Dict[str,
         params = parameters or {}
 
         # Run query in thread pool (Neo4j driver is sync)
-        import time
         start_time = time.time()
 
         loop = asyncio.get_event_loop()
@@ -805,12 +745,55 @@ async def refresh_schema() -> Dict[str, Any]:
 # =============================================================================
 
 def cleanup():
-    """Cleanup resources on shutdown"""
-    global _executor
+    """
+    Cleanup resources on shutdown.
+
+    Ensures graceful shutdown of:
+    - Thread pool executor (waits for running tasks)
+    - Neo4j driver connections
+
+    This function is registered with atexit to ensure cleanup
+    happens even on unexpected termination.
+    """
+    global _executor, graph
+
+    logger.info("Starting cleanup process...")
+
+    # Shutdown thread pool executor
     if _executor is not None:
-        logger.info("Shutting down thread pool executor")
-        _executor.shutdown(wait=True)
-        _executor = None
+        logger.info("Shutting down thread pool executor...")
+        try:
+            # Wait up to 30 seconds for tasks to complete
+            _executor.shutdown(wait=True, timeout=30)
+            logger.info("✓ Thread pool executor shutdown complete")
+        except TimeoutError:
+            logger.warning("⚠ Thread pool executor shutdown timed out - some tasks may not have completed")
+        except Exception as e:
+            logger.error(f"✗ Error shutting down executor: {e}", exc_info=True)
+        finally:
+            _executor = None
+    else:
+        logger.debug("Thread pool executor already cleaned up or not initialized")
+
+    # Close Neo4j driver connections
+    if graph is not None:
+        logger.info("Closing Neo4j driver connections...")
+        try:
+            # Check if graph has a driver attribute
+            if hasattr(graph, '_driver') and graph._driver is not None:
+                # Close the driver (this closes all sessions and connections)
+                graph._driver.close()
+                logger.info("✓ Neo4j driver closed successfully")
+            else:
+                logger.warning("Neo4j graph has no driver to close")
+        except AttributeError as e:
+            logger.warning(f"⚠ Could not access Neo4j driver: {e}")
+        except Exception as e:
+            logger.error(f"✗ Error closing Neo4j connections: {e}", exc_info=True)
+    else:
+        logger.debug("Neo4j graph already cleaned up or not initialized")
+
+    logger.info("Cleanup process complete")
 
 
 def main():
@@ -881,5 +864,4 @@ def main():
         mcp.run()
 
 
-if __name__ == "__main__":
-    main()
+

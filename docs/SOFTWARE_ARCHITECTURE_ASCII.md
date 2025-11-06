@@ -314,7 +314,7 @@ driver = GraphDatabase.driver(
 │  │  FastMCP Server Initialization                                 │  │
 │  │  - Load configuration from environment                         │  │
 │  │  - Initialize Neo4j driver                                     │  │
-│  │  - Initialize LLM (via config.py)                             │  │
+│  │  - Initialize LLM (via llm_config.py)                             │  │
 │  │  - Register MCP tools                                          │  │
 │  │  - Start server (stdio/HTTP/SSE)                              │  │
 │  └───────────────────────────────────────────────────────────────┘  │
@@ -323,7 +323,7 @@ driver = GraphDatabase.driver(
                             │ uses
                             ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         config.py                                    │
+│                         llm_config.py                                    │
 │  ┌───────────────────────────────────────────────────────────────┐  │
 │  │  LLMConfig (dataclass)                                         │  │
 │  │  - provider, model, temperature, api_key, streaming           │  │
@@ -461,14 +461,14 @@ async def estimate_tokens(text: str) -> str:
 ```
 
 **Dependencies**:
-- `config.py`: LLM configuration
+- `llm_config.py`: LLM configuration
 - `utilities/sanitizer.py`: Query validation
 - `utilities/audit_logger.py`: Compliance logging
 - `fastmcp`: MCP server framework
 - `langchain`: GraphCypherQAChain
 - `neo4j`: Database driver
 
-#### 4.2.2 config.py (Configuration Module)
+#### 4.2.2 llm_config.py (Configuration Module)
 
 **Responsibility**: LLM provider abstraction and server configuration
 

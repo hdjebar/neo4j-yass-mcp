@@ -80,9 +80,9 @@ uv pip install langchain-mistralai
 
 ---
 
-### Step 3: Update `config.py`
+### Step 3: Update `llm_config.py`
 
-Add your provider to the `chatLLM()` function in [config.py](../config.py).
+Add your provider to the `chatLLM()` function in [llm_config.py](../llm_config.py).
 
 **Example: Adding Mistral AI**
 
@@ -213,7 +213,7 @@ LLM_API_KEY=your-mistral-api-key
 
 ### Code Reference
 
-In [config.py:XXX-YYY](../config.py):
+In [llm_config.py:XXX-YYY](../llm_config.py):
 
 \`\`\`python
 elif config.provider == "mistralai":
@@ -259,7 +259,7 @@ python server.py
 ### Example 1: Mistral AI (API-based)
 
 ```python
-# config.py addition
+# llm_config.py addition
 elif config.provider == "mistralai":
     from langchain_mistralai import ChatMistralAI
     return ChatMistralAI(
@@ -282,7 +282,7 @@ LLM_API_KEY=your-mistral-api-key
 ### Example 2: Groq (Ultra-Fast Inference)
 
 ```python
-# config.py addition
+# llm_config.py addition
 elif config.provider == "groq":
     from langchain_groq import ChatGroq
     return ChatGroq(
@@ -305,7 +305,7 @@ LLM_API_KEY=your-groq-api-key
 ### Example 3: Ollama (Local, No API Key)
 
 ```python
-# config.py addition
+# llm_config.py addition
 elif config.provider == "ollama":
     from langchain_ollama import ChatOllama
     return ChatOllama(
@@ -333,7 +333,7 @@ LLM_TEMPERATURE=0.0
 ### Example 4: Cohere (RAG-Optimized)
 
 ```python
-# config.py addition
+# llm_config.py addition
 elif config.provider == "cohere":
     from langchain_cohere import ChatCohere
     return ChatCohere(
@@ -356,7 +356,7 @@ LLM_API_KEY=your-cohere-api-key
 ### Example 5: Hugging Face (Self-Hosted)
 
 ```python
-# config.py addition
+# llm_config.py addition
 elif config.provider == "huggingface":
     from langchain_huggingface import ChatHuggingFace
     from langchain_huggingface import HuggingFaceEndpoint
@@ -427,7 +427,7 @@ class LLMConfig:
 
 - [ ] Install LangChain package: `pip install langchain-{provider}`
 - [ ] Update `pyproject.toml` dependencies
-- [ ] Add provider to `config.py` → `chatLLM()` function
+- [ ] Add provider to `llm_config.py` → `chatLLM()` function
 - [ ] Update `.env.example` with provider configuration
 - [ ] Update `docs/LLM_PROVIDERS.md` with provider documentation
 - [ ] Test with your Neo4j database
@@ -440,7 +440,7 @@ class LLMConfig:
 
 ### Issue: "Unknown provider: myProvider"
 
-**Solution:** Update the error message in `config.py`:
+**Solution:** Update the error message in `llm_config.py`:
 
 ```python
 else:

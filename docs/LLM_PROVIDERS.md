@@ -77,7 +77,7 @@ LLM_API_KEY=AIzaSy...             # Starts with "AIzaSy"
 
 ### Code Reference
 
-In [config.py:181-187](../config.py):
+In [llm_config.py:181-187](../llm_config.py):
 
 ```python
 elif config.provider == "google-genai":  # ⚠️ Must be "google-genai"
@@ -129,7 +129,7 @@ LLM_API_KEY=sk-...                # Starts with "sk-"
 
 ### Code Reference
 
-In [config.py:165-171](../config.py):
+In [llm_config.py:165-171](../llm_config.py):
 
 ```python
 if config.provider == "openai":
@@ -182,7 +182,7 @@ LLM_API_KEY=sk-ant-...            # Starts with "sk-ant-"
 
 ### Code Reference
 
-In [config.py:173-179](../config.py):
+In [llm_config.py:173-179](../llm_config.py):
 
 ```python
 elif config.provider == "anthropic":

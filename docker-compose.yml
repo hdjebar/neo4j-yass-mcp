@@ -9,6 +9,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.11}
+        APP_VERSION: ${APP_VERSION:-1.0.0}
+    image: neo4j-yass-mcp:${APP_VERSION:-1.0.0}
     container_name: neo4j-yass-mcp
     restart: unless-stopped
 
@@ -87,10 +91,9 @@ services:
     # network_mode: "host"  # Uncomment for localhost Neo4j access
 
     healthcheck:
-      # Check if server process is running using Python (always available)
-      # For http/sse modes: verifies port is listening
-      # For stdio mode: verifies process exists
-      test: ["CMD-SHELL", "python -c 'import sys,os; sys.exit(0 if any(\"server.py\" in str(p) for p in os.popen(\"ps aux\").readlines()) else 1)' || exit 1"]
+      # Check if server process is running using pgrep (efficient process matching)
+      # Matches the Python module execution pattern
+      test: ["CMD-SHELL", "pgrep -f 'python.*neo4j_yass_mcp.server' > /dev/null || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -102,7 +105,14 @@ services:
 
 networks:
   neo4j-stack:
+    # External network: Must be created before starting this service
+    # Create with: docker network create neo4j-stack
+    # Or let it be created automatically by setting external: false
     external: true
+
+    # Alternative: Auto-create network (uncomment below, comment external: true)
+    # external: false
+    # driver: bridge
 
 # IMPORTANT: Neo4j Database Setup (Separate Instance Required)
 #
