@@ -53,16 +53,36 @@ Most MCP solutions rely on client-side LLMs (e.g., Claude Desktop, ChatGPT) to g
 
 Neo4j YASS MCP moves LLM processing to the server layer:
 
-```
-┌─────────────┐         ┌─────────────────────────────┐         ┌─────────────┐
-│   Client    │         │    Neo4j YASS MCP Server    │         │   Neo4j     │
-│  (Human)    │ Query   │  ┌──────────┐  ┌─────────┐ │ Cypher  │  Database   │
-│             │ ──────> │  │ LLM Core │─>│Sanitizer│ │ ──────> │             │
-│  Any MCP    │         │  └──────────┘  └─────────┘ │         │             │
-│  Client     │ <────── │  ┌──────────┐  ┌─────────┐ │ <────── │             │
-│             │ Results │  │  Audit   │  │ Schema  │ │ Results │             │
-└─────────────┘         │  └──────────┘  └─────────┘ │         └─────────────┘
-                        └─────────────────────────────┘
+```mermaid
+flowchart LR
+    Client["Client (Human)<br/>Any MCP Client"]
+
+    subgraph Server["Neo4j YASS MCP Server"]
+        direction TB
+        LLMCore["LLM Core"]
+        Sanitizer["Sanitizer"]
+        Schema["Schema Cache"]
+        Audit["Audit & Logging"]
+
+        LLMCore --> Sanitizer
+        LLMCore -.->|logs| Audit
+        Sanitizer -.->|logs| Audit
+    end
+
+    Database[("Neo4j<br/>Database")]
+
+    Client -->|Query| LLMCore
+    Sanitizer -->|Cypher| Database
+    Database -->|Results| Schema
+    Schema -->|Results| Client
+    Database -.->|logs| Audit
+    Schema -.->|logs| Audit
+
+    style Server fill:#f9f9f9,stroke:#333,stroke-width:2px
+    style Database fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
+    style LLMCore fill:#2196F3,stroke:#1565C0,stroke-width:2px,color:#fff
+    style Sanitizer fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
+    style Audit fill:#9C27B0,stroke:#6A1B9A,stroke-width:2px,color:#fff
 ```
 
 ---
@@ -750,29 +770,44 @@ async def query_graph(query: str, database: Optional[str] = None) -> str:
 
 #### Architecture
 
-```
-┌─────────────┐         ┌─────────────────────────────────────────┐
-│   MCP       │         │      Neo4j YASS MCP Server              │
-│   Client    │         │                                         │
-│             │ Natural │  ┌──────────────┐  ┌──────────────┐   │
-│             │Language │  │ LLM Query    │  │  Federation  │   │
-│             │ ──────> │  │ Orchestrator │─>│  Router      │   │
-│             │         │  └──────────────┘  └──────┬───────┘   │
-│             │         │                            │            │
-│             │ <────── │  ┌─────────────────────────┼──────┐   │
-└─────────────┘ Results │  │ Aggregated Results      ↓      │   │
-                        │  └─────────────────────────────────┘   │
-                        └─────────────────────────────────────────┘
-                                     │         │         │
-                        ┌────────────┼─────────┼─────────┼────────────┐
-                        │            ↓         ↓         ↓            │
-                        │    ┌──────────┐ ┌──────────┐ ┌──────────┐ │
-                        │    │  Neo4j   │ │  Neo4j   │ │  Neo4j   │ │
-                        │    │  DB #1   │ │  DB #2   │ │  DB #3   │ │
-                        │    │ GraphQL  │ │ GraphQL  │ │ GraphQL  │ │
-                        │    └──────────┘ └──────────┘ └──────────┘ │
-                        │  (Customers)   (Products)   (Analytics)   │
-                        └──────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    Client["MCP Client"]
+
+    subgraph Server["Neo4j YASS MCP Server"]
+        direction TB
+        Orchestrator["LLM Query<br/>Orchestrator"]
+        Router["Federation<br/>Router"]
+        Aggregator["Aggregated<br/>Results"]
+
+        Orchestrator --> Router
+        Router --> Aggregator
+    end
+
+    subgraph Federation["Federated GraphQL Neo4j Databases"]
+        direction LR
+        DB1[("Neo4j DB #1<br/>GraphQL<br/>(Customers)")]
+        DB2[("Neo4j DB #2<br/>GraphQL<br/>(Products)")]
+        DB3[("Neo4j DB #3<br/>GraphQL<br/>(Analytics)")]
+    end
+
+    Client -->|"Natural Language<br/>Query"| Orchestrator
+    Router -->|GraphQL Query| DB1
+    Router -->|GraphQL Query| DB2
+    Router -->|GraphQL Query| DB3
+    DB1 -->|Results| Aggregator
+    DB2 -->|Results| Aggregator
+    DB3 -->|Results| Aggregator
+    Aggregator -->|"Unified<br/>Results"| Client
+
+    style Server fill:#f9f9f9,stroke:#333,stroke-width:2px
+    style Federation fill:#e8f5e9,stroke:#4CAF50,stroke-width:2px
+    style Orchestrator fill:#2196F3,stroke:#1565C0,stroke-width:2px,color:#fff
+    style Router fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
+    style Aggregator fill:#9C27B0,stroke:#6A1B9A,stroke-width:2px,color:#fff
+    style DB1 fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
+    style DB2 fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
+    style DB3 fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
 ```
 
 #### Federation Approach
