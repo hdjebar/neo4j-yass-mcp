@@ -764,9 +764,18 @@ async def query_graph(query: str, database: Optional[str] = None) -> str:
 
 ### 🌐 GraphQL-Enabled Database Federation (Q3 2026)
 
-**Vision:** Federate multiple Neo4j graph databases with GraphQL support, enabling cross-database queries through a unified MCP interface
+**Vision:** Federate ANY GraphQL endpoints - not just Neo4j - enabling cross-service queries through a unified MCP interface with natural language
 
-**Important:** This is NOT about implementing a GraphQL client. Instead, it extends the multi-database support to federate Neo4j databases that expose GraphQL endpoints (via Neo4j GraphQL Library or similar), allowing seamless queries across federated graph databases.
+**Important:** This is NOT about implementing a GraphQL client. Instead, it's a federation layer that connects to ANY GraphQL service (Neo4j GraphQL, Hasura, PostGraphile, AWS AppSync, custom GraphQL APIs, etc.) and orchestrates queries across them using natural language via MCP.
+
+**Supported GraphQL Sources:**
+- ✅ Neo4j with GraphQL Library
+- ✅ PostgreSQL via PostGraphile or Hasura
+- ✅ MongoDB with GraphQL
+- ✅ AWS AppSync
+- ✅ Custom GraphQL APIs (REST → GraphQL gateways)
+- ✅ Third-party GraphQL services (Shopify, GitHub, Contentful, etc.)
+- ✅ Any GraphQL endpoint with introspection enabled
 
 #### Architecture
 
@@ -784,20 +793,20 @@ flowchart TB
         Router --> Aggregator
     end
 
-    subgraph Federation["Federated GraphQL Neo4j Databases"]
+    subgraph Federation["Federated GraphQL Endpoints"]
         direction LR
-        DB1[("Neo4j DB #1<br/>GraphQL<br/>(Customers)")]
-        DB2[("Neo4j DB #2<br/>GraphQL<br/>(Products)")]
-        DB3[("Neo4j DB #3<br/>GraphQL<br/>(Analytics)")]
+        Neo4j[("Neo4j<br/>GraphQL<br/>(Graph Data)")]
+        Hasura[("Hasura<br/>PostgreSQL<br/>(Relational)")]
+        AppSync[("AWS AppSync<br/>(Cloud API)")]
     end
 
     Client -->|"Natural Language<br/>Query"| Orchestrator
-    Router -->|GraphQL Query| DB1
-    Router -->|GraphQL Query| DB2
-    Router -->|GraphQL Query| DB3
-    DB1 -->|Results| Aggregator
-    DB2 -->|Results| Aggregator
-    DB3 -->|Results| Aggregator
+    Router -->|GraphQL Query| Neo4j
+    Router -->|GraphQL Query| Hasura
+    Router -->|GraphQL Query| AppSync
+    Neo4j -->|Results| Aggregator
+    Hasura -->|Results| Aggregator
+    AppSync -->|Results| Aggregator
     Aggregator -->|"Unified<br/>Results"| Client
 
     style Server fill:#f9f9f9,stroke:#333,stroke-width:2px
@@ -805,77 +814,112 @@ flowchart TB
     style Orchestrator fill:#2196F3,stroke:#1565C0,stroke-width:2px,color:#fff
     style Router fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
     style Aggregator fill:#9C27B0,stroke:#6A1B9A,stroke-width:2px,color:#fff
-    style DB1 fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
-    style DB2 fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
-    style DB3 fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
+    style Neo4j fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
+    style Hasura fill:#3F51B5,stroke:#1A237E,stroke-width:2px,color:#fff
+    style AppSync fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
 ```
 
 #### Federation Approach
 
-**Key Concept:** Connect to multiple Neo4j databases that already have GraphQL support enabled (via Neo4j GraphQL Library), and use MCP to orchestrate queries across them with natural language.
+**Key Concept:** Connect to ANY GraphQL endpoint (databases, APIs, services) and use MCP to orchestrate queries across them with natural language - creating a universal data federation layer.
 
-Each Neo4j database in the federation:
-- ✅ Runs Neo4j GraphQL Library (or similar GraphQL layer)
-- ✅ Exposes its own GraphQL schema
+Each GraphQL endpoint in the federation:
+- ✅ Exposes a GraphQL schema (any database: Neo4j, PostgreSQL, MongoDB, etc.)
+- ✅ Can be a third-party service (GitHub, Shopify, Stripe GraphQL APIs)
+- ✅ Can be a custom GraphQL gateway wrapping REST APIs
 - ✅ Maintains its own domain data
 - ✅ Can be queried independently via GraphQL
 
 The YASS MCP Server:
-- ✅ Connects to multiple GraphQL-enabled Neo4j databases
+- ✅ Connects to multiple heterogeneous GraphQL endpoints
 - ✅ Accepts natural language queries via MCP
-- ✅ Uses LLM to determine which database(s) to query
-- ✅ Routes queries to appropriate federated databases
+- ✅ Uses LLM to determine which endpoint(s) to query
+- ✅ Routes queries to appropriate services (graph DB, relational DB, external APIs)
 - ✅ Aggregates results from multiple sources
 - ✅ Returns unified response to MCP client
 
+**Universal Federation Examples:**
+- Neo4j (graph) + PostgreSQL via Hasura (relational) + Shopify (e-commerce API)
+- MongoDB (documents) + Neo4j (relationships) + Stripe (payments API)
+- Internal databases + External SaaS GraphQL APIs
+
 #### Natural Language Federation Query
 
+**Example 1: Cross-Database Query (Neo4j + PostgreSQL)**
 ```python
 # User query via MCP
-User: "Show me customer 123's orders with product details"
+User: "Show me customer 123's orders with shipping address"
 
 # LLM analyzes query intent
 LLM determines:
-  - Needs: Customer data (DB #1) + Product data (DB #2)
-  - Federation strategy: Join across databases
+  - Needs: Orders from Neo4j (graph) + Addresses from PostgreSQL (relational)
+  - Federation strategy: Join across different database types
 
 # MCP Server orchestrates
-Step 1: Query Neo4j DB #1 (Customers) via its GraphQL endpoint
-  → Get customer 123 and order IDs
+Step 1: Query Neo4j GraphQL endpoint
+  → Get customer 123's order IDs and details
 
-Step 2: Query Neo4j DB #2 (Products) via its GraphQL endpoint
-  → Get product details for items in those orders
+Step 2: Query Hasura/PostgreSQL GraphQL endpoint
+  → Get shipping addresses for those orders
 
 Step 3: Aggregate and join results
-  → Merge data from both databases
+  → Merge graph data with relational data
 
 Step 4: Return unified response to MCP client
+```
+
+**Example 2: Hybrid Internal + External API Query**
+```python
+# User query via MCP
+User: "Show me recent GitHub issues related to our Shopify orders"
+
+# LLM analyzes query intent
+LLM determines:
+  - Needs: Internal orders (Neo4j) + GitHub issues (GitHub API) + Shopify data (Shopify API)
+  - Federation strategy: Multi-source aggregation
+
+# MCP Server orchestrates
+Step 1: Query internal Neo4j GraphQL
+  → Get recent order data with product keywords
+
+Step 2: Query GitHub GraphQL API
+  → Search issues matching those product keywords
+
+Step 3: Query Shopify GraphQL API
+  → Get order details from Shopify
+
+Step 4: Aggregate all results
+  → Correlate issues with orders
+
+Step 5: Return unified insights to MCP client
 ```
 
 #### Federation Orchestrator
 
 ```python
 @dataclass
-class GraphQLDatabaseConfig:
-    """Configuration for a GraphQL-enabled Neo4j database"""
-    name: str                    # Logical name (e.g., "customers")
-    graphql_endpoint: str        # https://neo4j-1.example.com/graphql
-    auth_token: str              # Bearer token for GraphQL endpoint
+class GraphQLEndpointConfig:
+    """Configuration for any GraphQL endpoint (database, API, service)"""
+    name: str                    # Logical name (e.g., "customers", "github", "shopify")
+    endpoint_type: str           # "database" | "api" | "service"
+    graphql_endpoint: str        # https://api.github.com/graphql, https://hasura.example.com/v1/graphql
+    auth_token: str              # Bearer token or API key
+    auth_header: str = "Authorization"  # Header name (e.g., "X-Shopify-Access-Token")
     schema_cache: Optional[Dict] = None
 
 class FederationOrchestrator:
     """
-    Orchestrates queries across federated GraphQL databases.
+    Orchestrates queries across federated GraphQL endpoints.
 
     Uses LangChain's GraphQLAPIWrapper and BaseGraphQLTool for
-    querying GraphQL-enabled Neo4j databases.
+    querying ANY GraphQL endpoint: databases, APIs, services.
     """
 
-    def __init__(self, databases: Dict[str, GraphQLDatabaseConfig]):
-        self.databases = databases
+    def __init__(self, endpoints: Dict[str, GraphQLEndpointConfig]):
+        self.endpoints = endpoints
         self.llm = initialize_llm()
 
-        # Initialize LangChain GraphQL tools for each database
+        # Initialize LangChain GraphQL tools for each endpoint
         from langchain_community.tools.graphql.tool import BaseGraphQLTool
         from langchain_community.utilities.graphql import GraphQLAPIWrapper
 
@@ -883,44 +927,48 @@ class FederationOrchestrator:
             name: BaseGraphQLTool(
                 graphql_wrapper=GraphQLAPIWrapper(
                     graphql_endpoint=config.graphql_endpoint,
-                    custom_headers={"Authorization": f"Bearer {config.auth_token}"}
+                    custom_headers={
+                        config.auth_header: f"Bearer {config.auth_token}"
+                    }
                 )
             )
-            for name, config in databases.items()
+            for name, config in endpoints.items()
         }
 
     async def execute_federated_query(self, natural_language_query: str):
         """
-        Execute natural language query across federated databases.
+        Execute natural language query across federated GraphQL endpoints.
 
         Leverages LangChain's GraphQL support for query execution.
+        Works with ANY GraphQL endpoint: databases, APIs, services.
         """
-        # 1. LLM determines which databases are needed
+        # 1. LLM determines which endpoints are needed
         query_plan = await self.llm.analyze_query(
             query=natural_language_query,
-            available_databases=self.databases.keys()
+            available_endpoints=self.endpoints.keys(),
+            endpoint_types={name: ep.endpoint_type for name, ep in self.endpoints.items()}
         )
 
-        # 2. Generate GraphQL queries for each database using LLM
+        # 2. Generate GraphQL queries for each endpoint using LLM
         graphql_queries = await self.llm.generate_graphql_queries(
             query_plan=query_plan,
-            schemas={name: db.schema_cache for name, db in self.databases.items()}
+            schemas={name: ep.schema_cache for name, ep in self.endpoints.items()}
         )
 
         # 3. Execute queries in parallel using LangChain GraphQL tools
         results = await asyncio.gather(*[
-            self.execute_with_langchain(db_name, gql_query)
-            for db_name, gql_query in graphql_queries.items()
+            self.execute_with_langchain(endpoint_name, gql_query)
+            for endpoint_name, gql_query in graphql_queries.items()
         ])
 
-        # 4. Aggregate and join results
+        # 4. Aggregate and join results from heterogeneous sources
         unified_result = await self.aggregate_results(results, query_plan)
 
         return unified_result
 
-    async def execute_with_langchain(self, db_name: str, graphql_query: str):
+    async def execute_with_langchain(self, endpoint_name: str, graphql_query: str):
         """Execute GraphQL query using LangChain's GraphQL tool"""
-        tool = self.graphql_tools[db_name]
+        tool = self.graphql_tools[endpoint_name]
         result = await tool.arun(graphql_query)
         return result
 ```
@@ -933,23 +981,42 @@ class FederationOrchestrator:
 - Requires: `gql` Python package
 
 ```bash
-# .env - Configure multiple GraphQL-enabled Neo4j databases
-# Each database must have Neo4j GraphQL Library enabled
+# .env - Configure multiple GraphQL endpoints (databases + APIs + services)
 
-# Database 1: Customer Data (with GraphQL)
-GRAPHQL_DB1_NAME=customers
-GRAPHQL_DB1_ENDPOINT=https://neo4j-customers.example.com/graphql
-GRAPHQL_DB1_AUTH_TOKEN=bearer_token_1
+# Endpoint 1: Neo4j Graph Database (with Neo4j GraphQL Library)
+GRAPHQL_EP1_NAME=neo4j_customers
+GRAPHQL_EP1_TYPE=database
+GRAPHQL_EP1_ENDPOINT=https://neo4j.example.com/graphql
+GRAPHQL_EP1_AUTH_HEADER=Authorization
+GRAPHQL_EP1_AUTH_TOKEN=bearer_token_neo4j
 
-# Database 2: Product Catalog (with GraphQL)
-GRAPHQL_DB2_NAME=products
-GRAPHQL_DB2_ENDPOINT=https://neo4j-products.example.com/graphql
-GRAPHQL_DB2_AUTH_TOKEN=bearer_token_2
+# Endpoint 2: PostgreSQL via Hasura (relational data)
+GRAPHQL_EP2_NAME=hasura_orders
+GRAPHQL_EP2_TYPE=database
+GRAPHQL_EP2_ENDPOINT=https://hasura.example.com/v1/graphql
+GRAPHQL_EP2_AUTH_HEADER=X-Hasura-Admin-Secret
+GRAPHQL_EP2_AUTH_TOKEN=hasura_secret
 
-# Database 3: Analytics (with GraphQL)
-GRAPHQL_DB3_NAME=analytics
-GRAPHQL_DB3_ENDPOINT=https://neo4j-analytics.auradb.io/graphql
-GRAPHQL_DB3_AUTH_TOKEN=bearer_token_3
+# Endpoint 3: GitHub API (external service)
+GRAPHQL_EP3_NAME=github
+GRAPHQL_EP3_TYPE=api
+GRAPHQL_EP3_ENDPOINT=https://api.github.com/graphql
+GRAPHQL_EP3_AUTH_HEADER=Authorization
+GRAPHQL_EP3_AUTH_TOKEN=bearer_ghp_xxxxx
+
+# Endpoint 4: Shopify API (e-commerce)
+GRAPHQL_EP4_NAME=shopify
+GRAPHQL_EP4_TYPE=api
+GRAPHQL_EP4_ENDPOINT=https://mystore.myshopify.com/admin/api/2024-01/graphql.json
+GRAPHQL_EP4_AUTH_HEADER=X-Shopify-Access-Token
+GRAPHQL_EP4_AUTH_TOKEN=shpat_xxxxx
+
+# Endpoint 5: AWS AppSync (cloud service)
+GRAPHQL_EP5_NAME=appsync_analytics
+GRAPHQL_EP5_TYPE=service
+GRAPHQL_EP5_ENDPOINT=https://xxxxx.appsync-api.us-east-1.amazonaws.com/graphql
+GRAPHQL_EP5_AUTH_HEADER=x-api-key
+GRAPHQL_EP5_AUTH_TOKEN=da2-xxxxx
 
 # LLM for query orchestration
 LLM_PROVIDER=anthropic
@@ -964,50 +1031,69 @@ pip install langchain-community gql  # LangChain GraphQL support
 #### Benefits
 
 **For Developers:**
-- ✅ Unified interface to multiple GraphQL-enabled Neo4j databases
-- ✅ No need to manually orchestrate cross-database queries
-- ✅ Natural language interface for federated data
+- ✅ Unified interface to ANY GraphQL endpoint (databases, APIs, services)
+- ✅ No need to manually orchestrate cross-system queries
+- ✅ Natural language interface for federated data from heterogeneous sources
 - ✅ Standard MCP protocol, not GraphQL client complexity
+- ✅ Works with internal databases AND external SaaS APIs
 
 **For Non-Technical Users:**
-- ✅ Query across multiple databases with plain English
-- ✅ No knowledge of which database contains what data
-- ✅ Automatic data aggregation and joining
-- ✅ Single interface for federated graph data
+- ✅ Query across multiple systems with plain English
+- ✅ No knowledge of which system contains what data
+- ✅ Automatic data aggregation from databases, APIs, and services
+- ✅ Single interface for all GraphQL sources
 
 **For Organizations:**
-- ✅ Federation of multiple Neo4j instances with GraphQL support
-- ✅ Microservices-friendly (each service has its own graph database)
-- ✅ Domain-driven database separation
-- ✅ Scalable architecture (add databases without changing client code)
-- ✅ Works with Neo4j GraphQL Library, AuraDB, or any GraphQL-enabled Neo4j
+- ✅ **Universal Federation:** Internal DBs + External APIs in one query
+- ✅ Microservices-friendly (each service can expose GraphQL)
+- ✅ Vendor-agnostic (works with any GraphQL endpoint)
+- ✅ Reduce API integration complexity
+- ✅ Future-proof architecture (add new GraphQL sources without code changes)
 
-#### Use Case: Federated Neo4j Databases
+#### Use Case Examples
 
+**Use Case 1: Internal Databases + External SaaS**
 ```python
-# Example: E-commerce with separated domains
-
-# Scenario: Customer database (Neo4j #1) + Product database (Neo4j #2)
-User (via MCP): "Show me customers who bought iPhone in the last month"
+# Scenario: Neo4j (customers) + PostgreSQL (orders) + Stripe (payments)
+User (via MCP): "Show me high-value customers with failed payments"
 
 # MCP Server orchestrates:
-Step 1: Query Products database (Neo4j #2 GraphQL)
-  → Find product ID for "iPhone"
+Step 1: Query Neo4j GraphQL → Get customer relationship data
+Step 2: Query PostgreSQL/Hasura → Get order history
+Step 3: Query Stripe GraphQL API → Get payment failures
+Step 4: Join results → Identify high-value customers with payment issues
+```
 
-Step 2: Query Customers database (Neo4j #1 GraphQL)
-  → Find customers with orders containing that product in last 30 days
+**Use Case 2: Multi-Source Business Intelligence**
+```python
+# Scenario: Shopify (sales) + GitHub (issues) + Zendesk (support)
+User (via MCP): "Find products with high returns AND support tickets"
 
-Step 3: Join and return unified result
+# MCP Server orchestrates:
+Step 1: Query Shopify GraphQL → Get products with high return rates
+Step 2: Query GitHub GraphQL → Find issues mentioning those products
+Step 3: Query Zendesk GraphQL → Get support tickets for those products
+Step 4: Correlate all data → Identify problem products
+```
 
-# User gets: List of customers with purchase details
-# Databases remain independent but queryable as if unified
+**Use Case 3: Hybrid Cloud Architecture**
+```python
+# Scenario: On-prem Neo4j + AWS AppSync + Google Cloud Endpoints
+User (via MCP): "Combine our internal graph data with cloud analytics"
+
+# MCP Server orchestrates:
+Step 1: Query on-prem Neo4j → Internal relationship data
+Step 2: Query AWS AppSync → Cloud-based analytics
+Step 3: Query Google Cloud → Machine learning predictions
+Step 4: Merge insights → Unified business intelligence
 ```
 
 **Real-World Scenarios:**
-1. **Microservices Architecture:** Each microservice has its own Neo4j database with GraphQL
-2. **Multi-Region Deployment:** Different Neo4j instances per region, all GraphQL-enabled
-3. **Multi-Tenant SaaS:** One GraphQL Neo4j database per customer tenant
-4. **Domain-Driven Design:** Separate bounded contexts with GraphQL Neo4j databases
+1. **API Aggregation:** Combine GitHub + Jira + Slack GraphQL APIs
+2. **Polyglot Persistence:** Neo4j (graph) + PostgreSQL (relational) + MongoDB (documents)
+3. **SaaS Integration:** Internal databases + Shopify + Stripe + HubSpot
+4. **Multi-Cloud:** AWS AppSync + Google Cloud + Azure + on-prem databases
+5. **Vendor Flexibility:** Easily switch between Hasura, Postgraphile, or custom GraphQL
 
 ---
 
