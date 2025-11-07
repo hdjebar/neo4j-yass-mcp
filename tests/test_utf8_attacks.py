@@ -6,6 +6,7 @@ Tests the sanitizer's ability to detect and block various UTF-8 encoding attacks
 """
 
 import pytest
+
 from neo4j_yass_mcp.security.sanitizer import QuerySanitizer
 
 

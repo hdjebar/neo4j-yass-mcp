@@ -20,7 +20,7 @@ Security Features:
 """
 
 import re
-from typing import Any, Dict, Optional, Tuple
+from typing import AnyOptionalTuple
 
 
 class QuerySanitizer:
@@ -90,7 +90,7 @@ class QuerySanitizer:
         strict_mode: bool = False,
         allow_apoc: bool = False,
         allow_schema_changes: bool = False,
-        max_query_length: Optional[int] = None,
+        max_query_length: int | None = None,
         block_non_ascii: bool = False
     ):
         """
@@ -109,7 +109,7 @@ class QuerySanitizer:
         self.max_query_length = max_query_length or self.MAX_QUERY_LENGTH
         self.block_non_ascii = block_non_ascii
 
-    def sanitize_query(self, query: str) -> Tuple[bool, Optional[str], list]:
+    def sanitize_query(self, query: str) -> tuple[bool, str | None, list]:
         """
         Sanitize and validate a Cypher query.
 
@@ -169,7 +169,7 @@ class QuerySanitizer:
         # All checks passed
         return True, None, warnings
 
-    def sanitize_parameters(self, parameters: Optional[Dict[str, Any]]) -> Tuple[bool, Optional[str]]:
+    def sanitize_parameters(self, parameters: dict[str, Any | None]) -> tuple[bool, str | None]:
         """
         Sanitize and validate query parameters.
 
@@ -271,7 +271,7 @@ class QuerySanitizer:
 
         return False
 
-    def _detect_utf8_attacks(self, query: str) -> Tuple[bool, Optional[str]]:
+    def _detect_utf8_attacks(self, query: str) -> tuple[bool, str | None]:
         """
         Detect UTF-8/Unicode encoding attacks.
 
@@ -347,7 +347,7 @@ class QuerySanitizer:
 
 
 # Global sanitizer instance
-_sanitizer: Optional[QuerySanitizer] = None
+_sanitizer: QuerySanitizer | None = None
 
 
 def initialize_sanitizer(
@@ -381,12 +381,12 @@ def initialize_sanitizer(
     return _sanitizer
 
 
-def get_sanitizer() -> Optional[QuerySanitizer]:
+def get_sanitizer() -> QuerySanitizer | None:
     """Get the global sanitizer instance"""
     return _sanitizer
 
 
-def sanitize_query(query: str, parameters: Optional[Dict[str, Any]] = None) -> Tuple[bool, Optional[str], list]:
+def sanitize_query(query: str, parameters: dict[str, Any | None] = None) -> tuple[bool, str | None, list]:
     """
     Sanitize query and parameters using global sanitizer.
 

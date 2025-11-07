@@ -8,7 +8,6 @@ and other general-purpose functionality not specific to LLM configuration.
 import logging
 import os
 import socket
-from typing import List, Optional
 
 
 def configure_logging():
@@ -66,7 +65,7 @@ def is_port_available(host: str, port: int) -> bool:
         return False
 
 
-def find_available_port(host: str, preferred_ports: List[int], fallback_range: tuple = (8000, 9000)) -> Optional[int]:
+def find_available_port(host: str, preferred_ports: list[int], fallback_range: tuple = (8000, 9000)) -> int | None:
     """
     Find an available port from a list of preferred ports or a fallback range.
 
@@ -104,7 +103,7 @@ def find_available_port(host: str, preferred_ports: List[int], fallback_range: t
     return None
 
 
-def get_preferred_ports_from_env(env_var: str = "PREFERRED_PORTS_MCP", default: str = "8000 8001 8002") -> List[int]:
+def get_preferred_ports_from_env(env_var: str = "PREFERRED_PORTS_MCP", default: str = "8000 8001 8002") -> list[int]:
     """
     Parse preferred ports from environment variable.
 

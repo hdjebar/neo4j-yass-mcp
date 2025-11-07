@@ -16,10 +16,9 @@ import asyncio
 import json
 import logging
 import os
-import re
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, Optional
+from typing import Any
 
 from dotenv import load_dotenv
 from fastmcp import FastMCP
@@ -27,16 +26,16 @@ from langchain_neo4j import GraphCypherQAChain, Neo4jGraph
 from tokenizers import Tokenizer
 
 from neo4j_yass_mcp.config import (
-    chatLLM,
     LLMConfig,
+    chatLLM,
     configure_logging,
     find_available_port,
     get_preferred_ports_from_env,
 )
 from neo4j_yass_mcp.config.security_config import WEAK_PASSWORDS
 from neo4j_yass_mcp.security import (
-    initialize_audit_logger,
     get_audit_logger,
+    initialize_audit_logger,
     initialize_sanitizer,
     sanitize_query,
 )
@@ -69,23 +68,55 @@ else:
 mcp = FastMCP("neo4j-yass-mcp", version="1.0.0")
 
 # Global variables for Neo4j and LangChain components
-graph: Optional[Neo4jGraph] = None
-chain: Optional[GraphCypherQAChain] = None
+graph: Neo4jGraph | None = None
+chain: GraphCypherQAChain | None = None
 
 # Thread pool for async operations (LangChain is sync)
-_executor: Optional[ThreadPoolExecutor] = None
+_executor: ThreadPoolExecutor | None = None
 
 # Read-only mode flag
 _read_only_mode: bool = False
 
 # Response token limit
-_response_token_limit: Optional[int] = None
+_response_token_limit: int | None = None
 
 # Debug mode for detailed error messages (disable in production)
 _debug_mode: bool = False
 
 # Hugging Face tokenizers for accurate token counting
-_tokenizer: Optional[Tokenizer] = None
+_tokenizer: Tokenizer | None = None
+
+
+def get_executor() -> ThreadPoolExecutor:
+    """Get or create the thread pool executor for running sync LangChain operations."""
+    global _executor
+    if _executor is None:
+        _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="langchain_")
+    return _executor
+
+
+def check_read_only_access(cypher_query: str) -> str | None:
+    """
+    Check if a Cypher query is allowed in read-only mode.
+
+    Args:
+        cypher_query: The Cypher query to check
+
+    Returns:
+        Error message if query is not allowed, None if allowed
+    """
+    if not _read_only_mode:
+        return None
+
+    # Check for write operations
+    query_upper = cypher_query.upper()
+    write_keywords = ['CREATE', 'DELETE', 'SET', 'REMOVE', 'MERGE', 'DROP']
+
+    for keyword in write_keywords:
+        if f' {keyword} ' in f' {query_upper} ' or query_upper.startswith(keyword + ' '):
+            return f"Read-only mode: {keyword} operations are not allowed"
+
+    return None
 
 
 def get_tokenizer() -> Tokenizer:
@@ -169,7 +200,7 @@ def sanitize_error_message(error: Exception) -> str:
     return f"{error_type}: An error occurred. Enable DEBUG_MODE for details."
 
 
-def truncate_response(data: Any, max_tokens: Optional[int] = None) -> tuple[Any, bool]:
+def truncate_response(data: Any, max_tokens: int | None = None) -> tuple[Any, bool]:
     """
     Truncate response data if it exceeds token limit.
 
@@ -361,7 +392,7 @@ Status: Connected
 # =============================================================================
 
 @mcp.tool()
-async def query_graph(query: str) -> Dict[str, Any]:
+async def query_graph(query: str) -> dict[str, Any]:
     """
     Query the Neo4j graph database using natural language.
 
@@ -524,7 +555,7 @@ async def query_graph(query: str) -> Dict[str, Any]:
         return error_response
 
 
-async def _execute_cypher_impl(cypher_query: str, parameters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def _execute_cypher_impl(cypher_query: str, parameters: dict[str, Any | None] = None) -> dict[str, Any]:
     """
     Internal implementation of execute_cypher.
 
@@ -683,7 +714,7 @@ async def _execute_cypher_impl(cypher_query: str, parameters: Optional[Dict[str,
 # the MCP runtime only after `initialize_neo4j()` runs in `main()`. This
 # ensures `_read_only_mode` is set correctly before deciding whether to
 # expose the tool to MCP clients.
-async def execute_cypher(cypher_query: str, parameters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def execute_cypher(cypher_query: str, parameters: dict[str, Any | None] = None) -> dict[str, Any]:
     """
     Execute a raw Cypher query against the Neo4j database.
 
@@ -696,7 +727,7 @@ async def execute_cypher(cypher_query: str, parameters: Optional[Dict[str, Any]]
 
 
 @mcp.tool()
-async def refresh_schema() -> Dict[str, Any]:
+async def refresh_schema() -> dict[str, Any]:
     """
     Refresh the cached schema information from the Neo4j database.
 

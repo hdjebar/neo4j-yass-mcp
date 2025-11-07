@@ -18,7 +18,7 @@ import os
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import AnyOptional
 from uuid import uuid4
 
 
@@ -175,7 +175,7 @@ class AuditLogger:
 
         return text
 
-    def _format_entry(self, entry: Dict[str, Any]) -> str:
+    def _format_entry(self, entry: dict[str, Any]) -> str:
         """Format audit log entry based on configured format"""
         if self.log_format == "json":
             return json.dumps(entry, ensure_ascii=False, default=str)
@@ -204,9 +204,9 @@ class AuditLogger:
         self,
         tool: str,
         query: str,
-        parameters: Optional[Dict[str, Any]] = None,
-        user: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        parameters: dict[str, Any | None] = None,
+        user: str | None = None,
+        metadata: dict[str, Any | None] = None
     ):
         """
         Log a query execution.
@@ -241,10 +241,10 @@ class AuditLogger:
         self,
         tool: str,
         query: str,
-        response: Dict[str, Any],
-        execution_time_ms: Optional[float] = None,
-        user: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        response: dict[str, Any],
+        execution_time_ms: float | None = None,
+        user: str | None = None,
+        metadata: dict[str, Any | None] = None
     ):
         """
         Log a query response.
@@ -290,9 +290,9 @@ class AuditLogger:
         tool: str,
         query: str,
         error: str,
-        error_type: Optional[str] = None,
-        user: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        error_type: str | None = None,
+        user: str | None = None,
+        metadata: dict[str, Any | None] = None
     ):
         """
         Log an error.
@@ -329,7 +329,7 @@ class AuditLogger:
 
 
 # Global audit logger instance
-_audit_logger: Optional[AuditLogger] = None
+_audit_logger: AuditLogger | None = None
 
 
 def initialize_audit_logger() -> AuditLogger:
@@ -371,6 +371,6 @@ def initialize_audit_logger() -> AuditLogger:
     return _audit_logger
 
 
-def get_audit_logger() -> Optional[AuditLogger]:
+def get_audit_logger() -> AuditLogger | None:
     """Get the global audit logger instance"""
     return _audit_logger
