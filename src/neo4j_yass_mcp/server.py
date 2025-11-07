@@ -58,7 +58,7 @@ if sanitizer_enabled:
         allow_apoc=os.getenv("SANITIZER_ALLOW_APOC", "false").lower() == "true",
         allow_schema_changes=os.getenv("SANITIZER_ALLOW_SCHEMA_CHANGES", "false").lower() == "true",
         block_non_ascii=os.getenv("SANITIZER_BLOCK_NON_ASCII", "false").lower() == "true",
-        max_query_length=int(os.getenv("SANITIZER_MAX_QUERY_LENGTH", "10000"))
+        max_query_length=int(os.getenv("SANITIZER_MAX_QUERY_LENGTH", "10000")),
     )
     logger.info("Query sanitizer enabled (injection + UTF-8 attack protection active)")
 else:
@@ -110,10 +110,10 @@ def check_read_only_access(cypher_query: str) -> str | None:
 
     # Check for write operations
     query_upper = cypher_query.upper()
-    write_keywords = ['CREATE', 'DELETE', 'SET', 'REMOVE', 'MERGE', 'DROP']
+    write_keywords = ["CREATE", "DELETE", "SET", "REMOVE", "MERGE", "DROP"]
 
     for keyword in write_keywords:
-        if f' {keyword} ' in f' {query_upper} ' or query_upper.startswith(keyword + ' '):
+        if f" {keyword} " in f" {query_upper} " or query_upper.startswith(keyword + " "):
             return f"Read-only mode: {keyword} operations are not allowed"
 
     return None
@@ -279,19 +279,25 @@ def initialize_neo4j():
                 "Weak password detected. Set ALLOW_WEAK_PASSWORDS=true to override (NOT recommended for production)"
             )
         else:
-            logger.warning("⚠️  ALLOW_WEAK_PASSWORDS=true - Weak password allowed (DEVELOPMENT ONLY!)")
+            logger.warning(
+                "⚠️  ALLOW_WEAK_PASSWORDS=true - Weak password allowed (DEVELOPMENT ONLY!)"
+            )
 
     # Debug mode
     _debug_mode = os.getenv("DEBUG_MODE", "false").lower() == "true"
     if _debug_mode:
-        logger.warning("⚠️  DEBUG_MODE=true - Detailed error messages will be returned (NOT for production!)")
+        logger.warning(
+            "⚠️  DEBUG_MODE=true - Detailed error messages will be returned (NOT for production!)"
+        )
     else:
         logger.info("Production mode: Error messages will be sanitized")
 
     # Read-only mode
     _read_only_mode = os.getenv("NEO4J_READ_ONLY", "false").lower() == "true"
     if _read_only_mode:
-        logger.warning("⚠️  Server running in READ-ONLY mode - write-capable tools will be hidden from MCP clients")
+        logger.warning(
+            "⚠️  Server running in READ-ONLY mode - write-capable tools will be hidden from MCP clients"
+        )
 
     # Response token limit
     token_limit_str = os.getenv("NEO4J_RESPONSE_TOKEN_LIMIT")
@@ -308,7 +314,7 @@ def initialize_neo4j():
         username=neo4j_username,
         password=neo4j_password,
         database=neo4j_database,
-        timeout=neo4j_timeout
+        timeout=neo4j_timeout,
     )
 
     # LLM configuration
@@ -317,7 +323,7 @@ def initialize_neo4j():
         model=os.getenv("LLM_MODEL", "gpt-4"),
         temperature=float(os.getenv("LLM_TEMPERATURE", "0")),
         api_key=os.getenv("LLM_API_KEY", ""),
-        streaming=os.getenv("LLM_STREAMING", "false").lower() == "true"
+        streaming=os.getenv("LLM_STREAMING", "false").lower() == "true",
     )
 
     logger.info(f"Initializing LLM: {llm_config.provider}/{llm_config.model}")
@@ -329,7 +335,9 @@ def initialize_neo4j():
     allow_dangerous = os.getenv("LANGCHAIN_ALLOW_DANGEROUS_REQUESTS", "false").lower() == "true"
 
     if allow_dangerous:
-        logger.warning("⚠️  LANGCHAIN_ALLOW_DANGEROUS_REQUESTS=true - LangChain safety checks DISABLED!")
+        logger.warning(
+            "⚠️  LANGCHAIN_ALLOW_DANGEROUS_REQUESTS=true - LangChain safety checks DISABLED!"
+        )
         logger.warning("⚠️  Relying solely on query sanitizer for security. Use with caution!")
 
     chain = GraphCypherQAChain.from_llm(
@@ -337,7 +345,7 @@ def initialize_neo4j():
         graph=graph,
         allow_dangerous_requests=allow_dangerous,
         verbose=True,
-        return_intermediate_steps=True
+        return_intermediate_steps=True,
     )
 
     logger.info("Neo4j MCP Server initialized successfully")
@@ -350,6 +358,7 @@ def initialize_neo4j():
 # =============================================================================
 # Resources
 # =============================================================================
+
 
 @mcp.resource("neo4j://schema")
 def get_schema() -> str:
@@ -391,6 +400,7 @@ Status: Connected
 # Tools
 # =============================================================================
 
+
 @mcp.tool()
 async def query_graph(query: str) -> dict[str, Any]:
     """
@@ -421,10 +431,7 @@ async def query_graph(query: str) -> dict[str, Any]:
         - "Show me actors who have worked together"
     """
     if chain is None or graph is None:
-        return {
-            "error": "Neo4j or LangChain not initialized",
-            "success": False
-        }
+        return {"error": "Neo4j or LangChain not initialized", "success": False}
 
     # Audit log the query
     audit_logger = get_audit_logger()
@@ -438,17 +445,17 @@ async def query_graph(query: str) -> dict[str, Any]:
         start_time = time.time()
 
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            get_executor(),
-            lambda: chain.invoke({"query": query})
-        )
+        result = await loop.run_in_executor(get_executor(), lambda: chain.invoke({"query": query}))
 
         execution_time_ms = (time.time() - start_time) * 1000
 
         # Extract generated Cypher query from intermediate steps
         generated_cypher = ""
         if "intermediate_steps" in result and result["intermediate_steps"]:
-            if isinstance(result["intermediate_steps"], list) and len(result["intermediate_steps"]) > 0:
+            if (
+                isinstance(result["intermediate_steps"], list)
+                and len(result["intermediate_steps"]) > 0
+            ):
                 first_step = result["intermediate_steps"][0]
                 if isinstance(first_step, dict) and "query" in first_step:
                     generated_cypher = first_step["query"]
@@ -463,7 +470,7 @@ async def query_graph(query: str) -> dict[str, Any]:
                     "error": f"LLM-generated query blocked by sanitizer: {sanitize_error}",
                     "generated_cypher": generated_cypher,
                     "sanitizer_blocked": True,
-                    "success": False
+                    "success": False,
                 }
 
                 # Audit log the blocked query
@@ -472,7 +479,7 @@ async def query_graph(query: str) -> dict[str, Any]:
                         tool="query_graph",
                         query=query,
                         error=sanitize_error,
-                        metadata={"generated_cypher": generated_cypher, "sanitizer_blocked": True}
+                        metadata={"generated_cypher": generated_cypher, "sanitizer_blocked": True},
                     )
 
                 return error_response
@@ -490,7 +497,7 @@ async def query_graph(query: str) -> dict[str, Any]:
                     "error": "LLM generated a write operation, but server is in read-only mode",
                     "generated_cypher": generated_cypher,
                     "read_only_mode": True,
-                    "success": False
+                    "success": False,
                 }
 
                 # Audit log the error
@@ -499,7 +506,7 @@ async def query_graph(query: str) -> dict[str, Any]:
                         tool="query_graph",
                         query=query,
                         error=error_response["error"],
-                        metadata={"generated_cypher": generated_cypher}
+                        metadata={"generated_cypher": generated_cypher},
                     )
 
                 return error_response
@@ -512,7 +519,7 @@ async def query_graph(query: str) -> dict[str, Any]:
             "answer": result.get("result", ""),
             "generated_cypher": generated_cypher,
             "intermediate_steps": truncated_steps,
-            "success": True
+            "success": True,
         }
 
         if was_truncated:
@@ -526,7 +533,7 @@ async def query_graph(query: str) -> dict[str, Any]:
                 tool="query_graph",
                 query=query,
                 response=response,
-                execution_time_ms=execution_time_ms
+                execution_time_ms=execution_time_ms,
             )
 
         return response
@@ -537,11 +544,7 @@ async def query_graph(query: str) -> dict[str, Any]:
         # Sanitize error message for security
         safe_error_message = sanitize_error_message(e)
 
-        error_response = {
-            "error": safe_error_message,
-            "type": type(e).__name__,
-            "success": False
-        }
+        error_response = {"error": safe_error_message, "type": type(e).__name__, "success": False}
 
         # Audit log the error (with full details)
         if audit_logger:
@@ -549,13 +552,15 @@ async def query_graph(query: str) -> dict[str, Any]:
                 tool="query_graph",
                 query=query,
                 error=str(e),  # Log full error for debugging
-                error_type=type(e).__name__
+                error_type=type(e).__name__,
             )
 
         return error_response
 
 
-async def _execute_cypher_impl(cypher_query: str, parameters: dict[str, Any | None] = None) -> dict[str, Any]:
+async def _execute_cypher_impl(
+    cypher_query: str, parameters: dict[str, Any | None] = None
+) -> dict[str, Any]:
     """
     Internal implementation of execute_cypher.
 
@@ -588,10 +593,7 @@ async def _execute_cypher_impl(cypher_query: str, parameters: dict[str, Any | No
           parameters: {"name": "Tom Cruise"}
     """
     if graph is None:
-        return {
-            "error": "Neo4j graph not initialized",
-            "success": False
-        }
+        return {"error": "Neo4j graph not initialized", "success": False}
 
     # Sanitize query and parameters (SISO prevention)
     if sanitizer_enabled:
@@ -603,7 +605,7 @@ async def _execute_cypher_impl(cypher_query: str, parameters: dict[str, Any | No
                 "error": f"Query blocked by sanitizer: {sanitize_error}",
                 "query": cypher_query[:200],  # Only show first 200 chars
                 "sanitizer_blocked": True,
-                "success": False
+                "success": False,
             }
 
             # Audit log the blocked query
@@ -613,7 +615,7 @@ async def _execute_cypher_impl(cypher_query: str, parameters: dict[str, Any | No
                     tool="execute_cypher",
                     query=cypher_query,
                     error=sanitize_error,
-                    metadata={"sanitizer_blocked": True}
+                    metadata={"sanitizer_blocked": True},
                 )
 
             return error_response
@@ -634,9 +636,7 @@ async def _execute_cypher_impl(cypher_query: str, parameters: dict[str, Any | No
         # Audit log the error
         if audit_logger:
             audit_logger.log_error(
-                tool="execute_cypher",
-                query=cypher_query,
-                error=read_only_error["error"]
+                tool="execute_cypher", query=cypher_query, error=read_only_error["error"]
             )
         return read_only_error
 
@@ -650,8 +650,7 @@ async def _execute_cypher_impl(cypher_query: str, parameters: dict[str, Any | No
 
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
-            get_executor(),
-            lambda: graph.query(cypher_query, params=params)
+            get_executor(), lambda: graph.query(cypher_query, params=params)
         )
 
         execution_time_ms = (time.time() - start_time) * 1000
@@ -664,14 +663,18 @@ async def _execute_cypher_impl(cypher_query: str, parameters: dict[str, Any | No
             "parameters": params,
             "result": truncated_result,
             "count": len(result) if isinstance(result, list) else 1,
-            "success": True
+            "success": True,
         }
 
         if was_truncated:
             response["truncated"] = True
             response["original_count"] = len(result) if isinstance(result, list) else 1
-            response["returned_count"] = len(truncated_result) if isinstance(truncated_result, list) else None
-            logger.info(f"Response truncated: {response.get('original_count')} → {response.get('returned_count')} items")
+            response["returned_count"] = (
+                len(truncated_result) if isinstance(truncated_result, list) else None
+            )
+            logger.info(
+                f"Response truncated: {response.get('original_count')} → {response.get('returned_count')} items"
+            )
 
         # Audit log the response
         if audit_logger:
@@ -680,7 +683,7 @@ async def _execute_cypher_impl(cypher_query: str, parameters: dict[str, Any | No
                 query=cypher_query,
                 response=response,
                 execution_time_ms=execution_time_ms,
-                metadata={"parameters": params}
+                metadata={"parameters": params},
             )
 
         return response
@@ -695,7 +698,7 @@ async def _execute_cypher_impl(cypher_query: str, parameters: dict[str, Any | No
             "error": safe_error_message,
             "type": type(e).__name__,
             "query": cypher_query[:100] + "..." if len(cypher_query) > 100 else cypher_query,
-            "success": False
+            "success": False,
         }
 
         # Audit log the error (with full details)
@@ -704,7 +707,7 @@ async def _execute_cypher_impl(cypher_query: str, parameters: dict[str, Any | No
                 tool="execute_cypher",
                 query=cypher_query,
                 error=str(e),  # Log full error for debugging
-                error_type=type(e).__name__
+                error_type=type(e).__name__,
             )
 
         return error_response
@@ -714,7 +717,9 @@ async def _execute_cypher_impl(cypher_query: str, parameters: dict[str, Any | No
 # the MCP runtime only after `initialize_neo4j()` runs in `main()`. This
 # ensures `_read_only_mode` is set correctly before deciding whether to
 # expose the tool to MCP clients.
-async def execute_cypher(cypher_query: str, parameters: dict[str, Any | None] = None) -> dict[str, Any]:
+async def execute_cypher(
+    cypher_query: str, parameters: dict[str, Any | None] = None
+) -> dict[str, Any]:
     """
     Execute a raw Cypher query against the Neo4j database.
 
@@ -740,40 +745,27 @@ async def refresh_schema() -> dict[str, Any]:
         Dictionary containing the updated schema and success status
     """
     if graph is None:
-        return {
-            "error": "Neo4j graph not initialized",
-            "success": False
-        }
+        return {"error": "Neo4j graph not initialized", "success": False}
 
     try:
         logger.info("Refreshing graph schema")
 
         # Run schema refresh in thread pool
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
-            get_executor(),
-            graph.refresh_schema
-        )
+        await loop.run_in_executor(get_executor(), graph.refresh_schema)
         schema = graph.get_schema()
 
-        return {
-            "schema": schema,
-            "message": "Schema refreshed successfully",
-            "success": True
-        }
+        return {"schema": schema, "message": "Schema refreshed successfully", "success": True}
 
     except Exception as e:
         logger.error(f"Error in refresh_schema: {str(e)}", exc_info=True)
-        return {
-            "error": str(e),
-            "type": type(e).__name__,
-            "success": False
-        }
+        return {"error": str(e), "type": type(e).__name__, "success": False}
 
 
 # =============================================================================
 # Main Entry Point
 # =============================================================================
+
 
 def cleanup():
     """
@@ -798,7 +790,9 @@ def cleanup():
             _executor.shutdown(wait=True, timeout=30)
             logger.info("✓ Thread pool executor shutdown complete")
         except TimeoutError:
-            logger.warning("⚠ Thread pool executor shutdown timed out - some tasks may not have completed")
+            logger.warning(
+                "⚠ Thread pool executor shutdown timed out - some tasks may not have completed"
+            )
         except Exception as e:
             logger.error(f"✗ Error shutting down executor: {e}", exc_info=True)
         finally:
@@ -811,7 +805,7 @@ def cleanup():
         logger.info("Closing Neo4j driver connections...")
         try:
             # Check if graph has a driver attribute
-            if hasattr(graph, '_driver') and graph._driver is not None:
+            if hasattr(graph, "_driver") and graph._driver is not None:
                 # Close the driver (this closes all sessions and connections)
                 graph._driver.close()
                 logger.info("✓ Neo4j driver closed successfully")
@@ -830,6 +824,7 @@ def cleanup():
 def main():
     """Main entry point for the MCP server"""
     import atexit
+
     atexit.register(cleanup)
 
     # Initialize connections (Neo4j, LLM, chain) here instead of at import time.
@@ -893,6 +888,3 @@ def main():
         logger.info("Starting MCP server with stdio transport")
         logger.info(f"Async worker threads: {os.getenv('MCP_MAX_WORKERS', '10')}")
         mcp.run()
-
-
-

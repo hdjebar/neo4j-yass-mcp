@@ -14,6 +14,7 @@ from typing import Any
 @dataclass
 class LLMConfig:
     """Configuration for LLM providers"""
+
     provider: str  # "openai", "anthropic", or "google-genai"
     model: str
     temperature: float
@@ -45,30 +46,35 @@ def chatLLM(config: LLMConfig) -> Any:
     """
     if config.provider == "openai":
         from langchain_openai import ChatOpenAI
+
         return ChatOpenAI(
             model=config.model,
             temperature=config.temperature,
             openai_api_key=config.api_key,
-            streaming=config.streaming
+            streaming=config.streaming,
         )
 
     elif config.provider == "anthropic":
         from langchain_anthropic import ChatAnthropic
+
         return ChatAnthropic(
             model=config.model,
             temperature=config.temperature,
             anthropic_api_key=config.api_key,
-            streaming=config.streaming
+            streaming=config.streaming,
         )
 
     elif config.provider == "google-genai":
         from langchain_google_genai import ChatGoogleGenerativeAI
+
         return ChatGoogleGenerativeAI(
             model=config.model,
             temperature=config.temperature,
             google_api_key=config.api_key,
-            streaming=config.streaming
+            streaming=config.streaming,
         )
 
     else:
-        raise ValueError(f"Unknown provider: {config.provider}. Supported providers: openai, anthropic, google-genai")
+        raise ValueError(
+            f"Unknown provider: {config.provider}. Supported providers: openai, anthropic, google-genai"
+        )

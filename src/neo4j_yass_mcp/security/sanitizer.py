@@ -38,42 +38,38 @@ class QuerySanitizer:
     # Dangerous patterns that should be blocked
     DANGEROUS_PATTERNS = [
         # System commands and file operations
-        r'(?i)LOAD\s+CSV',                          # File loading
-        r'(?i)apoc\.load',                          # APOC file loading
-        r'(?i)apoc\.export',                        # APOC export
-        r'(?i)apoc\.cypher\.run',                   # Dynamic Cypher execution
-        r'(?i)apoc\.refactor',                      # Schema refactoring
-        r'(?i)dbms\.security',                      # Security procedures
-        r'(?i)dbms\.cluster',                       # Cluster operations
-
+        r"(?i)LOAD\s+CSV",  # File loading
+        r"(?i)apoc\.load",  # APOC file loading
+        r"(?i)apoc\.export",  # APOC export
+        r"(?i)apoc\.cypher\.run",  # Dynamic Cypher execution
+        r"(?i)apoc\.refactor",  # Schema refactoring
+        r"(?i)dbms\.security",  # Security procedures
+        r"(?i)dbms\.cluster",  # Cluster operations
         # Potential injection patterns (improved to catch whitespace variations)
-        r';\s+(?i:MATCH)',                          # Query chaining with any whitespace
-        r';\s+(?i:CREATE)',                         # Query chaining with any whitespace
-        r';\s+(?i:MERGE)',                          # Query chaining with any whitespace
-        r';\s+(?i:DELETE)',                         # Query chaining with any whitespace
-        r';\s+(?i:DROP)',                           # Query chaining with any whitespace
-        r';\s+(?i:CALL)',                           # Query chaining with CALL
-
+        r";\s+(?i:MATCH)",  # Query chaining with any whitespace
+        r";\s+(?i:CREATE)",  # Query chaining with any whitespace
+        r";\s+(?i:MERGE)",  # Query chaining with any whitespace
+        r";\s+(?i:DELETE)",  # Query chaining with any whitespace
+        r";\s+(?i:DROP)",  # Query chaining with any whitespace
+        r";\s+(?i:CALL)",  # Query chaining with CALL
         # Comment-based injection (fixed for multi-line)
-        r'/\*[\s\S]*?\*/',                          # Block comments (multi-line aware)
-        r'//[^\n]*',                                # Line comments (safer pattern)
-
+        r"/\*[\s\S]*?\*/",  # Block comments (multi-line aware)
+        r"//[^\n]*",  # Line comments (safer pattern)
         # Excessive operations
-        r'(?i)FOREACH\s*\([^)]*\s+IN\s+range\s*\(\s*\d+\s*,\s*\d{6,}',  # Large range iterations
-
+        r"(?i)FOREACH\s*\([^)]*\s+IN\s+range\s*\(\s*\d+\s*,\s*\d{6,}",  # Large range iterations
         # Additional dangerous patterns
-        r'(?i)apoc\.periodic\.iterate',             # Batch operations that can cause DoS
-        r'(?i)apoc\.cypher\.parallel',              # Parallel execution abuse
+        r"(?i)apoc\.periodic\.iterate",  # Batch operations that can cause DoS
+        r"(?i)apoc\.cypher\.parallel",  # Parallel execution abuse
     ]
 
     # Suspicious but not always dangerous (warnings)
     SUSPICIOUS_PATTERNS = [
-        r'(?i)CALL\s+apoc',                         # APOC procedures (review needed)
-        r'(?i)CALL\s+dbms',                         # DBMS procedures (review needed)
-        r'(?i)CREATE\s+INDEX',                      # Schema changes
-        r'(?i)DROP\s+INDEX',                        # Schema changes
-        r'(?i)CREATE\s+CONSTRAINT',                 # Schema changes
-        r'(?i)DROP\s+CONSTRAINT',                   # Schema changes
+        r"(?i)CALL\s+apoc",  # APOC procedures (review needed)
+        r"(?i)CALL\s+dbms",  # DBMS procedures (review needed)
+        r"(?i)CREATE\s+INDEX",  # Schema changes
+        r"(?i)DROP\s+INDEX",  # Schema changes
+        r"(?i)CREATE\s+CONSTRAINT",  # Schema changes
+        r"(?i)DROP\s+CONSTRAINT",  # Schema changes
     ]
 
     # Maximum query length
@@ -91,7 +87,7 @@ class QuerySanitizer:
         allow_apoc: bool = False,
         allow_schema_changes: bool = False,
         max_query_length: int | None = None,
-        block_non_ascii: bool = False
+        block_non_ascii: bool = False,
     ):
         """
         Initialize query sanitizer.
@@ -126,7 +122,11 @@ class QuerySanitizer:
 
         # Check 1: Query length
         if len(query) > self.max_query_length:
-            return False, f"Query exceeds maximum length ({self.max_query_length} characters)", warnings
+            return (
+                False,
+                f"Query exceeds maximum length ({self.max_query_length} characters)",
+                warnings,
+            )
 
         # Check 2: Null or empty
         if not query or not query.strip():
@@ -141,17 +141,23 @@ class QuerySanitizer:
         for pattern in self.SUSPICIOUS_PATTERNS:
             if re.search(pattern, query, re.IGNORECASE):
                 # APOC exceptions
-                if 'apoc' in pattern.lower() and self.allow_apoc:
+                if "apoc" in pattern.lower() and self.allow_apoc:
                     continue
 
                 # Schema change exceptions
-                if ('INDEX' in pattern or 'CONSTRAINT' in pattern) and self.allow_schema_changes:
+                if ("INDEX" in pattern or "CONSTRAINT" in pattern) and self.allow_schema_changes:
                     continue
 
                 if self.strict_mode:
-                    return False, f"Blocked in strict mode: Query contains suspicious pattern: {pattern}", warnings
+                    return (
+                        False,
+                        f"Blocked in strict mode: Query contains suspicious pattern: {pattern}",
+                        warnings,
+                    )
                 else:
-                    warnings.append(f"Warning: Query contains pattern that may need review: {pattern}")
+                    warnings.append(
+                        f"Warning: Query contains pattern that may need review: {pattern}"
+                    )
 
         # Check 5: Balance of parentheses, braces, brackets
         if not self._check_balanced_delimiters(query):
@@ -189,7 +195,7 @@ class QuerySanitizer:
         # Validate each parameter
         for key, value in parameters.items():
             # Check parameter key
-            if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', key):
+            if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", key):
                 return False, f"Invalid parameter name: {key}"
 
             # Check parameter value
@@ -204,6 +210,7 @@ class QuerySanitizer:
             elif isinstance(value, (list, dict)):
                 # Recursively check nested structures
                 import json
+
                 try:
                     json_str = json.dumps(value)
                     if len(json_str) > self.MAX_PARAM_LENGTH:
@@ -216,12 +223,12 @@ class QuerySanitizer:
     def _check_balanced_delimiters(self, query: str) -> bool:
         """Check if parentheses, braces, and brackets are balanced"""
         stack = []
-        pairs = {'(': ')', '{': '}', '[': ']'}
+        pairs = {"(": ")", "{": "}", "[": "]"}
         closing = set(pairs.values())
 
         # Remove string literals to avoid false positives
-        query_no_strings = re.sub(r"'[^']*'", '', query)
-        query_no_strings = re.sub(r'"[^"]*"', '', query_no_strings)
+        query_no_strings = re.sub(r"'[^']*'", "", query)
+        query_no_strings = re.sub(r'"[^"]*"', "", query_no_strings)
 
         for char in query_no_strings:
             if char in pairs:
@@ -236,11 +243,11 @@ class QuerySanitizer:
         """Detect potential string escape injection"""
         # Look for suspicious string escape patterns
         suspicious_escapes = [
-            r"\\x[0-9a-fA-F]{2}",              # Hex escapes
-            r"\\u[0-9a-fA-F]{4}",              # Unicode escapes
-            r"\\[0-7]{3}",                      # Octal escapes
-            r"'+\s*\+\s*'",                     # String concatenation with +
-            r'"+\s*\+\s*"',                     # String concatenation with +
+            r"\\x[0-9a-fA-F]{2}",  # Hex escapes
+            r"\\u[0-9a-fA-F]{4}",  # Unicode escapes
+            r"\\[0-7]{3}",  # Octal escapes
+            r"'+\s*\+\s*'",  # String concatenation with +
+            r'"+\s*\+\s*"',  # String concatenation with +
         ]
 
         for pattern in suspicious_escapes:
@@ -253,16 +260,16 @@ class QuerySanitizer:
         """Detect injection attempts in parameter values"""
         # Patterns that should not appear in parameter values
         injection_patterns = [
-            r';\s*\w+',                         # Statement separator
-            r'\bMATCH\b',                       # Cypher keywords
-            r'\bCREATE\b',
-            r'\bMERGE\b',
-            r'\bDELETE\b',
-            r'\bDROP\b',
-            r'\bCALL\b',
-            r'\bLOAD\b',
-            r'--',                              # SQL comment
-            r'/\*',                             # Block comment start
+            r";\s*\w+",  # Statement separator
+            r"\bMATCH\b",  # Cypher keywords
+            r"\bCREATE\b",
+            r"\bMERGE\b",
+            r"\bDELETE\b",
+            r"\bDROP\b",
+            r"\bCALL\b",
+            r"\bLOAD\b",
+            r"--",  # SQL comment
+            r"/\*",  # Block comment start
         ]
 
         for pattern in injection_patterns:
@@ -287,10 +294,10 @@ class QuerySanitizer:
         """
         # Zero-width characters (invisible characters for data hiding)
         zero_width_chars = [
-            '\u200B',  # Zero-width space
-            '\u200C',  # Zero-width non-joiner
-            '\u200D',  # Zero-width joiner
-            '\uFEFF',  # Zero-width no-break space (BOM)
+            "\u200b",  # Zero-width space
+            "\u200c",  # Zero-width non-joiner
+            "\u200d",  # Zero-width joiner
+            "\ufeff",  # Zero-width no-break space (BOM)
         ]
 
         for char in zero_width_chars:
@@ -299,47 +306,56 @@ class QuerySanitizer:
 
         # Directional override characters (text direction manipulation)
         directional_chars = [
-            '\u202E',  # Right-to-left override
-            '\u202D',  # Left-to-right override
-            '\u202A',  # Left-to-right embedding
-            '\u202B',  # Right-to-left embedding
+            "\u202e",  # Right-to-left override
+            "\u202d",  # Left-to-right override
+            "\u202a",  # Left-to-right embedding
+            "\u202b",  # Right-to-left embedding
         ]
 
         for char in directional_chars:
             if char in query:
-                return False, f"Blocked: Query contains directional override character (U+{ord(char):04X})"
+                return (
+                    False,
+                    f"Blocked: Query contains directional override character (U+{ord(char):04X})",
+                )
 
         # Homograph detection (Cyrillic/Greek lookalikes for Latin)
         # Common homographs used in attacks
         homograph_chars = {
-            '\u0430': 'a',  # Cyrillic 'a'
-            '\u0435': 'e',  # Cyrillic 'e'
-            '\u043E': 'o',  # Cyrillic 'o'
-            '\u0440': 'p',  # Cyrillic 'p'
-            '\u0441': 'c',  # Cyrillic 'c'
-            '\u0445': 'x',  # Cyrillic 'x'
-            '\u0455': 's',  # Cyrillic 's'
-            '\u0456': 'i',  # Cyrillic 'i'
-            '\u03BF': 'o',  # Greek omicron
-            '\u03C1': 'p',  # Greek rho
+            "\u0430": "a",  # Cyrillic 'a'
+            "\u0435": "e",  # Cyrillic 'e'
+            "\u043e": "o",  # Cyrillic 'o'
+            "\u0440": "p",  # Cyrillic 'p'
+            "\u0441": "c",  # Cyrillic 'c'
+            "\u0445": "x",  # Cyrillic 'x'
+            "\u0455": "s",  # Cyrillic 's'
+            "\u0456": "i",  # Cyrillic 'i'
+            "\u03bf": "o",  # Greek omicron
+            "\u03c1": "p",  # Greek rho
         }
 
         for char, lookalike in homograph_chars.items():
             if char in query:
-                return False, f"Blocked: Query contains homograph character '{char}' (looks like '{lookalike}', U+{ord(char):04X})"
+                return (
+                    False,
+                    f"Blocked: Query contains homograph character '{char}' (looks like '{lookalike}', U+{ord(char):04X})",
+                )
 
         # Check for non-ASCII if strict mode enabled
         if self.block_non_ascii:
             # Allow common exceptions (quotes, etc.) but block everything else
-            allowed_non_ascii = set('\u2018\u2019\u201C\u201D')  # Smart quotes
+            allowed_non_ascii = set("\u2018\u2019\u201c\u201d")  # Smart quotes
 
             for char in query:
                 if ord(char) > 127 and char not in allowed_non_ascii:
-                    return False, f"Blocked: Non-ASCII character '{char}' (U+{ord(char):04X}) not allowed in strict mode"
+                    return (
+                        False,
+                        f"Blocked: Non-ASCII character '{char}' (U+{ord(char):04X}) not allowed in strict mode",
+                    )
 
         # Validate UTF-8 encoding (detect invalid sequences)
         try:
-            query.encode('utf-8', errors='strict')
+            query.encode("utf-8", errors="strict")
         except UnicodeEncodeError as e:
             return False, f"Blocked: Invalid UTF-8 encoding at position {e.start}"
 
@@ -355,7 +371,7 @@ def initialize_sanitizer(
     allow_apoc: bool = False,
     allow_schema_changes: bool = False,
     block_non_ascii: bool = False,
-    max_query_length: int = 10000
+    max_query_length: int = 10000,
 ) -> QuerySanitizer:
     """
     Initialize global query sanitizer.
@@ -376,7 +392,7 @@ def initialize_sanitizer(
         allow_apoc=allow_apoc,
         allow_schema_changes=allow_schema_changes,
         block_non_ascii=block_non_ascii,
-        max_query_length=max_query_length
+        max_query_length=max_query_length,
     )
     return _sanitizer
 
@@ -386,7 +402,9 @@ def get_sanitizer() -> QuerySanitizer | None:
     return _sanitizer
 
 
-def sanitize_query(query: str, parameters: dict[str, Any | None] = None) -> tuple[bool, str | None, list]:
+def sanitize_query(
+    query: str, parameters: dict[str, Any | None] = None
+) -> tuple[bool, str | None, list]:
     """
     Sanitize query and parameters using global sanitizer.
 

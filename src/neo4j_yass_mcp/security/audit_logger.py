@@ -41,7 +41,7 @@ class AuditLogger:
         log_queries: bool = True,
         log_responses: bool = True,
         log_errors: bool = True,
-        pii_redaction: bool = False
+        pii_redaction: bool = False,
     ):
         """
         Initialize audit logger.
@@ -88,11 +88,11 @@ class AuditLogger:
         log_file = self._get_log_filename()
 
         # Configure file handler
-        handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
+        handler = logging.FileHandler(log_file, mode="a", encoding="utf-8")
         handler.setLevel(logging.INFO)
 
         # Simple format for audit logs (we handle formatting ourselves)
-        formatter = logging.Formatter('%(message)s')
+        formatter = logging.Formatter("%(message)s")
         handler.setFormatter(formatter)
 
         self.logger.addHandler(handler)
@@ -161,17 +161,21 @@ class AuditLogger:
             return text
 
         # Email addresses
-        text = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '[EMAIL_REDACTED]', text)
+        text = re.sub(
+            r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "[EMAIL_REDACTED]", text
+        )
 
         # Phone numbers (various formats)
-        text = re.sub(r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b', '[PHONE_REDACTED]', text)
-        text = re.sub(r'\b\+\d{1,3}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}\b', '[PHONE_REDACTED]', text)
+        text = re.sub(r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b", "[PHONE_REDACTED]", text)
+        text = re.sub(
+            r"\b\+\d{1,3}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}\b", "[PHONE_REDACTED]", text
+        )
 
         # Credit card patterns (simple)
-        text = re.sub(r'\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b', '[CARD_REDACTED]', text)
+        text = re.sub(r"\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b", "[CARD_REDACTED]", text)
 
         # SSN patterns (US)
-        text = re.sub(r'\b\d{3}-\d{2}-\d{4}\b', '[SSN_REDACTED]', text)
+        text = re.sub(r"\b\d{3}-\d{2}-\d{4}\b", "[SSN_REDACTED]", text)
 
         return text
 
@@ -189,7 +193,7 @@ class AuditLogger:
             lines = [
                 f"[{timestamp}] {event_type.upper()} - Tool: {tool}",
                 f"  Session: {entry.get('session_id', '')}",
-                f"  Success: {success}"
+                f"  Success: {success}",
             ]
 
             if "query" in entry:
@@ -206,7 +210,7 @@ class AuditLogger:
         query: str,
         parameters: dict[str, Any | None] = None,
         user: str | None = None,
-        metadata: dict[str, Any | None] = None
+        metadata: dict[str, Any | None] = None,
     ):
         """
         Log a query execution.
@@ -232,7 +236,7 @@ class AuditLogger:
             "query": query_logged,
             "parameters": parameters or {},
             "user": user,
-            "metadata": metadata or {}
+            "metadata": metadata or {},
         }
 
         self.logger.info(self._format_entry(entry))
@@ -244,7 +248,7 @@ class AuditLogger:
         response: dict[str, Any],
         execution_time_ms: float | None = None,
         user: str | None = None,
-        metadata: dict[str, Any | None] = None
+        metadata: dict[str, Any | None] = None,
     ):
         """
         Log a query response.
@@ -280,7 +284,7 @@ class AuditLogger:
             "success": response.get("success", True),
             "execution_time_ms": execution_time_ms,
             "user": user,
-            "metadata": metadata or {}
+            "metadata": metadata or {},
         }
 
         self.logger.info(self._format_entry(entry))
@@ -292,7 +296,7 @@ class AuditLogger:
         error: str,
         error_type: str | None = None,
         user: str | None = None,
-        metadata: dict[str, Any | None] = None
+        metadata: dict[str, Any | None] = None,
     ):
         """
         Log an error.
@@ -322,7 +326,7 @@ class AuditLogger:
             "error_type": error_type,
             "success": False,
             "user": user,
-            "metadata": metadata or {}
+            "metadata": metadata or {},
         }
 
         self.logger.info(self._format_entry(entry))
@@ -362,7 +366,7 @@ def initialize_audit_logger() -> AuditLogger:
         log_queries=log_queries,
         log_responses=log_responses,
         log_errors=log_errors,
-        pii_redaction=pii_redaction
+        pii_redaction=pii_redaction,
     )
 
     if enabled:

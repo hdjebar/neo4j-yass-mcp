@@ -27,7 +27,7 @@ class TestUTF8Attacks:
 
     def test_zero_width_space(self, sanitizer):
         """Test detection of zero-width space (U+200B)"""
-        query = "MATCH (n:Person\u200B) RETURN n"
+        query = "MATCH (n:Person\u200b) RETURN n"
         is_safe, error, warnings = sanitizer.sanitize_query(query)
 
         assert not is_safe, "Zero-width space should be blocked"
@@ -36,7 +36,7 @@ class TestUTF8Attacks:
 
     def test_zero_width_no_break_space(self, sanitizer):
         """Test detection of zero-width no-break space / BOM (U+FEFF)"""
-        query = "MATCH (n:Person\uFEFF) RETURN n"
+        query = "MATCH (n:Person\ufeff) RETURN n"
         is_safe, error, warnings = sanitizer.sanitize_query(query)
 
         assert not is_safe, "Zero-width no-break space (BOM) should be blocked"
@@ -44,7 +44,7 @@ class TestUTF8Attacks:
 
     def test_right_to_left_override(self, sanitizer):
         """Test detection of right-to-left override (U+202E)"""
-        query = "MATCH (n:Person\u202E) RETURN n"
+        query = "MATCH (n:Person\u202e) RETURN n"
         is_safe, error, warnings = sanitizer.sanitize_query(query)
 
         assert not is_safe, "Right-to-left override should be blocked"
@@ -163,17 +163,20 @@ class TestEdgeCases:
 
 
 # Parameterized test for multiple attack vectors
-@pytest.mark.parametrize("attack_char,description", [
-    ("\u200B", "Zero-width space"),
-    ("\u200C", "Zero-width non-joiner"),
-    ("\u200D", "Zero-width joiner"),
-    ("\uFEFF", "Zero-width no-break space (BOM)"),
-    ("\u202A", "Left-to-right embedding"),
-    ("\u202B", "Right-to-left embedding"),
-    ("\u202C", "Pop directional formatting"),
-    ("\u202D", "Left-to-right override"),
-    ("\u202E", "Right-to-left override"),
-])
+@pytest.mark.parametrize(
+    "attack_char,description",
+    [
+        ("\u200b", "Zero-width space"),
+        ("\u200c", "Zero-width non-joiner"),
+        ("\u200d", "Zero-width joiner"),
+        ("\ufeff", "Zero-width no-break space (BOM)"),
+        ("\u202a", "Left-to-right embedding"),
+        ("\u202b", "Right-to-left embedding"),
+        ("\u202c", "Pop directional formatting"),
+        ("\u202d", "Left-to-right override"),
+        ("\u202e", "Right-to-left override"),
+    ],
+)
 def test_zero_width_and_directional_characters(attack_char, description):
     """Parametrized test for various zero-width and directional characters"""
     sanitizer = QuerySanitizer(block_non_ascii=False)
@@ -184,12 +187,15 @@ def test_zero_width_and_directional_characters(attack_char, description):
     assert error is not None
 
 
-@pytest.mark.parametrize("homograph_query,description", [
-    ("MATCH (n:Persоn) RETURN n", "Cyrillic 'о' (U+043E)"),
-    ("MATCH (n:Pеrson) RETURN n", "Cyrillic 'е' (U+0435)"),
-    ("MATCH (n:Pеrsоn) RETURN n", "Multiple Cyrillic chars"),
-    ("MATCH (n:Реrson) RETURN n", "Cyrillic 'Р' (U+0420)"),
-])
+@pytest.mark.parametrize(
+    "homograph_query,description",
+    [
+        ("MATCH (n:Persоn) RETURN n", "Cyrillic 'о' (U+043E)"),
+        ("MATCH (n:Pеrson) RETURN n", "Cyrillic 'е' (U+0435)"),
+        ("MATCH (n:Pеrsоn) RETURN n", "Multiple Cyrillic chars"),
+        ("MATCH (n:Реrson) RETURN n", "Cyrillic 'Р' (U+0420)"),
+    ],
+)
 def test_homograph_attacks(homograph_query, description):
     """Parametrized test for various homograph attacks"""
     sanitizer = QuerySanitizer(block_non_ascii=False)
