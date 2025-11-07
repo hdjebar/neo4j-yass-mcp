@@ -17,10 +17,28 @@ Security Features:
 - Query complexity limits
 - Dangerous operation blocking
 - LLM output sanitization
+- UTF-8 attack prevention (homographs, zero-width chars, directional overrides)
+
+DRY Approach:
+- Uses confusable-homoglyphs for homograph detection
+- Uses ftfy for Unicode normalization and UTF-8 cleaning
+- Custom logic for Cypher-specific and advanced UTF-8 attacks
 """
 
 import re
 from typing import Any
+
+try:
+    from confusable_homoglyphs import confusables
+    CONFUSABLES_AVAILABLE = True
+except ImportError:
+    CONFUSABLES_AVAILABLE = False
+
+try:
+    import ftfy
+    FTFY_AVAILABLE = True
+except ImportError:
+    FTFY_AVAILABLE = False
 
 
 class QuerySanitizer:
@@ -286,12 +304,39 @@ class QuerySanitizer:
         - Zero-width characters (data hiding/exfiltration)
         - Right-to-left override (visual spoofing)
         - Homograph attacks (lookalike characters)
+        - Combining diacritics
+        - Mathematical alphanumeric symbols
+        - Null bytes
         - Invalid UTF-8 sequences
         - Non-ASCII in suspicious contexts
+
+        DRY Approach:
+        - Uses ftfy to normalize and detect problematic Unicode sequences
+        - Uses confusable-homoglyphs for comprehensive homograph detection
+        - Custom checks for attack patterns not covered by libraries
 
         Returns:
             Tuple of (is_safe, error_message)
         """
+        # Step 1: Use ftfy to normalize and detect UTF-8 issues (DRY approach)
+        if FTFY_AVAILABLE:
+            try:
+                # Normalize the query and check if it changed significantly
+                normalized = ftfy.fix_text(query)
+
+                # If ftfy had to fix things, it might indicate an attack
+                if normalized != query:
+                    # Check what ftfy fixed
+                    if len(normalized) < len(query) * 0.9:  # >10% shrinkage suggests removed characters
+                        return False, "Blocked: Query contained problematic Unicode sequences removed by normalization"
+            except Exception:
+                # ftfy failed, continue with manual checks
+                pass
+
+        # Null bytes (can truncate strings or bypass filters)
+        if "\x00" in query:
+            return False, "Blocked: Query contains null byte (U+0000)"
+
         # Zero-width characters (invisible characters for data hiding)
         zero_width_chars = [
             "\u200b",  # Zero-width space
@@ -310,6 +355,7 @@ class QuerySanitizer:
             "\u202d",  # Left-to-right override
             "\u202a",  # Left-to-right embedding
             "\u202b",  # Right-to-left embedding
+            "\u202c",  # Pop directional formatting
         ]
 
         for char in directional_chars:
@@ -319,8 +365,83 @@ class QuerySanitizer:
                     f"Blocked: Query contains directional override character (U+{ord(char):04X})",
                 )
 
-        # Homograph detection (Cyrillic/Greek lookalikes for Latin)
-        # Common homographs used in attacks
+        # Check for combining diacritical marks (U+0300 to U+036F)
+        for char in query:
+            if "\u0300" <= char <= "\u036f":
+                return (
+                    False,
+                    f"Blocked: Query contains combining diacritical mark (U+{ord(char):04X})",
+                )
+
+        # Check for mathematical alphanumeric symbols (U+1D400 to U+1D7FF)
+        # These look like normal letters but are different characters
+        for char in query:
+            if "\U0001d400" <= char <= "\U0001d7ff":
+                return (
+                    False,
+                    f"Blocked: Query contains mathematical alphanumeric symbol (U+{ord(char):04X})",
+                )
+
+        # Homograph detection using confusable-homoglyphs library (DRY approach)
+        if CONFUSABLES_AVAILABLE:
+            try:
+                # Check if the query contains dangerous confusable characters
+                if confusables.is_dangerous(query):
+                    return False, "Blocked: Query contains dangerous confusable characters (homograph attack)"
+
+                # Check for mixed scripts (e.g., Latin + Cyrillic)
+                if confusables.is_mixed_script(query):
+                    # Get more details about the confusables
+                    for char in query:
+                        if ord(char) > 127:  # Non-ASCII characters
+                            try:
+                                # Check if this character is confusable with Latin
+                                if confusables.is_confusable(char, preferred_aliases=['LATIN']):
+                                    return (
+                                        False,
+                                        f"Blocked: Character '{char}' (U+{ord(char):04X}) is confusable with Latin characters (homograph attack)",
+                                    )
+                            except Exception:
+                                # Character not in confusables database, continue
+                                pass
+            except Exception:
+                # If library fails, fall back to manual detection
+                homograph_result = self._manual_homograph_detection(query)
+                if not homograph_result[0]:
+                    return homograph_result
+        else:
+            # Fallback to manual homograph detection if library not available
+            homograph_result = self._manual_homograph_detection(query)
+            if not homograph_result[0]:
+                return homograph_result
+
+        # Check for non-ASCII if strict mode enabled
+        if self.block_non_ascii:
+            # Allow common exceptions (quotes, etc.) but block everything else
+            allowed_non_ascii = set("\u2018\u2019\u201c\u201d")  # Smart quotes
+
+            for char in query:
+                if ord(char) > 127 and char not in allowed_non_ascii:
+                    return (
+                        False,
+                        f"Blocked: Non-ASCII character '{char}' (U+{ord(char):04X}) not allowed in strict mode",
+                    )
+
+        # Validate UTF-8 encoding (detect invalid sequences)
+        try:
+            query.encode("utf-8", errors="strict")
+        except UnicodeEncodeError as e:
+            return False, f"Blocked: Invalid UTF-8 encoding at position {e.start}"
+
+        return True, None
+
+    def _manual_homograph_detection(self, query: str) -> tuple[bool, str | None]:
+        """
+        Manual fallback homograph detection when confusable-homoglyphs is not available.
+
+        Checks a limited set of common Cyrillic/Greek homoglyphs.
+        """
+        # Common homographs used in attacks (fallback when library not available)
         homograph_chars = {
             "\u0430": "a",  # Cyrillic 'a'
             "\u0435": "e",  # Cyrillic 'e'
@@ -340,24 +461,6 @@ class QuerySanitizer:
                     False,
                     f"Blocked: Query contains homograph character '{char}' (looks like '{lookalike}', U+{ord(char):04X})",
                 )
-
-        # Check for non-ASCII if strict mode enabled
-        if self.block_non_ascii:
-            # Allow common exceptions (quotes, etc.) but block everything else
-            allowed_non_ascii = set("\u2018\u2019\u201c\u201d")  # Smart quotes
-
-            for char in query:
-                if ord(char) > 127 and char not in allowed_non_ascii:
-                    return (
-                        False,
-                        f"Blocked: Non-ASCII character '{char}' (U+{ord(char):04X}) not allowed in strict mode",
-                    )
-
-        # Validate UTF-8 encoding (detect invalid sequences)
-        try:
-            query.encode("utf-8", errors="strict")
-        except UnicodeEncodeError as e:
-            return False, f"Blocked: Invalid UTF-8 encoding at position {e.start}"
 
         return True, None
 

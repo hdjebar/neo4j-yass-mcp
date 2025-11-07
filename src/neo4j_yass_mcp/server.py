@@ -32,7 +32,7 @@ from neo4j_yass_mcp.config import (
     find_available_port,
     get_preferred_ports_from_env,
 )
-from neo4j_yass_mcp.config.security_config import WEAK_PASSWORDS
+from neo4j_yass_mcp.config.security_config import is_password_weak
 from neo4j_yass_mcp.security import (
     get_audit_logger,
     initialize_audit_logger,
@@ -267,20 +267,21 @@ def initialize_neo4j():
     neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")
     neo4j_timeout = int(os.getenv("NEO4J_READ_TIMEOUT", "30"))
 
-    # Security: Check for default/weak passwords using centralized list
-    if neo4j_password.lower() in [p.lower() for p in WEAK_PASSWORDS]:
-        logger.error("🚨 SECURITY ERROR: Default or weak password detected!")
-        logger.error("   The provided password matches a known weak/default password")
+    # Security: Check for default/weak passwords using zxcvbn (DRY approach)
+    is_weak, weakness_reason = is_password_weak(neo4j_password, user_inputs=[neo4j_username, "neo4j"])
+    if is_weak:
+        logger.error("🚨 SECURITY ERROR: Weak password detected!")
+        logger.error(f"   Reason: {weakness_reason}")
         logger.error("   Set a strong password in NEO4J_PASSWORD environment variable")
 
         # Allow in development, but warn heavily
         if os.getenv("ALLOW_WEAK_PASSWORDS", "false").lower() != "true":
             raise ValueError(
-                "Weak password detected. Set ALLOW_WEAK_PASSWORDS=true to override (NOT recommended for production)"
+                f"Weak password detected: {weakness_reason}. Set ALLOW_WEAK_PASSWORDS=true to override (NOT recommended for production)"
             )
         else:
             logger.warning(
-                "⚠️  ALLOW_WEAK_PASSWORDS=true - Weak password allowed (DEVELOPMENT ONLY!)"
+                f"⚠️  ALLOW_WEAK_PASSWORDS=true - Weak password allowed (DEVELOPMENT ONLY!): {weakness_reason}"
             )
 
     # Debug mode

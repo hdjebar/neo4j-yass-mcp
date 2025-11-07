@@ -46,6 +46,10 @@ dependencies = [
     "python-dotenv>=1.0.0,<2.0.0",
     "pydantic>=2.0.0,<3.0.0",
     "tokenizers>=0.19.1,<1.0.0",
+    # Security & Sanitization libraries
+    "confusable-homoglyphs>=3.2.0,<4.0.0",  # Homograph attack detection
+    "ftfy>=6.0.0,<7.0.0",  # Unicode normalization & UTF-8 attack prevention
+    "zxcvbn>=4.4.0,<5.0.0",  # Password strength estimation
 ]
 
 [project.optional-dependencies]
