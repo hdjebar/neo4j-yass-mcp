@@ -2,7 +2,11 @@
 
 ## Executive Summary
 
-Neo4j YASS (Yet Another Semantic Search) MCP Server provides **server-side natural language to Cypher translation**, enabling organizations to democratize graph database access without requiring technical expertise or exposing sensitive data to client applications.
+Neo4j YASS
+**Yet Another Secure/Smart/Simple Server (YASS)** - A production-ready, security-enhanced Model Context Protocol (MCP) server  that:
+
+- transform natural language into graph insights with enterprise-grade security and compliance.
+- enabling organizations to democratize graph database access without requiring technical expertise or exposing sensitive data to client applications.
 
 **Key Value:** Move LLM intelligence to the server layer, eliminating client-side complexity and security risks.
 
@@ -14,11 +18,10 @@ Neo4j YASS (Yet Another Semantic Search) MCP Server provides **server-side natur
 
 Most MCP solutions rely on client-side LLMs (e.g., Claude Desktop, ChatGPT) to generate database queries:
 
-```
-┌─────────────┐         ┌──────────────┐         ┌─────────────┐
-│   Client    │ ───────>│  Client LLM  │ ───────>│   Neo4j     │
-│  (Human)    │  Query  │  (Claude)    │  Cypher │  Database   │
-└─────────────┘         └──────────────┘         └─────────────┘
+```mermaid
+flowchart LR
+  A[Client (Human)] -->|Query| B[Client LLM (Claude)]
+  B -->|Cypher| C[Neo4j Database]
 ```
 
 **Problems with this approach:**
@@ -55,34 +58,27 @@ Neo4j YASS MCP moves LLM processing to the server layer:
 
 ```mermaid
 flowchart LR
-    Client["Client (Human)<br/>Any MCP Client"]
+  Client[Client (Human)<br>Any MCP Client] -->|Query| LLMCore[LLM Core]
 
-    subgraph Server["Neo4j YASS MCP Server"]
-        direction TB
-        LLMCore["LLM Core"]
-        Sanitizer["Sanitizer"]
-        Schema["Schema Cache"]
-        Audit["Audit & Logging"]
+  subgraph Server [Neo4j YASS MCP Server]
+    direction TB
+    LLMCore
+    Sanitizer[Sanitizer<br>(PII redaction, read-only, sanitization)]
+    SchemaCache[Schema Cache / Context]
+    Audit[Audit & Logging]
+  end
 
-        LLMCore --> Sanitizer
-        LLMCore -.->|logs| Audit
-        Sanitizer -.->|logs| Audit
-    end
+  Sanitizer -->|Cypher| DB[(Neo4j Database)]
+  DB -->|Results| SchemaCache
+  SchemaCache -->|Results| Client
 
-    Database[("Neo4j<br/>Database")]
+  LLMCore --> Sanitizer
 
-    Client -->|Query| LLMCore
-    Sanitizer -->|Cypher| Database
-    Database -->|Results| Schema
-    Schema -->|Results| Client
-    Database -.->|logs| Audit
-    Schema -.->|logs| Audit
-
-    style Server fill:#f9f9f9,stroke:#333,stroke-width:2px
-    style Database fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
-    style LLMCore fill:#2196F3,stroke:#1565C0,stroke-width:2px,color:#fff
-    style Sanitizer fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
-    style Audit fill:#9C27B0,stroke:#6A1B9A,stroke-width:2px,color:#fff
+  %% Audit hooks (telemetry, who/when/what)
+  LLMCore -.-> Audit
+  Sanitizer -.-> Audit
+  DB -.-> Audit
+  SchemaCache -.-> Audit
 ```
 
 ---
@@ -92,17 +88,20 @@ flowchart LR
 ### 1. **Zero Client-Side AI Requirements**
 
 **Traditional MCP:**
+
 - ❌ Requires Claude Pro ($20/user/month) or ChatGPT Plus ($20/user/month)
 - ❌ Forces specific client tools
 - ❌ Users need AI expertise
 
 **Neo4j YASS MCP:**
+
 - ✅ Any MCP client works (even basic HTTP clients)
 - ✅ No per-user AI subscription needed
 - ✅ Natural language works for non-technical users
 - ✅ Centralized LLM cost (one subscription for entire organization)
 
 **ROI Example:**
+
 - 50 users with Claude Pro: $1,000/month
 - Neo4j YASS MCP (one GPT-4o API account): $50-200/month
 - **Savings: $800-950/month (80-95% reduction)**
@@ -112,6 +111,7 @@ flowchart LR
 ### 2. **Enterprise Security & Compliance**
 
 **Client-Side LLM (Claude Desktop):**
+
 ```
 User: "Show me all customers"
   ↓
@@ -127,6 +127,7 @@ Executes directly on database
 ```
 
 **Server-Side LLM (Neo4j YASS MCP):**
+
 ```
 User: "Show me all customers"
   ↓
@@ -142,6 +143,7 @@ Safe, logged, compliant execution
 ```
 
 **Security Advantages:**
+
 - ✅ Schema never leaves server
 - ✅ Complete audit trail (GDPR/SOC2/HIPAA)
 - ✅ Centralized query sanitization
@@ -155,12 +157,14 @@ Safe, logged, compliant execution
 ### 3. **Consistency & Quality Control**
 
 **Client-Side Variability:**
+
 - Different users = different client LLMs
 - Claude vs ChatGPT = different Cypher patterns
 - No version control on query generation
 - Cannot optimize for your specific schema
 
 **Server-Side Consistency:**
+
 - ✅ Single LLM source of truth
 - ✅ Fine-tuned for your domain
 - ✅ Consistent Cypher patterns
@@ -169,6 +173,7 @@ Safe, logged, compliant execution
 - ✅ Model versioning
 
 **Example:**
+
 ```bash
 # All users get identical Cypher for identical questions
 LLM_MODEL=claude-sonnet-4-5
@@ -180,11 +185,13 @@ LLM_TEMPERATURE=0.0  # Deterministic
 ### 4. **Multi-Provider Flexibility**
 
 **Client-Side Limitations:**
+
 - Locked to client's LLM (Claude Desktop = only Claude)
 - Cannot switch providers
 - No A/B testing
 
 **Neo4j YASS MCP:**
+
 - ✅ Switch LLMs in seconds (OpenAI, Anthropic, Google, Mistral, Groq, Ollama)
 - ✅ Choose best model for your use case
 - ✅ A/B test performance/cost
@@ -210,12 +217,14 @@ LLM_MODEL=llama3.2
 ### 5. **Performance & Scalability**
 
 **Client-Side Processing:**
+
 - Each client makes separate LLM calls
 - No caching
 - No query optimization
 - Network latency per user
 
 **Server-Side Processing:**
+
 - ✅ Connection pooling
 - ✅ Query plan caching
 - ✅ Schema caching (reduce LLM context)
@@ -223,6 +232,7 @@ LLM_MODEL=llama3.2
 - ✅ Horizontal scaling
 
 **Performance Metrics:**
+
 - Average query time: 1-3 seconds (server-side)
 - Concurrent users: 100+ (tested)
 - Query caching: 80% faster for repeated patterns
@@ -251,6 +261,7 @@ Feature | Client-Side MCP | Neo4j YASS MCP
 **Challenge:** Analysts need to query patient data without SQL knowledge, but HIPAA requires complete audit trails.
 
 **Solution:**
+
 ```
 Doctor: "Show me diabetic patients over 60"
   ↓
@@ -264,6 +275,7 @@ Audit log: "Dr. Smith queried 47 patients at 2025-10-15 14:32:15"
 ```
 
 **Value:**
+
 - ✅ HIPAA-compliant audit trail
 - ✅ No PII exposed to client LLM
 - ✅ Non-technical doctors can query safely
@@ -275,6 +287,7 @@ Audit log: "Dr. Smith queried 47 patients at 2025-10-15 14:32:15"
 **Challenge:** Risk analysts need fraud detection queries, but cannot expose transaction patterns to external LLMs.
 
 **Solution:**
+
 ```bash
 # On-premises deployment
 LLM_PROVIDER=ollama
@@ -283,6 +296,7 @@ NEO4J_URI=bolt://internal-neo4j:7687
 ```
 
 **Value:**
+
 - ✅ Zero data leaves premises
 - ✅ SOC2 Type II compliant
 - ✅ Full query traceability
@@ -294,9 +308,11 @@ NEO4J_URI=bolt://internal-neo4j:7687
 **Challenge:** 200 data analysts need graph query access, each requiring $20/month Claude Pro.
 
 **Traditional Cost:**
+
 - 200 users × $20/month = $4,000/month
 
 **Neo4j YASS MCP Cost:**
+
 - 1 OpenAI API account: ~$300/month (high usage)
 - Docker hosting: $50/month
 - **Total: $350/month**
@@ -310,6 +326,7 @@ NEO4J_URI=bolt://internal-neo4j:7687
 **Challenge:** Provide graph database access to customers without exposing schema or requiring AI subscriptions.
 
 **Solution:**
+
 ```yaml
 # Multi-instance deployment
 services:
@@ -327,6 +344,7 @@ services:
 ```
 
 **Value:**
+
 - ✅ Tenant isolation
 - ✅ Different LLM tiers per customer
 - ✅ Centralized billing
@@ -398,6 +416,7 @@ sanitized_query = sanitize_cypher_query(generated_query)
 ```
 
 **Result:** Defense-in-depth that blocks:
+
 - SQL injection-style attacks
 - UTF-8 zero-width exploits
 - Query chaining (`;` attacks)
@@ -418,6 +437,7 @@ def chatLLM(config: LLMConfig):
 ```
 
 **Benefit:** Not locked to any vendor. Switch providers based on:
+
 - Cost optimization
 - Performance requirements
 - Compliance needs (on-prem vs cloud)
@@ -430,6 +450,7 @@ def chatLLM(config: LLMConfig):
 ### Scenario: 50-Person Data Team
 
 **Option A: Client-Side (Claude Desktop)**
+
 ```
 Costs:
   - Claude Pro: 50 users × $20/month = $1,000/month
@@ -440,6 +461,7 @@ Annual Cost: $12,000 + (1,100 hours × $100/hr) = $122,000
 ```
 
 **Option B: Neo4j YASS MCP**
+
 ```
 Costs:
   - OpenAI API (GPT-4o): ~$200/month (shared)
@@ -457,9 +479,11 @@ Annual Cost: $3,000 + (58 hours × $100/hr) = $8,800
 ### Scenario: Enterprise (500 Users)
 
 **Client-Side Annual Cost:**
+
 - 500 users × $240/year = $120,000/year
 
 **Neo4j YASS MCP Annual Cost:**
+
 - API costs: $1,000/month = $12,000/year
 - Infrastructure: $200/month = $2,400/year
 - **Total: $14,400/year**
@@ -507,6 +531,7 @@ curl http://localhost:8000/health
 ### Risk: LLM Hallucinations
 
 **Mitigation:**
+
 - Temperature = 0.0 (deterministic)
 - Schema-aware generation (GraphCypherQAChain)
 - Sanitizer validation
@@ -515,6 +540,7 @@ curl http://localhost:8000/health
 ### Risk: API Costs
 
 **Mitigation:**
+
 - Query caching
 - Schema caching (reduce context)
 - Cost-effective models (Gemini 2.5 Flash)
@@ -524,6 +550,7 @@ curl http://localhost:8000/health
 ### Risk: Vendor Lock-in
 
 **Mitigation:**
+
 - Multi-provider support (OpenAI, Anthropic, Google, Ollama)
 - On-prem option (Ollama)
 - Open-source dependencies (LangChain)
@@ -578,6 +605,7 @@ curl http://localhost:8000/health
 ### 🔄 Conversational Query Refinement (Q1 2026)
 
 **Current State:** Single-turn query execution
+
 ```
 User: "Show me customers"
   ↓
@@ -585,6 +613,7 @@ Server: [Returns results]
 ```
 
 **Future State:** Multi-turn conversational refinement
+
 ```
 User: "Show me customers"
   ↓
@@ -601,6 +630,7 @@ Results: 47 customers
 ```
 
 **Technical Approach:**
+
 ```python
 # Stateful conversation tracking
 @dataclass
@@ -621,6 +651,7 @@ async def query_with_refinement(query: str, context: ConversationContext):
 ```
 
 **Benefits:**
+
 - ✅ Better query accuracy through iteration
 - ✅ Natural exploration workflow
 - ✅ Learn user preferences over time
@@ -628,6 +659,7 @@ async def query_with_refinement(query: str, context: ConversationContext):
 - ✅ Reduced cognitive load (no need to be precise first time)
 
 **Use Case Example:**
+
 ```
 Analyst: "Show me fraud patterns"
 Server: "Found 3 pattern types. Most common is multi-account transfers (342 cases).
@@ -748,6 +780,7 @@ async def query_graph(query: str, database: Optional[str] = None) -> str:
 ```
 
 **Benefits:**
+
 - ✅ Single server for multiple data sources
 - ✅ Reduced infrastructure costs
 - ✅ Cross-database queries
@@ -755,6 +788,7 @@ async def query_graph(query: str, database: Optional[str] = None) -> str:
 - ✅ Unified audit trail
 
 **Use Cases:**
+
 1. **Multi-tenant SaaS:** One database per customer
 2. **Microservices:** One database per domain (users, orders, inventory)
 3. **Hybrid Cloud:** On-prem + cloud databases
@@ -764,162 +798,105 @@ async def query_graph(query: str, database: Optional[str] = None) -> str:
 
 ### 🌐 GraphQL-Enabled Database Federation (Q3 2026)
 
-**Vision:** Federate ANY GraphQL endpoints - not just Neo4j - enabling cross-service queries through a unified MCP interface with natural language
+**Vision:** Federate multiple Neo4j graph databases with GraphQL support, enabling cross-database queries through a unified MCP interface
 
-**Important:** This is NOT about implementing a GraphQL client. Instead, it's a federation layer that connects to ANY GraphQL service (Neo4j GraphQL, Hasura, PostGraphile, AWS AppSync, custom GraphQL APIs, etc.) and orchestrates queries across them using natural language via MCP.
-
-**Supported GraphQL Sources:**
-- ✅ Neo4j with GraphQL Library
-- ✅ PostgreSQL via PostGraphile or Hasura
-- ✅ MongoDB with GraphQL
-- ✅ AWS AppSync
-- ✅ Custom GraphQL APIs (REST → GraphQL gateways)
-- ✅ Third-party GraphQL services (Shopify, GitHub, Contentful, etc.)
-- ✅ Any GraphQL endpoint with introspection enabled
+**Important:** This is NOT about implementing a GraphQL client. Instead, it extends the multi-database support to federate Neo4j databases that expose GraphQL endpoints (via Neo4j GraphQL Library or similar), allowing seamless queries across federated graph databases.
 
 #### Architecture
 
-```mermaid
-flowchart TB
-    Client["MCP Client"]
-
-    subgraph Server["Neo4j YASS MCP Server"]
-        direction TB
-        Orchestrator["LLM Query<br/>Orchestrator"]
-        Router["Federation<br/>Router"]
-        Aggregator["Aggregated<br/>Results"]
-
-        Orchestrator --> Router
-        Router --> Aggregator
-    end
-
-    subgraph Federation["Federated GraphQL Endpoints"]
-        direction LR
-        Neo4j[("Neo4j<br/>GraphQL<br/>(Graph Data)")]
-        Hasura[("Hasura<br/>PostgreSQL<br/>(Relational)")]
-        AppSync[("AWS AppSync<br/>(Cloud API)")]
-    end
-
-    Client -->|"Natural Language<br/>Query"| Orchestrator
-    Router -->|GraphQL Query| Neo4j
-    Router -->|GraphQL Query| Hasura
-    Router -->|GraphQL Query| AppSync
-    Neo4j -->|Results| Aggregator
-    Hasura -->|Results| Aggregator
-    AppSync -->|Results| Aggregator
-    Aggregator -->|"Unified<br/>Results"| Client
-
-    style Server fill:#f9f9f9,stroke:#333,stroke-width:2px
-    style Federation fill:#e8f5e9,stroke:#4CAF50,stroke-width:2px
-    style Orchestrator fill:#2196F3,stroke:#1565C0,stroke-width:2px,color:#fff
-    style Router fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
-    style Aggregator fill:#9C27B0,stroke:#6A1B9A,stroke-width:2px,color:#fff
-    style Neo4j fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
-    style Hasura fill:#3F51B5,stroke:#1A237E,stroke-width:2px,color:#fff
-    style AppSync fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
+```
+┌─────────────┐         ┌─────────────────────────────────────────┐
+│   MCP       │         │      Neo4j YASS MCP Server              │
+│   Client    │         │                                         │
+│             │ Natural │  ┌──────────────┐  ┌──────────────┐   │
+│             │Language │  │ LLM Query    │  │  Federation  │   │
+│             │ ──────> │  │ Orchestrator │─>│  Router      │   │
+│             │         │  └──────────────┘  └──────┬───────┘   │
+│             │         │                            │            │
+│             │ <────── │  ┌─────────────────────────┼──────┐   │
+└─────────────┘ Results │  │ Aggregated Results      ↓      │   │
+                        │  └─────────────────────────────────┘   │
+                        └─────────────────────────────────────────┘
+                                     │         │         │
+                        ┌────────────┼─────────┼─────────┼────────────┐
+                        │            ↓         ↓         ↓            │
+                        │    ┌──────────┐ ┌──────────┐ ┌──────────┐ │
+                        │    │  Neo4j   │ │  Neo4j   │ │  Neo4j   │ │
+                        │    │  DB #1   │ │  DB #2   │ │  DB #3   │ │
+                        │    │ GraphQL  │ │ GraphQL  │ │ GraphQL  │ │
+                        │    └──────────┘ └──────────┘ └──────────┘ │
+                        │  (Customers)   (Products)   (Analytics)   │
+                        └──────────────────────────────────────────────┘
 ```
 
 #### Federation Approach
 
-**Key Concept:** Connect to ANY GraphQL endpoint (databases, APIs, services) and use MCP to orchestrate queries across them with natural language - creating a universal data federation layer.
+**Key Concept:** Connect to multiple Neo4j databases that already have GraphQL support enabled (via Neo4j GraphQL Library), and use MCP to orchestrate queries across them with natural language.
 
-Each GraphQL endpoint in the federation:
-- ✅ Exposes a GraphQL schema (any database: Neo4j, PostgreSQL, MongoDB, etc.)
-- ✅ Can be a third-party service (GitHub, Shopify, Stripe GraphQL APIs)
-- ✅ Can be a custom GraphQL gateway wrapping REST APIs
+Each Neo4j database in the federation:
+
+- ✅ Runs Neo4j GraphQL Library (or similar GraphQL layer)
+- ✅ Exposes its own GraphQL schema
 - ✅ Maintains its own domain data
 - ✅ Can be queried independently via GraphQL
 
 The YASS MCP Server:
-- ✅ Connects to multiple heterogeneous GraphQL endpoints
+
+- ✅ Connects to multiple GraphQL-enabled Neo4j databases
 - ✅ Accepts natural language queries via MCP
-- ✅ Uses LLM to determine which endpoint(s) to query
-- ✅ Routes queries to appropriate services (graph DB, relational DB, external APIs)
+- ✅ Uses LLM to determine which database(s) to query
+- ✅ Routes queries to appropriate federated databases
 - ✅ Aggregates results from multiple sources
 - ✅ Returns unified response to MCP client
 
-**Universal Federation Examples:**
-- Neo4j (graph) + PostgreSQL via Hasura (relational) + Shopify (e-commerce API)
-- MongoDB (documents) + Neo4j (relationships) + Stripe (payments API)
-- Internal databases + External SaaS GraphQL APIs
-
 #### Natural Language Federation Query
 
-**Example 1: Cross-Database Query (Neo4j + PostgreSQL)**
 ```python
 # User query via MCP
-User: "Show me customer 123's orders with shipping address"
+User: "Show me customer 123's orders with product details"
 
 # LLM analyzes query intent
 LLM determines:
-  - Needs: Orders from Neo4j (graph) + Addresses from PostgreSQL (relational)
-  - Federation strategy: Join across different database types
+  - Needs: Customer data (DB #1) + Product data (DB #2)
+  - Federation strategy: Join across databases
 
 # MCP Server orchestrates
-Step 1: Query Neo4j GraphQL endpoint
-  → Get customer 123's order IDs and details
+Step 1: Query Neo4j DB #1 (Customers) via its GraphQL endpoint
+  → Get customer 123 and order IDs
 
-Step 2: Query Hasura/PostgreSQL GraphQL endpoint
-  → Get shipping addresses for those orders
+Step 2: Query Neo4j DB #2 (Products) via its GraphQL endpoint
+  → Get product details for items in those orders
 
 Step 3: Aggregate and join results
-  → Merge graph data with relational data
+  → Merge data from both databases
 
 Step 4: Return unified response to MCP client
-```
-
-**Example 2: Hybrid Internal + External API Query**
-```python
-# User query via MCP
-User: "Show me recent GitHub issues related to our Shopify orders"
-
-# LLM analyzes query intent
-LLM determines:
-  - Needs: Internal orders (Neo4j) + GitHub issues (GitHub API) + Shopify data (Shopify API)
-  - Federation strategy: Multi-source aggregation
-
-# MCP Server orchestrates
-Step 1: Query internal Neo4j GraphQL
-  → Get recent order data with product keywords
-
-Step 2: Query GitHub GraphQL API
-  → Search issues matching those product keywords
-
-Step 3: Query Shopify GraphQL API
-  → Get order details from Shopify
-
-Step 4: Aggregate all results
-  → Correlate issues with orders
-
-Step 5: Return unified insights to MCP client
 ```
 
 #### Federation Orchestrator
 
 ```python
 @dataclass
-class GraphQLEndpointConfig:
-    """Configuration for any GraphQL endpoint (database, API, service)"""
-    name: str                    # Logical name (e.g., "customers", "github", "shopify")
-    endpoint_type: str           # "database" | "api" | "service"
-    graphql_endpoint: str        # https://api.github.com/graphql, https://hasura.example.com/v1/graphql
-    auth_token: str              # Bearer token or API key
-    auth_header: str = "Authorization"  # Header name (e.g., "X-Shopify-Access-Token")
+class GraphQLDatabaseConfig:
+    """Configuration for a GraphQL-enabled Neo4j database"""
+    name: str                    # Logical name (e.g., "customers")
+    graphql_endpoint: str        # https://neo4j-1.example.com/graphql
+    auth_token: str              # Bearer token for GraphQL endpoint
     schema_cache: Optional[Dict] = None
 
 class FederationOrchestrator:
     """
-    Orchestrates queries across federated GraphQL endpoints.
+    Orchestrates queries across federated GraphQL databases.
 
     Uses LangChain's GraphQLAPIWrapper and BaseGraphQLTool for
-    querying ANY GraphQL endpoint: databases, APIs, services.
+    querying GraphQL-enabled Neo4j databases.
     """
 
-    def __init__(self, endpoints: Dict[str, GraphQLEndpointConfig]):
-        self.endpoints = endpoints
+    def __init__(self, databases: Dict[str, GraphQLDatabaseConfig]):
+        self.databases = databases
         self.llm = initialize_llm()
 
-        # Initialize LangChain GraphQL tools for each endpoint
+        # Initialize LangChain GraphQL tools for each database
         from langchain_community.tools.graphql.tool import BaseGraphQLTool
         from langchain_community.utilities.graphql import GraphQLAPIWrapper
 
@@ -927,48 +904,44 @@ class FederationOrchestrator:
             name: BaseGraphQLTool(
                 graphql_wrapper=GraphQLAPIWrapper(
                     graphql_endpoint=config.graphql_endpoint,
-                    custom_headers={
-                        config.auth_header: f"Bearer {config.auth_token}"
-                    }
+                    custom_headers={"Authorization": f"Bearer {config.auth_token}"}
                 )
             )
-            for name, config in endpoints.items()
+            for name, config in databases.items()
         }
 
     async def execute_federated_query(self, natural_language_query: str):
         """
-        Execute natural language query across federated GraphQL endpoints.
+        Execute natural language query across federated databases.
 
         Leverages LangChain's GraphQL support for query execution.
-        Works with ANY GraphQL endpoint: databases, APIs, services.
         """
-        # 1. LLM determines which endpoints are needed
+        # 1. LLM determines which databases are needed
         query_plan = await self.llm.analyze_query(
             query=natural_language_query,
-            available_endpoints=self.endpoints.keys(),
-            endpoint_types={name: ep.endpoint_type for name, ep in self.endpoints.items()}
+            available_databases=self.databases.keys()
         )
 
-        # 2. Generate GraphQL queries for each endpoint using LLM
+        # 2. Generate GraphQL queries for each database using LLM
         graphql_queries = await self.llm.generate_graphql_queries(
             query_plan=query_plan,
-            schemas={name: ep.schema_cache for name, ep in self.endpoints.items()}
+            schemas={name: db.schema_cache for name, db in self.databases.items()}
         )
 
         # 3. Execute queries in parallel using LangChain GraphQL tools
         results = await asyncio.gather(*[
-            self.execute_with_langchain(endpoint_name, gql_query)
-            for endpoint_name, gql_query in graphql_queries.items()
+            self.execute_with_langchain(db_name, gql_query)
+            for db_name, gql_query in graphql_queries.items()
         ])
 
-        # 4. Aggregate and join results from heterogeneous sources
+        # 4. Aggregate and join results
         unified_result = await self.aggregate_results(results, query_plan)
 
         return unified_result
 
-    async def execute_with_langchain(self, endpoint_name: str, graphql_query: str):
+    async def execute_with_langchain(self, db_name: str, graphql_query: str):
         """Execute GraphQL query using LangChain's GraphQL tool"""
-        tool = self.graphql_tools[endpoint_name]
+        tool = self.graphql_tools[db_name]
         result = await tool.arun(graphql_query)
         return result
 ```
@@ -976,47 +949,29 @@ class FederationOrchestrator:
 #### Federation Configuration
 
 **Technical Foundation:** This feature leverages LangChain's native GraphQL support:
+
 - `langchain_community.tools.graphql.tool.BaseGraphQLTool`
 - `langchain_community.utilities.graphql.GraphQLAPIWrapper`
 - Requires: `gql` Python package
 
 ```bash
-# .env - Configure multiple GraphQL endpoints (databases + APIs + services)
+# .env - Configure multiple GraphQL-enabled Neo4j databases
+# Each database must have Neo4j GraphQL Library enabled
 
-# Endpoint 1: Neo4j Graph Database (with Neo4j GraphQL Library)
-GRAPHQL_EP1_NAME=neo4j_customers
-GRAPHQL_EP1_TYPE=database
-GRAPHQL_EP1_ENDPOINT=https://neo4j.example.com/graphql
-GRAPHQL_EP1_AUTH_HEADER=Authorization
-GRAPHQL_EP1_AUTH_TOKEN=bearer_token_neo4j
+# Database 1: Customer Data (with GraphQL)
+GRAPHQL_DB1_NAME=customers
+GRAPHQL_DB1_ENDPOINT=https://neo4j-customers.example.com/graphql
+GRAPHQL_DB1_AUTH_TOKEN=bearer_token_1
 
-# Endpoint 2: PostgreSQL via Hasura (relational data)
-GRAPHQL_EP2_NAME=hasura_orders
-GRAPHQL_EP2_TYPE=database
-GRAPHQL_EP2_ENDPOINT=https://hasura.example.com/v1/graphql
-GRAPHQL_EP2_AUTH_HEADER=X-Hasura-Admin-Secret
-GRAPHQL_EP2_AUTH_TOKEN=hasura_secret
+# Database 2: Product Catalog (with GraphQL)
+GRAPHQL_DB2_NAME=products
+GRAPHQL_DB2_ENDPOINT=https://neo4j-products.example.com/graphql
+GRAPHQL_DB2_AUTH_TOKEN=bearer_token_2
 
-# Endpoint 3: GitHub API (external service)
-GRAPHQL_EP3_NAME=github
-GRAPHQL_EP3_TYPE=api
-GRAPHQL_EP3_ENDPOINT=https://api.github.com/graphql
-GRAPHQL_EP3_AUTH_HEADER=Authorization
-GRAPHQL_EP3_AUTH_TOKEN=bearer_ghp_xxxxx
-
-# Endpoint 4: Shopify API (e-commerce)
-GRAPHQL_EP4_NAME=shopify
-GRAPHQL_EP4_TYPE=api
-GRAPHQL_EP4_ENDPOINT=https://mystore.myshopify.com/admin/api/2024-01/graphql.json
-GRAPHQL_EP4_AUTH_HEADER=X-Shopify-Access-Token
-GRAPHQL_EP4_AUTH_TOKEN=shpat_xxxxx
-
-# Endpoint 5: AWS AppSync (cloud service)
-GRAPHQL_EP5_NAME=appsync_analytics
-GRAPHQL_EP5_TYPE=service
-GRAPHQL_EP5_ENDPOINT=https://xxxxx.appsync-api.us-east-1.amazonaws.com/graphql
-GRAPHQL_EP5_AUTH_HEADER=x-api-key
-GRAPHQL_EP5_AUTH_TOKEN=da2-xxxxx
+# Database 3: Analytics (with GraphQL)
+GRAPHQL_DB3_NAME=analytics
+GRAPHQL_DB3_ENDPOINT=https://neo4j-analytics.auradb.io/graphql
+GRAPHQL_DB3_AUTH_TOKEN=bearer_token_3
 
 # LLM for query orchestration
 LLM_PROVIDER=anthropic
@@ -1024,6 +979,7 @@ LLM_MODEL=claude-sonnet-4-5
 ```
 
 **Dependencies:**
+
 ```bash
 pip install langchain-community gql  # LangChain GraphQL support
 ```
@@ -1031,75 +987,61 @@ pip install langchain-community gql  # LangChain GraphQL support
 #### Benefits
 
 **For Developers:**
-- ✅ Unified interface to ANY GraphQL endpoint (databases, APIs, services)
-- ✅ No need to manually orchestrate cross-system queries
-- ✅ Natural language interface for federated data from heterogeneous sources
+
+- ✅ Unified interface to multiple GraphQL-enabled Neo4j databases
+- ✅ No need to manually orchestrate cross-database queries
+- ✅ Natural language interface for federated data
 - ✅ Standard MCP protocol, not GraphQL client complexity
-- ✅ Works with internal databases AND external SaaS APIs
 
 **For Non-Technical Users:**
-- ✅ Query across multiple systems with plain English
-- ✅ No knowledge of which system contains what data
-- ✅ Automatic data aggregation from databases, APIs, and services
-- ✅ Single interface for all GraphQL sources
+
+- ✅ Query across multiple databases with plain English
+- ✅ No knowledge of which database contains what data
+- ✅ Automatic data aggregation and joining
+- ✅ Single interface for federated graph data
 
 **For Organizations:**
-- ✅ **Universal Federation:** Internal DBs + External APIs in one query
-- ✅ Microservices-friendly (each service can expose GraphQL)
-- ✅ Vendor-agnostic (works with any GraphQL endpoint)
-- ✅ Reduce API integration complexity
-- ✅ Future-proof architecture (add new GraphQL sources without code changes)
 
-#### Use Case Examples
+- ✅ Federation of multiple Neo4j instances with GraphQL support
+- ✅ Microservices-friendly (each service has its own graph database)
+- ✅ Domain-driven database separation
+- ✅ Scalable architecture (add databases without changing client code)
+- ✅ Works with Neo4j GraphQL Library, AuraDB, or any GraphQL-enabled Neo4j
 
-**Use Case 1: Internal Databases + External SaaS**
+#### Use Case: Federated Neo4j Databases
+
 ```python
-# Scenario: Neo4j (customers) + PostgreSQL (orders) + Stripe (payments)
-User (via MCP): "Show me high-value customers with failed payments"
+# Example: E-commerce with separated domains
+
+# Scenario: Customer database (Neo4j #1) + Product database (Neo4j #2)
+User (via MCP): "Show me customers who bought iPhone in the last month"
 
 # MCP Server orchestrates:
-Step 1: Query Neo4j GraphQL → Get customer relationship data
-Step 2: Query PostgreSQL/Hasura → Get order history
-Step 3: Query Stripe GraphQL API → Get payment failures
-Step 4: Join results → Identify high-value customers with payment issues
-```
+Step 1: Query Products database (Neo4j #2 GraphQL)
+  → Find product ID for "iPhone"
 
-**Use Case 2: Multi-Source Business Intelligence**
-```python
-# Scenario: Shopify (sales) + GitHub (issues) + Zendesk (support)
-User (via MCP): "Find products with high returns AND support tickets"
+Step 2: Query Customers database (Neo4j #1 GraphQL)
+  → Find customers with orders containing that product in last 30 days
 
-# MCP Server orchestrates:
-Step 1: Query Shopify GraphQL → Get products with high return rates
-Step 2: Query GitHub GraphQL → Find issues mentioning those products
-Step 3: Query Zendesk GraphQL → Get support tickets for those products
-Step 4: Correlate all data → Identify problem products
-```
+Step 3: Join and return unified result
 
-**Use Case 3: Hybrid Cloud Architecture**
-```python
-# Scenario: On-prem Neo4j + AWS AppSync + Google Cloud Endpoints
-User (via MCP): "Combine our internal graph data with cloud analytics"
-
-# MCP Server orchestrates:
-Step 1: Query on-prem Neo4j → Internal relationship data
-Step 2: Query AWS AppSync → Cloud-based analytics
-Step 3: Query Google Cloud → Machine learning predictions
-Step 4: Merge insights → Unified business intelligence
+# User gets: List of customers with purchase details
+# Databases remain independent but queryable as if unified
 ```
 
 **Real-World Scenarios:**
-1. **API Aggregation:** Combine GitHub + Jira + Slack GraphQL APIs
-2. **Polyglot Persistence:** Neo4j (graph) + PostgreSQL (relational) + MongoDB (documents)
-3. **SaaS Integration:** Internal databases + Shopify + Stripe + HubSpot
-4. **Multi-Cloud:** AWS AppSync + Google Cloud + Azure + on-prem databases
-5. **Vendor Flexibility:** Easily switch between Hasura, Postgraphile, or custom GraphQL
+
+1. **Microservices Architecture:** Each microservice has its own Neo4j database with GraphQL
+2. **Multi-Region Deployment:** Different Neo4j instances per region, all GraphQL-enabled
+3. **Multi-Tenant SaaS:** One GraphQL Neo4j database per customer tenant
+4. **Domain-Driven Design:** Separate bounded contexts with GraphQL Neo4j databases
 
 ---
 
 ### 🎯 Additional Future Enhancements
 
 #### 1. Query Result Caching (Q4 2025)
+
 ```python
 # Cache frequent queries
 @cache(ttl=300)  # 5 minutes
@@ -1112,6 +1054,7 @@ async def execute_query(cypher: str, params: Dict):
 ---
 
 #### 2. Query Plan Optimization (Q1 2026)
+
 ```python
 # LLM learns optimal Cypher patterns
 class QueryOptimizer:
