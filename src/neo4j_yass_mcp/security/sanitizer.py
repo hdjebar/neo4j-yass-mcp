@@ -20,7 +20,7 @@ Security Features:
 """
 
 import re
-from typing import AnyOptionalTuple
+from typing import Any
 
 
 class QuerySanitizer:

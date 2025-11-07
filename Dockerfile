@@ -16,14 +16,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv using the official installer
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+# Install uv using the official installer and verify
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    /root/.cargo/bin/uv --version
 
 # Add uv to PATH for subsequent commands
 ENV PATH="/root/.cargo/bin:$PATH"
-
-# Verify uv installation
-RUN uv --version
 
 # Create virtual environment using uv
 RUN uv venv /opt/venv
