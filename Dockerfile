@@ -14,11 +14,16 @@ FROM python:${PYTHON_VERSION}-slim as builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && curl -LsSf https://astral.sh/uv/install.sh | sh
+    && rm -rf /var/lib/apt/lists/*
 
-# Add uv to PATH
+# Install uv using the official installer
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Add uv to PATH for subsequent commands
 ENV PATH="/root/.cargo/bin:$PATH"
+
+# Verify uv installation
+RUN uv --version
 
 # Create virtual environment using uv
 RUN uv venv /opt/venv
