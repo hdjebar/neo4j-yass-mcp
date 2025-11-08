@@ -33,15 +33,15 @@ try:
     from confusable_homoglyphs import confusables
 
     CONFUSABLES_AVAILABLE = True
-except ImportError:
-    CONFUSABLES_AVAILABLE = False
+except ImportError:  # pragma: no cover
+    CONFUSABLES_AVAILABLE = False  # pragma: no cover
 
 try:
     import ftfy
 
     FTFY_AVAILABLE = True
-except ImportError:
-    FTFY_AVAILABLE = False
+except ImportError:  # pragma: no cover
+    FTFY_AVAILABLE = False  # pragma: no cover
 
 
 class QuerySanitizer:

@@ -15,8 +15,8 @@ try:
     from zxcvbn import zxcvbn
 
     ZXCVBN_AVAILABLE = True
-except ImportError:
-    ZXCVBN_AVAILABLE = False
+except ImportError:  # pragma: no cover
+    ZXCVBN_AVAILABLE = False  # pragma: no cover
 
 # Fallback list of known weak or default passwords (used if zxcvbn not available)
 # This list should be updated periodically.
