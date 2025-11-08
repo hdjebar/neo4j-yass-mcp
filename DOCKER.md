@@ -23,7 +23,7 @@ Complete guide to deploying Neo4j YASS MCP Server with Docker.
 ### Prerequisites
 
 - Docker 20.10+ with BuildKit enabled
-- Docker Compose 2.0+ (or docker-compose 1.29+)
+- Docker Compose V2 (command: docker compose)
 - Neo4j 5.x running (separate instance)
 - GNU Make (optional, for convenience commands)
 

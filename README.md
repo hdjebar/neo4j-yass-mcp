@@ -113,10 +113,10 @@ The `neo4j-stack/neo4j` service automatically downloads APOC and GDS plugins usi
 cd ../neo4j
 
 # Start Neo4j (plugins download automatically on first startup)
-docker-compose up -d
+docker compose up -d
 
 # Verify plugins are installed (wait 30-60s for Neo4j to start)
-docker-compose exec neo4j cypher-shell -u neo4j -p password123 \
+docker compose exec neo4j cypher-shell -u neo4j -p password123 \
   "RETURN apoc.version() AS apoc, gds.version() AS gds;"
 ```
 
@@ -169,7 +169,7 @@ curl -L https://graphdatascience.ninja/neo4j-graph-data-science-2.12.1.jar \
   -o plugins/neo4j-graph-data-science-2.12.1.jar
 
 # Start Neo4j (will mount plugins/ folder)
-docker-compose up -d
+docker compose up -d
 ```
 
 **Plugin Sources:**
@@ -196,10 +196,10 @@ cd ../neo4j
 # See Dockerfile.custom-build-alternative for details
 
 # Build custom image
-docker-compose build
+docker compose build
 
 # Start Neo4j (plugins already in image)
-docker-compose up -d
+docker compose up -d
 ```
 
 **Configuration reference:** See [Dockerfile.custom-build-alternative](../neo4j/Dockerfile.custom-build-alternative)
@@ -371,10 +371,10 @@ cp .env.example .env
 nano .env  # Edit configuration (set MCP_SERVER_PORT if needed)
 
 # 2. Start with Docker
-docker-compose up -d
+docker compose up -d
 
 # 4. View logs
-docker-compose logs -f
+docker compose logs -f
 ```
 
 ### Essential Configuration
@@ -615,7 +615,7 @@ Run multiple MCP server instances, each connected to a different database:
 **Using docker-compose.multi-instance.yml:**
 ```bash
 # Start all instances (analytics, production, dev)
-docker-compose -f docker-compose.multi-instance.yml up -d
+docker compose -f docker-compose.multi-instance.yml up -d
 
 # Access different databases:
 # - Analytics:  http://localhost:8001/mcp/

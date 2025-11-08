@@ -128,7 +128,7 @@ networks:
 # Quick Setup Options:
 #
 # Option 1: Use existing neo4j-stack
-#   cd ../neo4j && docker-compose up -d
+#   cd ../neo4j && docker compose up -d
 #
 # Option 2: Standalone Neo4j with Docker
 #   docker run -d \

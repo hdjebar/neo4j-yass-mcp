@@ -6,7 +6,7 @@ Welcome to the Neo4j YASS MCP documentation! This directory contains comprehensi
 
 ### Getting Started
 - [Quick Start Guide](../QUICK_START.md) - Get up and running in 5 minutes
-- [Docker Deployment](../DOCKER.md) - Deploy with Docker and docker-compose
+- [Docker Deployment](../DOCKER.md) - Deploy with Docker Compose
 - [Contributing Guidelines](../CONTRIBUTING.md) - How to contribute to the project
 
 ### Core Documentation
