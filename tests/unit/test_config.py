@@ -359,6 +359,7 @@ class TestIsPortAvailable:
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server_socket.bind(("127.0.0.1", 0))
+        server_socket.listen(1)  # Start listening to actually hold the port
         used_port = server_socket.getsockname()[1]
 
         try:
@@ -396,11 +397,12 @@ class TestFindAvailablePort:
         preferred_ports = [45100, 45101, 45102]
 
         try:
-            # Occupy all preferred ports
+            # Occupy all preferred ports with listening sockets
             for p in preferred_ports:
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 s.bind(("127.0.0.1", p))
+                s.listen(1)  # Start listening to actually hold the port
                 sockets.append(s)
 
             # Should fall back to range
