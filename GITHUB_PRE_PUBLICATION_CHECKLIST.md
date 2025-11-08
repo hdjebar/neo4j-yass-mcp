@@ -119,10 +119,10 @@ cd /path/to/neo4j-yass-mcp-repo
 docker build -t neo4j-yass-mcp:test .
 
 # Test docker-compose
-docker-compose up -d
-docker-compose ps
-docker-compose logs
-docker-compose down
+docker compose up -d
+docker compose ps
+docker compose logs
+docker compose down
 ```
 
 ### 5. Code Quality

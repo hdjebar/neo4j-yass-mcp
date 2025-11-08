@@ -383,7 +383,7 @@ networks:
 
 **Network Setup Options Documented:**
 1. Neo4j on localhost (host mode)
-2. Neo4j in external docker-compose stack
+2. Neo4j in external Docker Compose stack
 3. Neo4j in separate Docker container (same bridge)
 4. Neo4j AuraDB (cloud)
 
@@ -419,7 +419,7 @@ healthcheck:
 ```
 
 ✅ **Matches Dockerfile health check** (consistency)
-✅ **CMD-SHELL format** (proper docker-compose syntax)
+✅ **CMD-SHELL format** (proper Docker Compose syntax)
 ✅ **Proper timing** (20s start period for initialization)
 
 **Labels:**
@@ -1557,7 +1557,7 @@ trivy image neo4j-yass-mcp:1.0.0
 
 ---
 
-### A.2 docker-compose Commands
+### A.2 Docker Compose Commands
 
 ```bash
 # Start services (Compose V2)

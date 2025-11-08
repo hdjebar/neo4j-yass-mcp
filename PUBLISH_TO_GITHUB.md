@@ -148,7 +148,7 @@ git tag -a v1.0.0 -m "Release v1.0.0 - Production-Ready Neo4j YASS MCP
 - Built with FastMCP framework
 - UV package manager integration (4-6x faster builds)
 - Comprehensive test suite
-- Docker support with docker-compose
+- Docker support with Docker Compose
 - Extensive documentation
 
 ### Security Implementation
