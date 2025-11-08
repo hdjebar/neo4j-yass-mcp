@@ -120,6 +120,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101"]  # Allow assert in tests
+"tests/integration/test_server_integration.py" = ["S101", "S106"]  # Allow assert and hardcoded test passwords
 
 [tool.black]
 line-length = 100
