@@ -375,7 +375,7 @@ def get_schema() -> str:
         return "Error: Neo4j graph not initialized"
 
     try:
-        schema = graph.get_schema()
+        schema = graph.get_schema
         return f"Neo4j Graph Schema:\n\n{schema}"
     except Exception as e:
         return f"Error retrieving schema: {str(e)}"
@@ -481,7 +481,7 @@ async def query_graph(query: str) -> dict[str, Any]:
                     audit_logger.log_error(
                         tool="query_graph",
                         query=query,
-                        error=sanitize_error,
+                        error=sanitize_error or "Query blocked by sanitizer",
                         metadata={"generated_cypher": generated_cypher, "sanitizer_blocked": True},
                     )
 
@@ -508,7 +508,7 @@ async def query_graph(query: str) -> dict[str, Any]:
                     audit_logger.log_error(
                         tool="query_graph",
                         query=query,
-                        error=error_response["error"],
+                        error=str(error_response["error"]),
                         metadata={"generated_cypher": generated_cypher},
                     )
 
@@ -562,7 +562,7 @@ async def query_graph(query: str) -> dict[str, Any]:
 
 
 async def _execute_cypher_impl(
-    cypher_query: str, parameters: dict[str, Any | None] = None
+    cypher_query: str, parameters: dict[str, Any | None] | None = None
 ) -> dict[str, Any]:
     """
     Internal implementation of execute_cypher.
@@ -617,7 +617,7 @@ async def _execute_cypher_impl(
                 audit_logger.log_error(
                     tool="execute_cypher",
                     query=cypher_query,
-                    error=sanitize_error,
+                    error=sanitize_error or "Query blocked by sanitizer",
                     metadata={"sanitizer_blocked": True},
                 )
 
@@ -634,14 +634,14 @@ async def _execute_cypher_impl(
         audit_logger.log_query(tool="execute_cypher", query=cypher_query, parameters=parameters)
 
     # Check read-only access control
-    read_only_error = check_read_only_access(cypher_query)
-    if read_only_error:
+    read_only_error_msg = check_read_only_access(cypher_query)
+    if read_only_error_msg:
         # Audit log the error
         if audit_logger:
             audit_logger.log_error(
-                tool="execute_cypher", query=cypher_query, error=read_only_error["error"]
+                tool="execute_cypher", query=cypher_query, error=read_only_error_msg
             )
-        return read_only_error
+        return {"error": read_only_error_msg}
 
     try:
         logger.info(f"Executing Cypher query: {cypher_query}")
@@ -721,7 +721,7 @@ async def _execute_cypher_impl(
 # ensures `_read_only_mode` is set correctly before deciding whether to
 # expose the tool to MCP clients.
 async def execute_cypher(
-    cypher_query: str, parameters: dict[str, Any | None] = None
+    cypher_query: str, parameters: dict[str, Any | None] | None = None
 ) -> dict[str, Any]:
     """
     Execute a raw Cypher query against the Neo4j database.
@@ -756,7 +756,7 @@ async def refresh_schema() -> dict[str, Any]:
         # Run schema refresh in thread pool
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(get_executor(), graph.refresh_schema)
-        schema = graph.get_schema()
+        schema = graph.get_schema
 
         return {"schema": schema, "message": "Schema refreshed successfully", "success": True}
 
@@ -789,13 +789,9 @@ def cleanup():
     if _executor is not None:
         logger.info("Shutting down thread pool executor...")
         try:
-            # Wait up to 30 seconds for tasks to complete
-            _executor.shutdown(wait=True, timeout=30)
+            # Wait for tasks to complete
+            _executor.shutdown(wait=True)
             logger.info("✓ Thread pool executor shutdown complete")
-        except TimeoutError:
-            logger.warning(
-                "⚠ Thread pool executor shutdown timed out - some tasks may not have completed"
-            )
         except Exception as e:
             logger.error(f"✗ Error shutting down executor: {e}", exc_info=True)
         finally:

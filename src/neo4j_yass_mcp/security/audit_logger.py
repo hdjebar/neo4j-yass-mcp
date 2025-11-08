@@ -208,9 +208,9 @@ class AuditLogger:
         self,
         tool: str,
         query: str,
-        parameters: dict[str, Any | None] = None,
+        parameters: dict[str, Any | None] | None = None,
         user: str | None = None,
-        metadata: dict[str, Any | None] = None,
+        metadata: dict[str, Any | None] | None = None,
     ):
         """
         Log a query execution.
@@ -248,7 +248,7 @@ class AuditLogger:
         response: dict[str, Any],
         execution_time_ms: float | None = None,
         user: str | None = None,
-        metadata: dict[str, Any | None] = None,
+        metadata: dict[str, Any | None] | None = None,
     ):
         """
         Log a query response.
@@ -296,7 +296,7 @@ class AuditLogger:
         error: str,
         error_type: str | None = None,
         user: str | None = None,
-        metadata: dict[str, Any | None] = None,
+        metadata: dict[str, Any | None] | None = None,
     ):
         """
         Log an error.

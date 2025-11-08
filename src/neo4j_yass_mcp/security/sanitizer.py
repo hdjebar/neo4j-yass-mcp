@@ -139,7 +139,7 @@ class QuerySanitizer:
             - error_message: Error description if blocked, None if safe
             - warnings: List of warning messages
         """
-        warnings = []
+        warnings: list[str] = []
 
         # Check 1: Query length
         if len(query) > self.max_query_length:
@@ -519,7 +519,7 @@ def get_sanitizer() -> QuerySanitizer | None:
 
 
 def sanitize_query(
-    query: str, parameters: dict[str, Any | None] = None
+    query: str, parameters: dict[str, Any | None] | None = None
 ) -> tuple[bool, str | None, list]:
     """
     Sanitize query and parameters using global sanitizer.
@@ -534,6 +534,9 @@ def sanitize_query(
     if _sanitizer is None:
         # Auto-initialize with default settings
         initialize_sanitizer()
+
+    # After initialization, _sanitizer is guaranteed to be non-None
+    assert _sanitizer is not None
 
     # Sanitize query
     is_safe, error, warnings = _sanitizer.sanitize_query(query)
