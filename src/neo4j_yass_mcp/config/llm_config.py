@@ -46,21 +46,23 @@ def chatLLM(config: LLMConfig) -> Any:
     """
     if config.provider == "openai":
         from langchain_openai import ChatOpenAI
+        from pydantic import SecretStr
 
         return ChatOpenAI(
             model=config.model,
             temperature=config.temperature,
-            openai_api_key=config.api_key,
+            api_key=SecretStr(config.api_key) if config.api_key else None,
             streaming=config.streaming,
         )
 
     elif config.provider == "anthropic":
         from langchain_anthropic import ChatAnthropic
+        from pydantic import SecretStr
 
-        return ChatAnthropic(
-            model=config.model,
+        return ChatAnthropic(  # type: ignore[call-arg]
+            model_name=config.model,
             temperature=config.temperature,
-            anthropic_api_key=config.api_key,
+            api_key=SecretStr(config.api_key),
             streaming=config.streaming,
         )
 

@@ -5,9 +5,9 @@ This module provides common fixtures for mocking Neo4j, LangChain,
 and other dependencies used throughout the test suite.
 """
 
+from unittest.mock import Mock
+
 import pytest
-from unittest.mock import Mock, AsyncMock, MagicMock
-from typing import Any, Dict
 
 
 @pytest.fixture

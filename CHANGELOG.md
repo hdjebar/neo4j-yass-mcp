@@ -5,6 +5,72 @@ All notable changes to Neo4j YASS MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Features in development
+
+### Changed
+- Changes in existing functionality
+
+### Deprecated
+- Soon-to-be removed features
+
+### Removed
+- Removed features
+
+### Fixed
+- Bug fixes
+
+### Security
+- Security improvements and fixes
+
+## [1.1.0] - 2025-11-08
+
+### Changed
+- **BREAKING**: Upgraded FastMCP from 0.4.1 to 2.13.0.2
+  - Major version jump across 0.x → 1.0 → 2.x
+  - Tests now access underlying functions via `.fn()` attribute on decorated tools/resources
+  - Server initialization compatible with new API (no changes needed)
+  - All 287 tests passing with 81.89% coverage
+- **BREAKING**: Upgraded LangChain from 0.3.27 to 1.0.5
+  - Major version release with stability guarantees until 2.0
+  - Python 3.10+ required (project already using 3.13)
+  - `langchain-neo4j` upgraded to 0.6.0 (from 0.5.0)
+  - `langchain-openai` upgraded to 1.0.2 (from 0.3.35)
+  - `langchain-anthropic` upgraded to 1.0.2 (from 0.3.22)
+  - `langchain-core` now explicit dependency at 1.0.4
+  - All provider integrations tested and working
+- Upgraded MCP Protocol SDK from 1.20.0 to 1.21.0 (minor update)
+
+### Added
+- Comprehensive Phase 3 dependency upgrade analysis document
+- FastMCP 2.13 feature availability:
+  - Response caching middleware (available for future use)
+  - Pluggable storage backends with encryption (available for future use)
+  - Server lifespan hooks for proper resource management (available for future use)
+  - Pydantic input validation with better flexibility
+  - Icon support for richer UX
+
+### Fixed
+- Test suite compatibility with FastMCP 2.13 FunctionTool API
+- Rate limiter test floating point precision issues
+- Updated all test imports to use `.fn()` for accessing decorated functions
+
+### Documentation
+- Added detailed migration guide: [docs/repo-arai/PHASE3_DEPENDENCY_UPGRADE_ANALYSIS.md](docs/repo-arai/PHASE3_DEPENDENCY_UPGRADE_ANALYSIS.md)
+- Documented breaking changes and migration steps
+- Updated dependency version matrix
+- Added FastMCP 2.13 feature overview
+
+### Technical Details
+- All dependencies now on latest stable versions
+- No code changes required for FastMCP upgrade (imports already correct)
+- No `.text()` method usage found (LangChain 1.0 compatibility)
+- `allow_dangerous_requests` parameter confirmed working (introduced in 0.2.19)
+- GraphCypherQAChain fully compatible with LangChain 1.0
+- Test coverage maintained above 80% threshold
+
 ## [1.0.0] - 2025-11-07
 
 ### Added

@@ -33,10 +33,10 @@ Fixes # (issue)
 - [ ] Code coverage maintained or improved
 
 **Test Configuration**:
-- Python version: 
-- Neo4j version: 
-- LLM provider tested: 
-- Operating System: 
+- Python version:
+- Neo4j version:
+- LLM provider tested:
+- Operating System:
 
 ## Checklist
 

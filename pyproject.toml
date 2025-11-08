@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "neo4j-yass-mcp"
-version = "1.0.0"
+version = "1.1.0"
 description = "YASS (Yet Another Secure Server) - Production-ready, security-enhanced MCP server for Neo4j with LLM integration"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -35,16 +35,24 @@ classifiers = [
 ]
 
 dependencies = [
-    "fastmcp>=0.2.0,<1.0.0",
-    "langchain>=0.1.0,<0.4.0",
-    "langchain-neo4j>=0.1.0,<1.0.0",
-    "langchain-openai>=0.0.5,<1.0.0",
-    "langchain-anthropic>=0.1.0,<1.0.0",
-    "langchain-google-genai>=2.0.0",  # v2.x+ supports langchain-core>=0.3
+    # MCP Server Framework
+    "fastmcp>=2.13.0,<3.0.0",  # Upgraded from 0.4.1 (Phase 3)
+    "mcp>=1.21.0,<2.0.0",  # MCP Protocol SDK
+
+    # LangChain Core & Providers
+    "langchain>=1.0.0,<2.0.0",  # Upgraded from 0.3.27 (Phase 3)
+    "langchain-core>=1.0.4,<2.0.0",  # Required for LangChain 1.0
+    "langchain-neo4j>=0.1.0,<1.0.0",  # Neo4j integration
+    "langchain-openai>=1.0.0,<2.0.0",  # Upgraded from 0.3.35 (Phase 3)
+    "langchain-anthropic>=1.0.0,<2.0.0",  # Upgraded from 0.3.22 (Phase 3)
+    "langchain-google-genai>=2.0.0,<3.0.0",  # Already v2.x+ (supports langchain-core>=1.0)
+
+    # Database & Core Dependencies
     "neo4j>=5.14.0,<6.0.0",
     "python-dotenv>=1.0.0,<2.0.0",
     "pydantic>=2.0.0,<3.0.0",
     "tokenizers>=0.19.1,<1.0.0",
+
     # Security & Sanitization libraries
     "confusable-homoglyphs>=3.2.0,<4.0.0",  # Homograph attack detection
     "ftfy>=6.0.0,<7.0.0",  # Unicode normalization & UTF-8 attack prevention

@@ -14,14 +14,14 @@ Tests cover:
 Target: 90%+ code coverage
 """
 
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import patch, Mock
-from typing import Any
 
 from neo4j_yass_mcp.security.sanitizer import (
     QuerySanitizer,
-    initialize_sanitizer,
     get_sanitizer,
+    initialize_sanitizer,
     sanitize_query,
 )
 
@@ -702,7 +702,7 @@ class TestUTF8Attacks:
             "\u043e": "o",  # Cyrillic 'o'
         }
 
-        for char, lookalike in cyrillic_chars.items():
+        for char, _lookalike in cyrillic_chars.items():
             query = f"MATCH (n) WHERE n.title = 'T{char}st' RETURN n"
 
             # Patch to force manual detection

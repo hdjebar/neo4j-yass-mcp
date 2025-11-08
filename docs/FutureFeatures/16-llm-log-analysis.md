@@ -346,7 +346,7 @@ Commands:
   compliance      Generate compliance report
 
 Options:
-  --model MODEL   LLM model to use 
+  --model MODEL   LLM model to use
   --hours N       Hours to analyze (default: 24)
   --alert         Send alerts via configured channels
 

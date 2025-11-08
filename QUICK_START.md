@@ -4,7 +4,7 @@ Get Neo4j YASS MCP running in under 5 minutes!
 
 ## Prerequisites
 
-- Python 3.11+
+- Python 3.13+
 - Neo4j 5.x running (or Docker)
 - An API key for your LLM provider (OpenAI, Anthropic, or Google)
 

@@ -1,7 +1,7 @@
 # Neo4j YASS MCP
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![Neo4j 5.x](https://img.shields.io/badge/neo4j-5.x-green.svg)](https://neo4j.com/)
 [![FastMCP](https://img.shields.io/badge/framework-FastMCP-orange.svg)](https://github.com/jlowin/fastmcp)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
@@ -41,7 +41,7 @@
 ### Prerequisites
 
 **Required:**
-- Python 3.10+ (for Python mode) OR Docker (for containerized mode)
+- Python 3.13+ (for Python mode) OR Docker (for containerized mode)
 - **Neo4j 5.x database** (separate instance - see [Neo4j Setup](#neo4j-setup) below)
   - **APOC plugin installed and enabled** (required for advanced operations)
   - Bolt protocol accessible (default port 7687)
@@ -499,7 +499,7 @@ SANITIZER_BLOCK_NON_ASCII=false
 - ✅ UTF-8/Unicode attack prevention (homographs, zero-width chars)
 - ✅ Query complexity limits
 
-**📖 Detailed Documentation:** [docs/architecture/security.md](docs/architecture/security.md)
+**📖 Detailed Documentation:** [docs/SECURITY.md](docs/SECURITY.md)
 
 ### Audit Logging
 
@@ -520,7 +520,7 @@ AUDIT_LOG_PII_REDACTION=false
 - Performance monitoring
 - Usage analytics
 
-**📖 Detailed Documentation:** [docs/architecture/audit-logging.md](docs/architecture/audit-logging.md)
+**📖 Detailed Documentation:** See "Audit Logging" section in [docs/SECURITY.md](docs/SECURITY.md)
 
 ### Read-Only Mode
 
@@ -707,7 +707,7 @@ Neo4j Graph Database
 
 ### Security Architecture
 
-**📖 Detailed Documentation:** [docs/architecture/security.md](docs/architecture/security.md)
+**📖 Detailed Documentation:** [docs/SECURITY.md](docs/SECURITY.md)
 
 **Defense in Depth:**
 1. Input sanitization (injection prevention)
@@ -856,7 +856,7 @@ For security issues, please email security@[your-domain] instead of using the pu
 ---
 
 **📖 For detailed documentation:**
-- Security Architecture: [docs/architecture/security.md](docs/architecture/security.md)
-- Audit Logging: [docs/architecture/audit-logging.md](docs/architecture/audit-logging.md)
-- Docker Deployment: [docs/architecture/docker-deployment.md](docs/architecture/docker-deployment.md)
+- Security Architecture: [docs/SECURITY.md](docs/SECURITY.md)
+- Software Architecture: [docs/SOFTWARE_ARCHITECTURE.md](docs/SOFTWARE_ARCHITECTURE.md)
+- Docker Deployment: [DOCKER.md](DOCKER.md)
 - Configuration Reference: [.env.example](.env.example)

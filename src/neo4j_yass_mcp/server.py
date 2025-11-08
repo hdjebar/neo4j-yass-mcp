@@ -34,8 +34,12 @@ from neo4j_yass_mcp.config import (
 )
 from neo4j_yass_mcp.config.security_config import is_password_weak
 from neo4j_yass_mcp.security import (
+    check_query_complexity,
+    check_rate_limit,
     get_audit_logger,
     initialize_audit_logger,
+    initialize_complexity_limiter,
+    initialize_rate_limiter,
     initialize_sanitizer,
     sanitize_query,
 )
@@ -64,8 +68,32 @@ if sanitizer_enabled:
 else:
     logger.warning("⚠️  Query sanitizer disabled - injection protection is OFF!")
 
+# Initialize query complexity limiter
+complexity_limit_enabled = os.getenv("COMPLEXITY_LIMIT_ENABLED", "true").lower() == "true"
+if complexity_limit_enabled:
+    initialize_complexity_limiter(
+        max_complexity=int(os.getenv("MAX_QUERY_COMPLEXITY", "100")),
+        max_variable_path_length=int(os.getenv("MAX_VARIABLE_PATH_LENGTH", "10")),
+        require_limit_unbounded=os.getenv("REQUIRE_LIMIT_UNBOUNDED", "true").lower() == "true",
+    )
+    logger.info("Query complexity limiter enabled (prevents resource exhaustion attacks)")
+else:
+    logger.warning("⚠️  Query complexity limiter disabled - no protection against complex queries!")
+
+# Initialize rate limiter
+rate_limit_enabled = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
+if rate_limit_enabled:
+    initialize_rate_limiter(
+        rate=int(os.getenv("RATE_LIMIT_REQUESTS", "10")),
+        per_seconds=int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60")),
+        burst=int(os.getenv("RATE_LIMIT_BURST", "20")) if os.getenv("RATE_LIMIT_BURST") else None,
+    )
+    logger.info("Rate limiter enabled (prevents abuse through excessive requests)")
+else:
+    logger.warning("⚠️  Rate limiter disabled - no protection against request flooding!")
+
 # Initialize FastMCP server
-mcp = FastMCP("neo4j-yass-mcp", version="1.0.0")
+mcp = FastMCP("neo4j-yass-mcp", version="1.1.0")
 
 # Global variables for Neo4j and LangChain components
 graph: Neo4jGraph | None = None
@@ -443,6 +471,31 @@ async def query_graph(query: str) -> dict[str, Any]:
     if chain is None or graph is None:
         return {"error": "Neo4j or LangChain not initialized", "success": False}
 
+    # Check rate limit
+    if rate_limit_enabled:
+        is_allowed, rate_info = check_rate_limit(client_id="default")
+        if not is_allowed and rate_info is not None:
+            error_msg = f"Rate limit exceeded. Retry after {rate_info.retry_after_seconds:.1f}s"
+            logger.warning(f"Rate limit exceeded for query_graph: {query[:50]}...")
+
+            # Log rate limit violation
+            audit_logger = get_audit_logger()
+            if audit_logger:
+                audit_logger.log_error(
+                    tool="query_graph",
+                    query=query,
+                    error=error_msg,
+                    error_type="rate_limit",
+                )
+
+            return {
+                "error": error_msg,
+                "rate_limited": True,
+                "retry_after_seconds": rate_info.retry_after_seconds,
+                "reset_time": rate_info.reset_time.isoformat(),
+                "success": False,
+            }
+
     # Audit log the query
     audit_logger = get_audit_logger()
     if audit_logger:
@@ -498,6 +551,37 @@ async def query_graph(query: str) -> dict[str, Any]:
             if warnings:
                 for warning in warnings:
                     logger.warning(f"LLM-generated Cypher warning: {warning}")
+
+        # Check generated Cypher complexity
+        if generated_cypher and complexity_limit_enabled:
+            is_allowed, complexity_error, complexity_score = check_query_complexity(generated_cypher)
+
+            if not is_allowed:
+                logger.warning(f"LLM generated complex query: {complexity_error}")
+                error_response = {
+                    "error": f"LLM-generated query blocked by complexity limiter: {complexity_error}",
+                    "generated_cypher": generated_cypher,
+                    "complexity_score": complexity_score.total_score if complexity_score else None,
+                    "complexity_limit": complexity_score.max_allowed if complexity_score else None,
+                    "complexity_blocked": True,
+                    "success": False,
+                }
+
+                # Audit log the blocked query
+                if audit_logger:
+                    audit_logger.log_error(
+                        tool="query_graph",
+                        query=query,
+                        error=complexity_error or "Query blocked by complexity limiter",
+                        metadata={"generated_cypher": generated_cypher, "complexity_blocked": True, "complexity_score": complexity_score.total_score if complexity_score else None},
+                    )
+
+                return error_response
+
+            # Log complexity warnings if any
+            if complexity_score and complexity_score.warnings:
+                for warning in complexity_score.warnings:
+                    logger.info(f"LLM-generated Cypher complexity warning: {warning}")
 
         # Check if generated Cypher is allowed in read-only mode
         if generated_cypher:
@@ -605,6 +689,31 @@ async def _execute_cypher_impl(
     if graph is None:
         return {"error": "Neo4j graph not initialized", "success": False}
 
+    # Check rate limit
+    if rate_limit_enabled:
+        is_allowed, rate_info = check_rate_limit(client_id="default")
+        if not is_allowed and rate_info is not None:
+            error_msg = f"Rate limit exceeded. Retry after {rate_info.retry_after_seconds:.1f}s"
+            logger.warning(f"Rate limit exceeded for execute_cypher: {cypher_query[:50]}...")
+
+            # Log rate limit violation
+            audit_logger = get_audit_logger()
+            if audit_logger:
+                audit_logger.log_error(
+                    tool="execute_cypher",
+                    query=cypher_query,
+                    error=error_msg,
+                    error_type="rate_limit",
+                )
+
+            return {
+                "error": error_msg,
+                "rate_limited": True,
+                "retry_after_seconds": rate_info.retry_after_seconds,
+                "reset_time": rate_info.reset_time.isoformat(),
+                "success": False,
+            }
+
     # Sanitize query and parameters (SISO prevention)
     if sanitizer_enabled:
         is_safe, sanitize_error, warnings = sanitize_query(cypher_query, parameters)
@@ -634,6 +743,38 @@ async def _execute_cypher_impl(
         if warnings:
             for warning in warnings:
                 logger.warning(f"Query sanitizer warning: {warning}")
+
+    # Check query complexity
+    if complexity_limit_enabled:
+        is_allowed, complexity_error, complexity_score = check_query_complexity(cypher_query)
+
+        if not is_allowed:
+            logger.warning(f"Blocked complex query: {complexity_error}")
+            error_response = {
+                "error": f"Query blocked by complexity limiter: {complexity_error}",
+                "query": cypher_query[:200],
+                "complexity_score": complexity_score.total_score if complexity_score else None,
+                "complexity_limit": complexity_score.max_allowed if complexity_score else None,
+                "complexity_blocked": True,
+                "success": False,
+            }
+
+            # Audit log the blocked query
+            audit_logger = get_audit_logger()
+            if audit_logger:
+                audit_logger.log_error(
+                    tool="execute_cypher",
+                    query=cypher_query,
+                    error=complexity_error or "Query blocked by complexity limiter",
+                    metadata={"complexity_blocked": True, "complexity_score": complexity_score.total_score if complexity_score else None},
+                )
+
+            return error_response
+
+        # Log complexity warnings if any
+        if complexity_score and complexity_score.warnings:
+            for warning in complexity_score.warnings:
+                logger.info(f"Query complexity warning: {warning}")
 
     # Audit log the query
     audit_logger = get_audit_logger()

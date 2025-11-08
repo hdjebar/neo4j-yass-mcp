@@ -9,24 +9,24 @@ Tests cover:
 Target: 80%+ code coverage for config modules
 """
 
-import pytest
-import os
 import logging
+import os
 import socket
-from unittest.mock import patch, Mock, MagicMock
-from dataclasses import dataclass
+from unittest.mock import Mock, patch
+
+import pytest
 
 from neo4j_yass_mcp.config.llm_config import LLMConfig, chatLLM
 from neo4j_yass_mcp.config.security_config import (
-    is_password_weak,
     WEAK_PASSWORDS,
     ZXCVBN_AVAILABLE,
+    is_password_weak,
 )
 from neo4j_yass_mcp.config.utils import (
     configure_logging,
-    is_port_available,
     find_available_port,
     get_preferred_ports_from_env,
+    is_port_available,
 )
 
 
@@ -62,6 +62,8 @@ class TestLLMConfig:
 
     def test_chat_llm_openai(self):
         """Test ChatOpenAI LLM initialization."""
+        from pydantic import SecretStr
+
         config = LLMConfig(
             provider="openai",
             model="gpt-4",
@@ -75,16 +77,19 @@ class TestLLMConfig:
 
             llm = chatLLM(config)
 
-            mock_openai.assert_called_once_with(
-                model="gpt-4",
-                temperature=0.0,
-                openai_api_key="sk-test123",
-                streaming=False,
-            )
+            # Verify call with SecretStr-wrapped API key (LangChain 1.0)
+            call_args = mock_openai.call_args
+            assert call_args[1]["model"] == "gpt-4"
+            assert call_args[1]["temperature"] == 0.0
+            assert isinstance(call_args[1]["api_key"], SecretStr)
+            assert call_args[1]["api_key"].get_secret_value() == "sk-test123"
+            assert call_args[1]["streaming"] is False
             assert llm == mock_instance
 
     def test_chat_llm_openai_with_streaming(self):
         """Test ChatOpenAI with streaming enabled."""
+        from pydantic import SecretStr
+
         config = LLMConfig(
             provider="openai",
             model="gpt-4",
@@ -96,15 +101,18 @@ class TestLLMConfig:
         with patch("langchain_openai.ChatOpenAI") as mock_openai:
             chatLLM(config)
 
-            mock_openai.assert_called_once_with(
-                model="gpt-4",
-                temperature=0.5,
-                openai_api_key="sk-test",
-                streaming=True,
-            )
+            # Verify call with SecretStr-wrapped API key (LangChain 1.0)
+            call_args = mock_openai.call_args
+            assert call_args[1]["model"] == "gpt-4"
+            assert call_args[1]["temperature"] == 0.5
+            assert isinstance(call_args[1]["api_key"], SecretStr)
+            assert call_args[1]["api_key"].get_secret_value() == "sk-test"
+            assert call_args[1]["streaming"] is True
 
     def test_chat_llm_anthropic(self):
         """Test ChatAnthropic LLM initialization."""
+        from pydantic import SecretStr
+
         config = LLMConfig(
             provider="anthropic",
             model="claude-3-opus-20240229",
@@ -118,12 +126,13 @@ class TestLLMConfig:
 
             llm = chatLLM(config)
 
-            mock_anthropic.assert_called_once_with(
-                model="claude-3-opus-20240229",
-                temperature=0.0,
-                anthropic_api_key="sk-ant-test",
-                streaming=False,
-            )
+            # Verify call with model_name and SecretStr-wrapped API key (LangChain 1.0)
+            call_args = mock_anthropic.call_args
+            assert call_args[1]["model_name"] == "claude-3-opus-20240229"
+            assert call_args[1]["temperature"] == 0.0
+            assert isinstance(call_args[1]["api_key"], SecretStr)
+            assert call_args[1]["api_key"].get_secret_value() == "sk-ant-test"
+            assert call_args[1]["streaming"] is False
             assert llm == mock_instance
 
     def test_chat_llm_google_genai(self):

@@ -15,19 +15,20 @@ Tests cover:
 Target: 80%+ code coverage
 """
 
-import pytest
 import json
 import os
-import tempfile
 import shutil
-from pathlib import Path
+import tempfile
 from datetime import datetime, timedelta
-from unittest.mock import patch, Mock, MagicMock
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
 
 from neo4j_yass_mcp.security.audit_logger import (
     AuditLogger,
-    initialize_audit_logger,
     get_audit_logger,
+    initialize_audit_logger,
 )
 
 
@@ -141,7 +142,7 @@ class TestLogFileRotation:
         with open(current_file, "w") as f:
             f.write("x" * (2 * 1024 * 1024))  # 2MB
 
-        logger = AuditLogger(
+        AuditLogger(
             enabled=True, log_dir=temp_log_dir, rotation="size", max_size_mb=1
         )
 
@@ -176,7 +177,7 @@ class TestLogCleanup:
         os.utime(old_file, (old_date.timestamp(), old_date.timestamp()))
 
         # Initialize logger with 90-day retention
-        logger = AuditLogger(
+        AuditLogger(
             enabled=True, log_dir=temp_log_dir, retention_days=90
         )
 
@@ -191,7 +192,7 @@ class TestLogCleanup:
         recent_file.touch()
 
         # Initialize logger
-        logger = AuditLogger(
+        AuditLogger(
             enabled=True, log_dir=temp_log_dir, retention_days=90
         )
 
@@ -297,7 +298,7 @@ class TestLogQuery:
         log_files = list(Path(temp_log_dir).glob("audit_*.log"))
         assert len(log_files) > 0
 
-        with open(log_files[0], "r") as f:
+        with open(log_files[0]) as f:
             content = f.read()
             assert "query_graph" in content
             assert "MATCH (n) RETURN n" in content
@@ -326,7 +327,7 @@ class TestLogQuery:
         logger.log_query(tool="execute_cypher", query="MATCH (n) RETURN n LIMIT 5")
 
         log_files = list(Path(temp_log_dir).glob("audit_*.log"))
-        with open(log_files[0], "r") as f:
+        with open(log_files[0]) as f:
             lines = f.readlines()
             # Skip initialization message, get actual log entry
             for line in lines:
@@ -351,7 +352,7 @@ class TestLogQuery:
         )
 
         log_files = list(Path(temp_log_dir).glob("audit_*.log"))
-        with open(log_files[0], "r") as f:
+        with open(log_files[0]) as f:
             content = f.read()
             assert "[EMAIL_REDACTED]" in content
             assert "user@example.com" not in content
@@ -374,7 +375,7 @@ class TestLogResponse:
         )
 
         log_files = list(Path(temp_log_dir).glob("audit_*.log"))
-        with open(log_files[0], "r") as f:
+        with open(log_files[0]) as f:
             content = f.read()
             assert "response" in content
             assert "query_graph" in content
@@ -392,12 +393,12 @@ class TestLogResponse:
         )
 
         log_files = list(Path(temp_log_dir).glob("audit_*.log"))
-        with open(log_files[0], "r") as f:
+        with open(log_files[0]) as f:
             content = f.read()
             # Should only have initialization message, not response
-            lines = [l for l in content.split("\n") if l.strip()]
+            lines = [line for line in content.split("\n") if line.strip()]
             # Only initialization log
-            assert len([l for l in lines if "response" in l]) == 0
+            assert len([line for line in lines if "response" in line]) == 0
 
     def test_log_response_with_pii_redaction(self, temp_log_dir):
         """Test response with PII redaction."""
@@ -419,7 +420,7 @@ class TestLogResponse:
         )
 
         log_files = list(Path(temp_log_dir).glob("audit_*.log"))
-        with open(log_files[0], "r") as f:
+        with open(log_files[0]) as f:
             content = f.read()
             # Result should be redacted
             assert "[RESPONSE_REDACTED]" in content or "[EMAIL_REDACTED]" in content
@@ -442,7 +443,7 @@ class TestLogError:
         )
 
         log_files = list(Path(temp_log_dir).glob("audit_*.log"))
-        with open(log_files[0], "r") as f:
+        with open(log_files[0]) as f:
             content = f.read()
             assert "error" in content.lower()
             assert "Syntax error" in content
@@ -458,11 +459,11 @@ class TestLogError:
         )
 
         log_files = list(Path(temp_log_dir).glob("audit_*.log"))
-        with open(log_files[0], "r") as f:
+        with open(log_files[0]) as f:
             content = f.read()
-            lines = [l for l in content.split("\n") if l.strip()]
+            lines = [line for line in content.split("\n") if line.strip()]
             # Should not have error entry
-            assert not any("Test error" in l for l in lines)
+            assert not any("Test error" in line for line in lines)
 
     def test_log_error_json_format(self, temp_log_dir):
         """Test error logged in JSON format."""
@@ -481,7 +482,7 @@ class TestLogError:
         )
 
         log_files = list(Path(temp_log_dir).glob("audit_*.log"))
-        with open(log_files[0], "r") as f:
+        with open(log_files[0]) as f:
             lines = f.readlines()
             for line in lines:
                 if "SecurityError" in line:
@@ -605,7 +606,7 @@ class TestEdgeCases:
         )
 
         log_files = list(Path(temp_log_dir).glob("audit_*.log"))
-        with open(log_files[0], "r") as f:
+        with open(log_files[0]) as f:
             content = f.read()
             assert "request_id" in content
             assert "127.0.0.1" in content
@@ -618,7 +619,7 @@ class TestEdgeCases:
             logger.log_query(tool="test", query=f"QUERY {i}")
 
         log_files = list(Path(temp_log_dir).glob("audit_*.log"))
-        with open(log_files[0], "r") as f:
+        with open(log_files[0]) as f:
             content = f.read()
             # Should have all queries
             for i in range(5):
