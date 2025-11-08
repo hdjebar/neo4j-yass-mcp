@@ -603,6 +603,55 @@ class TestEdgeCases:
         log_files = list(Path(temp_log_dir).glob("audit_*.log"))
         assert len(log_files) > 0  # Should not crash
 
+    def test_cleanup_logs_delete_exception(self, temp_log_dir):
+        """Test exception handling during log cleanup (lines 145-146)."""
+        from unittest.mock import patch
+        import time
+
+        logger = AuditLogger(enabled=True, log_dir=temp_log_dir, retention_days=1)
+
+        # Create an old log file with a timestamp from 2 days ago
+        old_log = Path(temp_log_dir) / "audit_old.log"
+        old_log.write_text("old log content")
+
+        # Set the file's modification time to 2 days ago
+        two_days_ago = time.time() - (2 * 24 * 60 * 60)
+        import os
+
+        os.utime(old_log, (two_days_ago, two_days_ago))
+
+        # Mock unlink to raise an exception
+        original_unlink = Path.unlink
+
+        def mock_unlink(self, *args, **kwargs):
+            if "audit_old.log" in str(self):
+                raise PermissionError("Permission denied")
+            return original_unlink(self, *args, **kwargs)
+
+        with patch.object(Path, "unlink", mock_unlink):
+            # This should trigger the exception path when trying to delete
+            logger._cleanup_old_logs()
+            # Exception is caught and logged, should not crash
+
+    def test_format_entry_with_error(self, temp_log_dir):
+        """Test formatting audit entry with error field (line 203)."""
+        # Use text format to trigger the _format_entry text formatting path
+        logger = AuditLogger(enabled=True, log_dir=temp_log_dir, log_format="text")
+
+        # Log an error
+        logger.log_error(
+            tool="test_tool", query="MATCH (n) RETURN n", error="Test error message"
+        )
+
+        # Read the log file
+        log_files = list(Path(temp_log_dir).glob("audit_*.log"))
+        with open(log_files[0]) as f:
+            content = f.read()
+
+        # Verify error is in the output with "Error:" prefix (line 203)
+        assert "Test error message" in content
+        assert "Error: Test error message" in content
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--cov=neo4j_yass_mcp.security.audit_logger"])

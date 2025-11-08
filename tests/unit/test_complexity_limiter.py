@@ -384,6 +384,48 @@ class TestRealWorldQueries:
         # Should be within limit
         assert score.is_within_limit is True
 
+    def test_single_match_not_cartesian(self):
+        """Test that single MATCH statement is not detected as cartesian (line 211)."""
+        analyzer = QueryComplexityAnalyzer()
+
+        # Single MATCH should return False from _detect_cartesian_product
+        query = "MATCH (n:Person) RETURN n"
+        result = analyzer._detect_cartesian_product(query)
+
+        assert result is False
+
+    def test_connected_matches_not_cartesian(self):
+        """Test that connected MATCH statements are not cartesian (line 231)."""
+        analyzer = QueryComplexityAnalyzer()
+
+        # Two MATCH statements with shared variables (both define with :)
+        # The regex looks for (var: pattern, so both matches need to define variables
+        query = """
+        MATCH (a:Person)
+        MATCH (a:Person)-[:KNOWS]->(b:Person)
+        RETURN a, b
+        """
+        result = analyzer._detect_cartesian_product(query)
+
+        assert result is False
+
+    def test_get_complexity_analyzer_returns_instance(self):
+        """Test get_complexity_analyzer returns the global instance (line 282)."""
+        from neo4j_yass_mcp.security.complexity_limiter import (
+            get_complexity_analyzer,
+            initialize_complexity_limiter,
+        )
+
+        # Initialize the global analyzer
+        initialize_complexity_limiter(max_complexity=50)
+
+        # Get the analyzer
+        analyzer = get_complexity_analyzer()
+
+        # Verify it's the correct instance
+        assert analyzer is not None
+        assert analyzer.max_complexity == 50
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
