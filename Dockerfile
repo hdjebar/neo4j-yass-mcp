@@ -8,17 +8,19 @@ ARG APP_VERSION=1.0.0
 # =============================================================================
 # Stage 1: Builder - Install dependencies
 # =============================================================================
-FROM python:${PYTHON_VERSION}-slim as builder
+FROM python:${PYTHON_VERSION}-slim AS builder
 
 # Install build dependencies and uv
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && curl -LsSf https://astral.sh/uv/install.sh | sh
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv package manager
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Add uv to PATH for subsequent commands
-ENV PATH="/root/.cargo/bin:$PATH"
+ENV PATH="/root/.local/bin:$PATH"
 
 # Verify uv installation works
 RUN uv --version
