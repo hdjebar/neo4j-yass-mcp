@@ -23,7 +23,7 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Install dependencies
+      - name: Install linting dependencies
         run: |
           uv pip install --system ruff mypy
 
@@ -32,6 +32,10 @@ jobs:
 
       - name: Run ruff (formatter check)
         run: ruff format --check src/ tests/
+
+      - name: Install project dependencies for type checking
+        run: |
+          uv pip install --system -e .
 
       - name: Run mypy (type checker)
         run: mypy src/neo4j_yass_mcp/
