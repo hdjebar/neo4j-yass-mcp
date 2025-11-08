@@ -70,7 +70,7 @@ SECRET_PATTERNS=(
 )
 
 for pattern in "${SECRET_PATTERNS[@]}"; do
-    if git grep -qE "$pattern" -- ':(exclude).env.example' ':(exclude)docs/*'; then
+    if git grep -qE "$pattern" -- ':(exclude).env.example' ':(exclude)docs/*' ':(exclude)verify-publication-ready.sh'; then
         check_fail "Found potential secret matching pattern: $pattern"
     fi
 done
