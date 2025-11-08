@@ -15,9 +15,7 @@ def mock_neo4j_graph():
     """Mock Neo4jGraph instance."""
     graph = Mock()
     graph.get_schema = "Node: Movie\nRelationship: ACTED_IN"
-    graph.query = Mock(return_value=[
-        {"name": "Tom Cruise", "title": "Top Gun"}
-    ])
+    graph.query = Mock(return_value=[{"name": "Tom Cruise", "title": "Top Gun"}])
     graph.refresh_schema = Mock()
     graph._driver = Mock()
     graph._driver.close = Mock()
@@ -28,14 +26,16 @@ def mock_neo4j_graph():
 def mock_langchain_chain():
     """Mock GraphCypherQAChain instance."""
     chain = Mock()
-    chain.invoke = Mock(return_value={
-        "result": "Tom Cruise starred in Top Gun",
-        "intermediate_steps": [
-            {
-                "query": "MATCH (m:Movie {title: 'Top Gun'})<-[:ACTED_IN]-(p:Person) RETURN p.name"
-            }
-        ]
-    })
+    chain.invoke = Mock(
+        return_value={
+            "result": "Tom Cruise starred in Top Gun",
+            "intermediate_steps": [
+                {
+                    "query": "MATCH (m:Movie {title: 'Top Gun'})<-[:ACTED_IN]-(p:Person) RETURN p.name"
+                }
+            ],
+        }
+    )
     return chain
 
 
@@ -73,7 +73,7 @@ def sample_cypher_queries():
         "complex": [
             "MATCH (a)-[r1]->(b)-[r2]->(c)-[r3]->(d)-[r4]->(e) RETURN *",
             "MATCH (n) OPTIONAL MATCH (n)-[r]->(m) RETURN n, collect(m) AS related",
-        ]
+        ],
     }
 
 
@@ -86,22 +86,22 @@ def sample_llm_configs():
             "model": "gpt-4",
             "temperature": 0.0,
             "api_key": "sk-test-key",
-            "streaming": False
+            "streaming": False,
         },
         "anthropic": {
             "provider": "anthropic",
             "model": "claude-3-sonnet-20240229",
             "temperature": 0.0,
             "api_key": "sk-ant-test-key",
-            "streaming": False
+            "streaming": False,
         },
         "google": {
             "provider": "google-genai",
             "model": "gemini-pro",
             "temperature": 0.0,
             "api_key": "test-google-key",
-            "streaming": False
-        }
+            "streaming": False,
+        },
     }
 
 
@@ -143,9 +143,9 @@ def reset_global_state():
     import neo4j_yass_mcp.server as server_module
 
     # Reset global variables
-    original_graph = getattr(server_module, 'graph', None)
-    original_chain = getattr(server_module, 'chain', None)
-    original_executor = getattr(server_module, '_executor', None)
+    original_graph = getattr(server_module, "graph", None)
+    original_chain = getattr(server_module, "chain", None)
+    original_executor = getattr(server_module, "_executor", None)
 
     yield
 

@@ -554,7 +554,9 @@ async def query_graph(query: str) -> dict[str, Any]:
 
         # Check generated Cypher complexity
         if generated_cypher and complexity_limit_enabled:
-            is_allowed, complexity_error, complexity_score = check_query_complexity(generated_cypher)
+            is_allowed, complexity_error, complexity_score = check_query_complexity(
+                generated_cypher
+            )
 
             if not is_allowed:
                 logger.warning(f"LLM generated complex query: {complexity_error}")
@@ -573,7 +575,13 @@ async def query_graph(query: str) -> dict[str, Any]:
                         tool="query_graph",
                         query=query,
                         error=complexity_error or "Query blocked by complexity limiter",
-                        metadata={"generated_cypher": generated_cypher, "complexity_blocked": True, "complexity_score": complexity_score.total_score if complexity_score else None},
+                        metadata={
+                            "generated_cypher": generated_cypher,
+                            "complexity_blocked": True,
+                            "complexity_score": complexity_score.total_score
+                            if complexity_score
+                            else None,
+                        },
                     )
 
                 return error_response
@@ -766,7 +774,12 @@ async def _execute_cypher_impl(
                     tool="execute_cypher",
                     query=cypher_query,
                     error=complexity_error or "Query blocked by complexity limiter",
-                    metadata={"complexity_blocked": True, "complexity_score": complexity_score.total_score if complexity_score else None},
+                    metadata={
+                        "complexity_blocked": True,
+                        "complexity_score": complexity_score.total_score
+                        if complexity_score
+                        else None,
+                    },
                 )
 
             return error_response

@@ -295,6 +295,7 @@ class TestGlobalRateLimiter:
         """Test check_rate_limit when limiter not initialized."""
         # Reset global limiter
         from neo4j_yass_mcp.security import rate_limiter
+
         rate_limiter._rate_limiter = None
 
         is_allowed, info = check_rate_limit(client_id="test")

@@ -79,26 +79,28 @@ class QueryComplexityAnalyzer:
 
         # Normalize query for analysis
         query_upper = query.upper()
-        query_normalized = re.sub(r'\s+', ' ', query).strip()
+        query_normalized = re.sub(r"\s+", " ", query).strip()
 
         breakdown = {}
         warnings = []
 
         # 1. Count MATCH clauses (base complexity)
-        match_count = len(re.findall(r'\bMATCH\b', query_upper))
-        breakdown['match_clauses'] = match_count * 5
+        match_count = len(re.findall(r"\bMATCH\b", query_upper))
+        breakdown["match_clauses"] = match_count * 5
 
         # 2. Detect Cartesian products (multiple MATCH without relationships)
         if match_count > 1:
             # Check if MATCH clauses are connected via WHERE or relationships
             cartesian_risk = self._detect_cartesian_product(query_normalized)
             if cartesian_risk:
-                breakdown['cartesian_product_risk'] = 50
-                warnings.append("Potential Cartesian product detected - multiple MATCH clauses without clear relationships")
+                breakdown["cartesian_product_risk"] = 50
+                warnings.append(
+                    "Potential Cartesian product detected - multiple MATCH clauses without clear relationships"
+                )
 
         # 3. Variable-length patterns
-        variable_patterns = re.findall(r'-\[\*(\d+)?\.\.(\d+)?\]->', query_normalized)
-        variable_patterns += re.findall(r'-\[\*(\d+)?\]->', query_normalized)
+        variable_patterns = re.findall(r"-\[\*(\d+)?\.\.(\d+)?\]->", query_normalized)
+        variable_patterns += re.findall(r"-\[\*(\d+)?\]->", query_normalized)
 
         if variable_patterns:
             max_length = 0
@@ -113,52 +115,59 @@ class QueryComplexityAnalyzer:
                     max_length = self.max_variable_path_length
 
             if max_length > self.max_variable_path_length:
-                breakdown['excessive_variable_path'] = 30
-                warnings.append(f"Variable-length path exceeds limit: {max_length} > {self.max_variable_path_length}")
+                breakdown["excessive_variable_path"] = 30
+                warnings.append(
+                    f"Variable-length path exceeds limit: {max_length} > {self.max_variable_path_length}"
+                )
             else:
-                breakdown['variable_length_patterns'] = len(variable_patterns) * 10
+                breakdown["variable_length_patterns"] = len(variable_patterns) * 10
 
         # 4. Unbounded variable-length patterns (no upper limit)
-        unbounded_patterns = re.findall(r'-\[\*\]->', query_normalized) + re.findall(r'-\[\*\.\.]->', query_normalized)
+        unbounded_patterns = re.findall(r"-\[\*\]->", query_normalized) + re.findall(
+            r"-\[\*\.\.]->", query_normalized
+        )
         if unbounded_patterns:
-            breakdown['unbounded_patterns'] = len(unbounded_patterns) * 25
-            warnings.append(f"Found {len(unbounded_patterns)} unbounded variable-length pattern(s) - may traverse entire graph")
+            breakdown["unbounded_patterns"] = len(unbounded_patterns) * 25
+            warnings.append(
+                f"Found {len(unbounded_patterns)} unbounded variable-length pattern(s) - may traverse entire graph"
+            )
 
         # 5. Check for LIMIT clause on unbounded queries
-        has_limit = bool(re.search(r'\bLIMIT\s+\d+', query_upper))
+        has_limit = bool(re.search(r"\bLIMIT\s+\d+", query_upper))
         if self.require_limit_unbounded and not has_limit:
             if match_count > 0 or unbounded_patterns:
-                breakdown['missing_limit'] = 20
-                warnings.append("Unbounded query without LIMIT clause - may return excessive results")
+                breakdown["missing_limit"] = 20
+                warnings.append(
+                    "Unbounded query without LIMIT clause - may return excessive results"
+                )
 
         # 6. Nested subqueries and WITH clauses
-        with_count = len(re.findall(r'\bWITH\b', query_upper))
+        with_count = len(re.findall(r"\bWITH\b", query_upper))
         if with_count > 0:
-            breakdown['with_clauses'] = with_count * 5
+            breakdown["with_clauses"] = with_count * 5
 
-        call_subquery_count = len(re.findall(r'\bCALL\s*\{', query_upper))
+        call_subquery_count = len(re.findall(r"\bCALL\s*\{", query_upper))
         if call_subquery_count > 0:
-            breakdown['call_subqueries'] = call_subquery_count * 15
+            breakdown["call_subqueries"] = call_subquery_count * 15
             if call_subquery_count > 3:
                 warnings.append(f"High subquery nesting: {call_subquery_count} CALL subqueries")
 
         # 7. Aggregation complexity
         aggregate_functions = re.findall(
-            r'\b(COUNT|SUM|AVG|MIN|MAX|COLLECT|PERCENTILE)\s*\(',
-            query_upper
+            r"\b(COUNT|SUM|AVG|MIN|MAX|COLLECT|PERCENTILE)\s*\(", query_upper
         )
         if aggregate_functions:
-            breakdown['aggregations'] = len(aggregate_functions) * 3
+            breakdown["aggregations"] = len(aggregate_functions) * 3
 
         # 8. UNION operations
-        union_count = len(re.findall(r'\bUNION\b', query_upper))
+        union_count = len(re.findall(r"\bUNION\b", query_upper))
         if union_count > 0:
-            breakdown['union_operations'] = union_count * 10
+            breakdown["union_operations"] = union_count * 10
 
         # 9. OPTIONAL MATCH (may increase result set)
-        optional_match_count = len(re.findall(r'\bOPTIONAL\s+MATCH\b', query_upper))
+        optional_match_count = len(re.findall(r"\bOPTIONAL\s+MATCH\b", query_upper))
         if optional_match_count > 0:
-            breakdown['optional_matches'] = optional_match_count * 5
+            breakdown["optional_matches"] = optional_match_count * 5
 
         # Calculate total score
         total_score = sum(breakdown.values())
@@ -167,7 +176,9 @@ class QueryComplexityAnalyzer:
         is_within_limit = total_score <= self.max_complexity
 
         if not is_within_limit:
-            warnings.insert(0, f"Query complexity {total_score} exceeds limit of {self.max_complexity}")
+            warnings.insert(
+                0, f"Query complexity {total_score} exceeds limit of {self.max_complexity}"
+            )
 
         return ComplexityScore(
             total_score=total_score,
@@ -194,7 +205,7 @@ class QueryComplexityAnalyzer:
         query_upper = query.upper()
 
         # Count MATCH statements
-        matches = re.findall(r'MATCH[^;]*?(?=MATCH|WHERE|WITH|RETURN|$)', query_upper, re.DOTALL)
+        matches = re.findall(r"MATCH[^;]*?(?=MATCH|WHERE|WITH|RETURN|$)", query_upper, re.DOTALL)
 
         if len(matches) <= 1:
             return False
@@ -205,14 +216,16 @@ class QueryComplexityAnalyzer:
             next_clause = matches[i + 1]
 
             # Extract variable names from patterns
-            vars_current = set(re.findall(r'\((\w+):', match_clause))
-            vars_next = set(re.findall(r'\((\w+):', next_clause))
+            vars_current = set(re.findall(r"\((\w+):", match_clause))
+            vars_next = set(re.findall(r"\((\w+):", next_clause))
 
             # If no shared variables and no WHERE connecting them
             if not vars_current.intersection(vars_next):
                 # Check if there's a WHERE clause between MATCH statements
-                between_text = query_upper[query_upper.find(match_clause):query_upper.find(next_clause)]
-                if 'WHERE' not in between_text and 'WITH' not in between_text:
+                between_text = query_upper[
+                    query_upper.find(match_clause) : query_upper.find(next_clause)
+                ]
+                if "WHERE" not in between_text and "WITH" not in between_text:
                     return True
 
         return False

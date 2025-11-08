@@ -581,9 +581,7 @@ class TestParameterValidation:
         assert is_safe is True
 
         # Nested structure too large
-        large_params = {
-            "data": {f"key_{i}": "x" * 3000 for i in range(10)}
-        }
+        large_params = {"data": {f"key_{i}": "x" * 3000 for i in range(10)}}
         is_safe, error = sanitizer.sanitize_parameters(large_params)
         assert is_safe is False
         assert "too large" in error.lower()
@@ -672,8 +670,11 @@ class TestUTF8Attacks:
         assert "mathematical alphanumeric" in error.lower()
 
     @pytest.mark.skipif(
-        not hasattr(__import__('neo4j_yass_mcp.security.sanitizer', fromlist=['CONFUSABLES_AVAILABLE']), 'CONFUSABLES_AVAILABLE'),
-        reason="confusable_homoglyphs not available"
+        not hasattr(
+            __import__("neo4j_yass_mcp.security.sanitizer", fromlist=["CONFUSABLES_AVAILABLE"]),
+            "CONFUSABLES_AVAILABLE",
+        ),
+        reason="confusable_homoglyphs not available",
     )
     def test_homograph_attack_blocked_with_library(self):
         """Test homograph attacks blocked (with library)."""
@@ -706,7 +707,7 @@ class TestUTF8Attacks:
             query = f"MATCH (n) WHERE n.title = 'T{char}st' RETURN n"
 
             # Patch to force manual detection
-            with patch('neo4j_yass_mcp.security.sanitizer.CONFUSABLES_AVAILABLE', False):
+            with patch("neo4j_yass_mcp.security.sanitizer.CONFUSABLES_AVAILABLE", False):
                 is_safe, error, warnings = sanitizer.sanitize_query(query)
                 assert is_safe is False
                 assert "homograph" in error.lower()
@@ -742,8 +743,11 @@ class TestUTF8Attacks:
         assert is_safe is True
 
     @pytest.mark.skipif(
-        not hasattr(__import__('neo4j_yass_mcp.security.sanitizer', fromlist=['FTFY_AVAILABLE']), 'FTFY_AVAILABLE'),
-        reason="ftfy not available"
+        not hasattr(
+            __import__("neo4j_yass_mcp.security.sanitizer", fromlist=["FTFY_AVAILABLE"]),
+            "FTFY_AVAILABLE",
+        ),
+        reason="ftfy not available",
     )
     def test_ftfy_normalization_detection(self):
         """Test ftfy normalization for UTF-8 attack detection."""
@@ -826,6 +830,7 @@ class TestGlobalSanitizerFunctions:
         """Test sanitize_query auto-initializes if needed."""
         # Reset global sanitizer
         import neo4j_yass_mcp.security.sanitizer as sanitizer_module
+
         sanitizer_module._sanitizer = None
 
         query = "MATCH (n) RETURN n"
@@ -946,8 +951,11 @@ class TestEdgeCases:
         sanitizer = QuerySanitizer()
 
         # Mock ftfy to raise exception
-        with patch('neo4j_yass_mcp.security.sanitizer.FTFY_AVAILABLE', True):
-            with patch('neo4j_yass_mcp.security.sanitizer.ftfy.fix_text', side_effect=Exception("Test error")):
+        with patch("neo4j_yass_mcp.security.sanitizer.FTFY_AVAILABLE", True):
+            with patch(
+                "neo4j_yass_mcp.security.sanitizer.ftfy.fix_text",
+                side_effect=Exception("Test error"),
+            ):
                 query = "MATCH (n) RETURN n"
                 is_safe, error, warnings = sanitizer.sanitize_query(query)
 
@@ -959,8 +967,11 @@ class TestEdgeCases:
         sanitizer = QuerySanitizer()
 
         # Mock confusables to raise exception
-        with patch('neo4j_yass_mcp.security.sanitizer.CONFUSABLES_AVAILABLE', True):
-            with patch('neo4j_yass_mcp.security.sanitizer.confusables.is_dangerous', side_effect=Exception("Test error")):
+        with patch("neo4j_yass_mcp.security.sanitizer.CONFUSABLES_AVAILABLE", True):
+            with patch(
+                "neo4j_yass_mcp.security.sanitizer.confusables.is_dangerous",
+                side_effect=Exception("Test error"),
+            ):
                 query = "MATCH (n) RETURN n"
                 is_safe, error, warnings = sanitizer.sanitize_query(query)
 

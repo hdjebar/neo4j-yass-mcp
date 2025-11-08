@@ -105,9 +105,7 @@ class TokenBucketRateLimiter:
 
         return tokens
 
-    def check_rate_limit(
-        self, client_id: str = "default", cost: int = 1
-    ) -> RateLimitInfo:
+    def check_rate_limit(self, client_id: str = "default", cost: int = 1) -> RateLimitInfo:
         """
         Check if request is allowed under rate limit.
 
@@ -212,9 +210,7 @@ def initialize_rate_limiter(
         Initialized rate limiter instance
     """
     global _rate_limiter
-    _rate_limiter = TokenBucketRateLimiter(
-        rate=rate, per_seconds=per_seconds, burst=burst
-    )
+    _rate_limiter = TokenBucketRateLimiter(rate=rate, per_seconds=per_seconds, burst=burst)
     return _rate_limiter
 
 

@@ -26,7 +26,7 @@ class TestComplexityScoring:
         # Should have low complexity (base MATCH + has LIMIT)
         assert score.total_score < 30
         assert score.is_within_limit is True
-        assert 'match_clauses' in score.breakdown
+        assert "match_clauses" in score.breakdown
 
     def test_cartesian_product_detection(self):
         """Test Cartesian product increases complexity."""
@@ -41,9 +41,9 @@ class TestComplexityScoring:
         score = analyzer.analyze_query(query)
 
         # Should detect Cartesian product risk
-        assert 'cartesian_product_risk' in score.breakdown
-        assert score.breakdown['cartesian_product_risk'] == 50
-        assert any('Cartesian product' in w for w in score.warnings)
+        assert "cartesian_product_risk" in score.breakdown
+        assert score.breakdown["cartesian_product_risk"] == 50
+        assert any("Cartesian product" in w for w in score.warnings)
 
     def test_variable_length_pattern(self):
         """Test variable-length pattern scoring."""
@@ -53,8 +53,8 @@ class TestComplexityScoring:
         score = analyzer.analyze_query(query)
 
         # Should score variable-length pattern
-        assert 'variable_length_patterns' in score.breakdown
-        assert score.breakdown['variable_length_patterns'] == 10  # 1 pattern * 10
+        assert "variable_length_patterns" in score.breakdown
+        assert score.breakdown["variable_length_patterns"] == 10  # 1 pattern * 10
 
     def test_unbounded_variable_pattern(self):
         """Test unbounded variable-length pattern."""
@@ -64,9 +64,9 @@ class TestComplexityScoring:
         score = analyzer.analyze_query(query)
 
         # Should penalize unbounded pattern
-        assert 'unbounded_patterns' in score.breakdown
-        assert score.breakdown['unbounded_patterns'] == 25
-        assert any('unbounded' in w.lower() for w in score.warnings)
+        assert "unbounded_patterns" in score.breakdown
+        assert score.breakdown["unbounded_patterns"] == 25
+        assert any("unbounded" in w.lower() for w in score.warnings)
 
     def test_excessive_variable_path_length(self):
         """Test excessive variable path length detection."""
@@ -76,8 +76,8 @@ class TestComplexityScoring:
         score = analyzer.analyze_query(query)
 
         # Should detect excessive path length
-        assert 'excessive_variable_path' in score.breakdown
-        assert any('exceeds limit' in w for w in score.warnings)
+        assert "excessive_variable_path" in score.breakdown
+        assert any("exceeds limit" in w for w in score.warnings)
 
     def test_missing_limit_on_unbounded_query(self):
         """Test penalty for missing LIMIT on unbounded query."""
@@ -87,9 +87,9 @@ class TestComplexityScoring:
         score = analyzer.analyze_query(query)
 
         # Should penalize missing LIMIT
-        assert 'missing_limit' in score.breakdown
-        assert score.breakdown['missing_limit'] == 20
-        assert any('without LIMIT' in w for w in score.warnings)
+        assert "missing_limit" in score.breakdown
+        assert score.breakdown["missing_limit"] == 20
+        assert any("without LIMIT" in w for w in score.warnings)
 
     def test_query_with_limit(self):
         """Test query with LIMIT doesn't get penalized."""
@@ -99,7 +99,7 @@ class TestComplexityScoring:
         score = analyzer.analyze_query(query)
 
         # Should NOT have missing_limit penalty
-        assert 'missing_limit' not in score.breakdown
+        assert "missing_limit" not in score.breakdown
 
     def test_with_clauses(self):
         """Test WITH clause complexity."""
@@ -115,8 +115,8 @@ class TestComplexityScoring:
         score = analyzer.analyze_query(query)
 
         # Should score WITH clauses
-        assert 'with_clauses' in score.breakdown
-        assert score.breakdown['with_clauses'] == 10  # 2 WITH * 5
+        assert "with_clauses" in score.breakdown
+        assert score.breakdown["with_clauses"] == 10  # 2 WITH * 5
 
     def test_subqueries(self):
         """Test CALL subquery complexity."""
@@ -133,8 +133,8 @@ class TestComplexityScoring:
         score = analyzer.analyze_query(query)
 
         # Should score subqueries
-        assert 'call_subqueries' in score.breakdown
-        assert score.breakdown['call_subqueries'] == 15  # 1 CALL * 15
+        assert "call_subqueries" in score.breakdown
+        assert score.breakdown["call_subqueries"] == 15  # 1 CALL * 15
 
     def test_multiple_subqueries(self):
         """Test multiple CALL subqueries trigger warning."""
@@ -150,7 +150,7 @@ class TestComplexityScoring:
         score = analyzer.analyze_query(query)
 
         # Should warn about high nesting
-        assert any('High subquery nesting' in w for w in score.warnings)
+        assert any("High subquery nesting" in w for w in score.warnings)
 
     def test_aggregation_complexity(self):
         """Test aggregation function complexity."""
@@ -163,8 +163,8 @@ class TestComplexityScoring:
         score = analyzer.analyze_query(query)
 
         # Should score aggregations
-        assert 'aggregations' in score.breakdown
-        assert score.breakdown['aggregations'] == 6  # 2 aggregations * 3
+        assert "aggregations" in score.breakdown
+        assert score.breakdown["aggregations"] == 6  # 2 aggregations * 3
 
     def test_union_operations(self):
         """Test UNION operation complexity."""
@@ -178,8 +178,8 @@ class TestComplexityScoring:
         score = analyzer.analyze_query(query)
 
         # Should score UNION
-        assert 'union_operations' in score.breakdown
-        assert score.breakdown['union_operations'] == 10  # 1 UNION * 10
+        assert "union_operations" in score.breakdown
+        assert score.breakdown["union_operations"] == 10  # 1 UNION * 10
 
     def test_optional_match(self):
         """Test OPTIONAL MATCH complexity."""
@@ -193,8 +193,8 @@ class TestComplexityScoring:
         score = analyzer.analyze_query(query)
 
         # Should score OPTIONAL MATCH
-        assert 'optional_matches' in score.breakdown
-        assert score.breakdown['optional_matches'] == 5  # 1 OPTIONAL * 5
+        assert "optional_matches" in score.breakdown
+        assert score.breakdown["optional_matches"] == 5  # 1 OPTIONAL * 5
 
 
 class TestComplexityLimits:
@@ -262,8 +262,8 @@ class TestComplexityWarnings:
 
         # Should have multiple warnings
         assert len(score.warnings) > 0
-        assert any('unbounded' in w.lower() for w in score.warnings)
-        assert any('LIMIT' in w for w in score.warnings)
+        assert any("unbounded" in w.lower() for w in score.warnings)
+        assert any("LIMIT" in w for w in score.warnings)
 
 
 class TestEdgeCases:
@@ -322,6 +322,7 @@ class TestGlobalAnalyzer:
         """Test check_query_complexity when not initialized."""
         # Reset global analyzer
         from neo4j_yass_mcp.security import complexity_limiter
+
         complexity_limiter._complexity_analyzer = None
 
         # Should allow query when not initialized
@@ -363,8 +364,8 @@ class TestRealWorldQueries:
         is_allowed, error, score = analyzer.check_complexity(query)
 
         # Should have excessive variable path penalty
-        assert 'excessive_variable_path' in score.breakdown
-        assert any('exceeds limit' in w for w in score.warnings)
+        assert "excessive_variable_path" in score.breakdown
+        assert any("exceeds limit" in w for w in score.warnings)
 
     def test_aggregation_report_query(self):
         """Test aggregation report query."""

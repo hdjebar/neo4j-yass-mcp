@@ -102,9 +102,7 @@ class TestLogFileRotation:
 
     def test_daily_rotation_filename(self, temp_log_dir):
         """Test daily rotation generates correct filename."""
-        logger = AuditLogger(
-            enabled=True, log_dir=temp_log_dir, rotation="daily"
-        )
+        logger = AuditLogger(enabled=True, log_dir=temp_log_dir, rotation="daily")
 
         filename = logger._get_log_filename()
         # Should contain today's date in YYYY-MM-DD format
@@ -114,9 +112,7 @@ class TestLogFileRotation:
 
     def test_weekly_rotation_filename(self, temp_log_dir):
         """Test weekly rotation generates correct filename."""
-        logger = AuditLogger(
-            enabled=True, log_dir=temp_log_dir, rotation="weekly"
-        )
+        logger = AuditLogger(enabled=True, log_dir=temp_log_dir, rotation="weekly")
 
         filename = logger._get_log_filename()
         # Week number format (contains current year)
@@ -125,9 +121,7 @@ class TestLogFileRotation:
 
     def test_size_rotation_creates_current_file(self, temp_log_dir):
         """Test size-based rotation creates current file."""
-        logger = AuditLogger(
-            enabled=True, log_dir=temp_log_dir, rotation="size", max_size_mb=1
-        )
+        logger = AuditLogger(enabled=True, log_dir=temp_log_dir, rotation="size", max_size_mb=1)
 
         filename = logger._get_log_filename()
         assert filename == Path(temp_log_dir) / "audit_current.log"
@@ -142,9 +136,7 @@ class TestLogFileRotation:
         with open(current_file, "w") as f:
             f.write("x" * (2 * 1024 * 1024))  # 2MB
 
-        AuditLogger(
-            enabled=True, log_dir=temp_log_dir, rotation="size", max_size_mb=1
-        )
+        AuditLogger(enabled=True, log_dir=temp_log_dir, rotation="size", max_size_mb=1)
 
         # Should have rotated the old file
         rotated_files = list(Path(temp_log_dir).glob("audit_*.log"))
@@ -153,9 +145,7 @@ class TestLogFileRotation:
 
     def test_invalid_rotation_defaults_to_daily(self, temp_log_dir):
         """Test invalid rotation policy defaults to daily."""
-        logger = AuditLogger(
-            enabled=True, log_dir=temp_log_dir, rotation="invalid"
-        )
+        logger = AuditLogger(enabled=True, log_dir=temp_log_dir, rotation="invalid")
 
         filename = logger._get_log_filename()
         # Should use daily format
@@ -177,9 +167,7 @@ class TestLogCleanup:
         os.utime(old_file, (old_date.timestamp(), old_date.timestamp()))
 
         # Initialize logger with 90-day retention
-        AuditLogger(
-            enabled=True, log_dir=temp_log_dir, retention_days=90
-        )
+        AuditLogger(enabled=True, log_dir=temp_log_dir, retention_days=90)
 
         # Old file should be deleted
         assert not old_file.exists()
@@ -192,9 +180,7 @@ class TestLogCleanup:
         recent_file.touch()
 
         # Initialize logger
-        AuditLogger(
-            enabled=True, log_dir=temp_log_dir, retention_days=90
-        )
+        AuditLogger(enabled=True, log_dir=temp_log_dir, retention_days=90)
 
         # Recent file should still exist
         assert recent_file.exists()
@@ -283,9 +269,7 @@ class TestLogQuery:
 
     def test_log_query_when_enabled(self, temp_log_dir):
         """Test query is logged when logging is enabled."""
-        logger = AuditLogger(
-            enabled=True, log_dir=temp_log_dir, log_queries=True
-        )
+        logger = AuditLogger(enabled=True, log_dir=temp_log_dir, log_queries=True)
 
         logger.log_query(
             tool="query_graph",
@@ -305,9 +289,7 @@ class TestLogQuery:
 
     def test_log_query_when_disabled(self, temp_log_dir):
         """Test query is not logged when disabled."""
-        logger = AuditLogger(
-            enabled=False, log_dir=temp_log_dir, log_queries=True
-        )
+        logger = AuditLogger(enabled=False, log_dir=temp_log_dir, log_queries=True)
 
         logger.log_query(tool="test", query="MATCH (n) RETURN n")
 
@@ -347,9 +329,7 @@ class TestLogQuery:
             pii_redaction=True,
         )
 
-        logger.log_query(
-            tool="test", query="Find user@example.com in database"
-        )
+        logger.log_query(tool="test", query="Find user@example.com in database")
 
         log_files = list(Path(temp_log_dir).glob("audit_*.log"))
         with open(log_files[0]) as f:
@@ -363,9 +343,7 @@ class TestLogResponse:
 
     def test_log_response_when_enabled(self, temp_log_dir):
         """Test response is logged when enabled."""
-        logger = AuditLogger(
-            enabled=True, log_dir=temp_log_dir, log_responses=True
-        )
+        logger = AuditLogger(enabled=True, log_dir=temp_log_dir, log_responses=True)
 
         logger.log_response(
             tool="query_graph",
@@ -382,9 +360,7 @@ class TestLogResponse:
 
     def test_log_response_when_disabled(self, temp_log_dir):
         """Test response is not logged when disabled."""
-        logger = AuditLogger(
-            enabled=True, log_dir=temp_log_dir, log_responses=False
-        )
+        logger = AuditLogger(enabled=True, log_dir=temp_log_dir, log_responses=False)
 
         logger.log_response(
             tool="test",
@@ -431,9 +407,7 @@ class TestLogError:
 
     def test_log_error_when_enabled(self, temp_log_dir):
         """Test error is logged when enabled."""
-        logger = AuditLogger(
-            enabled=True, log_dir=temp_log_dir, log_errors=True
-        )
+        logger = AuditLogger(enabled=True, log_dir=temp_log_dir, log_errors=True)
 
         logger.log_error(
             tool="execute_cypher",
@@ -450,13 +424,9 @@ class TestLogError:
 
     def test_log_error_when_disabled(self, temp_log_dir):
         """Test error is not logged when disabled."""
-        logger = AuditLogger(
-            enabled=True, log_dir=temp_log_dir, log_errors=False
-        )
+        logger = AuditLogger(enabled=True, log_dir=temp_log_dir, log_errors=False)
 
-        logger.log_error(
-            tool="test", query="MATCH (n) RETURN n", error="Test error"
-        )
+        logger.log_error(tool="test", query="MATCH (n) RETURN n", error="Test error")
 
         log_files = list(Path(temp_log_dir).glob("audit_*.log"))
         with open(log_files[0]) as f:
@@ -498,9 +468,7 @@ class TestLogFormatting:
 
     def test_json_format_output(self, temp_log_dir):
         """Test JSON format produces valid JSON."""
-        logger = AuditLogger(
-            enabled=True, log_dir=temp_log_dir, log_format="json"
-        )
+        logger = AuditLogger(enabled=True, log_dir=temp_log_dir, log_format="json")
 
         entry = {
             "timestamp": "2025-01-15T10:00:00",
@@ -516,9 +484,7 @@ class TestLogFormatting:
 
     def test_text_format_output(self, temp_log_dir):
         """Test text format produces readable text."""
-        logger = AuditLogger(
-            enabled=True, log_dir=temp_log_dir, log_format="text"
-        )
+        logger = AuditLogger(enabled=True, log_dir=temp_log_dir, log_format="text")
 
         entry = {
             "timestamp": "2025-01-15T10:00:00",
@@ -584,6 +550,7 @@ class TestGlobalLoggerFunctions:
         """Test get_audit_logger before initialization."""
         # Reset global logger
         import neo4j_yass_mcp.security.audit_logger as audit_module
+
         audit_module._audit_logger = None
 
         result = get_audit_logger()
@@ -595,9 +562,7 @@ class TestEdgeCases:
 
     def test_log_with_metadata(self, temp_log_dir):
         """Test logging with additional metadata."""
-        logger = AuditLogger(
-            enabled=True, log_dir=temp_log_dir, log_queries=True
-        )
+        logger = AuditLogger(enabled=True, log_dir=temp_log_dir, log_queries=True)
 
         logger.log_query(
             tool="test",
@@ -627,9 +592,7 @@ class TestEdgeCases:
 
     def test_response_with_no_success_key(self, temp_log_dir):
         """Test response logging when success key is missing."""
-        logger = AuditLogger(
-            enabled=True, log_dir=temp_log_dir, log_responses=True
-        )
+        logger = AuditLogger(enabled=True, log_dir=temp_log_dir, log_responses=True)
 
         logger.log_response(
             tool="test",

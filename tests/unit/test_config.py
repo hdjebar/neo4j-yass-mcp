@@ -406,9 +406,7 @@ class TestFindAvailablePort:
                 sockets.append(s)
 
             # Should fall back to range
-            port = find_available_port(
-                "127.0.0.1", preferred_ports, fallback_range=(45200, 45300)
-            )
+            port = find_available_port("127.0.0.1", preferred_ports, fallback_range=(45200, 45300))
 
             assert port is not None
             assert port not in preferred_ports
@@ -421,12 +419,8 @@ class TestFindAvailablePort:
     def test_find_available_port_no_ports_available(self):
         """Test when no ports are available (returns None)."""
         # Mock is_port_available to always return False
-        with patch(
-            "neo4j_yass_mcp.config.utils.is_port_available", return_value=False
-        ):
-            port = find_available_port(
-                "127.0.0.1", [8000, 8001], fallback_range=(8000, 8010)
-            )
+        with patch("neo4j_yass_mcp.config.utils.is_port_available", return_value=False):
+            port = find_available_port("127.0.0.1", [8000, 8001], fallback_range=(8000, 8010))
 
             assert port is None
 
@@ -482,18 +476,14 @@ class TestGetPreferredPortsFromEnv:
     def test_custom_env_var_name(self):
         """Test using custom environment variable name."""
         with patch.dict(os.environ, {"CUSTOM_PORTS": "7000 7001"}):
-            ports = get_preferred_ports_from_env(
-                env_var="CUSTOM_PORTS", default="8000"
-            )
+            ports = get_preferred_ports_from_env(env_var="CUSTOM_PORTS", default="8000")
 
             assert ports == [7000, 7001]
 
     def test_custom_default_value(self):
         """Test custom default value when env var not set."""
         with patch.dict(os.environ, {}, clear=True):
-            ports = get_preferred_ports_from_env(
-                env_var="NONEXISTENT", default="7500 7501"
-            )
+            ports = get_preferred_ports_from_env(env_var="NONEXISTENT", default="7500 7501")
 
             assert ports == [7500, 7501]
 
