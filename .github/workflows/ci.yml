@@ -168,9 +168,9 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Start services with docker-compose
+      - name: Start services with docker compose
         run: |
-          docker-compose up -d
+          docker compose up -d
           sleep 30  # Wait for services to be ready
 
       - name: Install dependencies
@@ -188,9 +188,9 @@ jobs:
       - name: Show logs on failure
         if: failure()
         run: |
-          docker-compose logs
+          docker compose logs
 
       - name: Cleanup
         if: always()
         run: |
-          docker-compose down -v
+          docker compose down -v
