@@ -25,17 +25,20 @@ DRY Approach:
 - Custom logic for Cypher-specific and advanced UTF-8 attacks
 """
 
+import logging
 import re
 from typing import Any
 
 try:
     from confusable_homoglyphs import confusables
+
     CONFUSABLES_AVAILABLE = True
 except ImportError:
     CONFUSABLES_AVAILABLE = False
 
 try:
     import ftfy
+
     FTFY_AVAILABLE = True
 except ImportError:
     FTFY_AVAILABLE = False
@@ -327,11 +330,16 @@ class QuerySanitizer:
                 # If ftfy had to fix things, it might indicate an attack
                 if normalized != query:
                     # Check what ftfy fixed
-                    if len(normalized) < len(query) * 0.9:  # >10% shrinkage suggests removed characters
-                        return False, "Blocked: Query contained problematic Unicode sequences removed by normalization"
-            except Exception:
+                    if (
+                        len(normalized) < len(query) * 0.9
+                    ):  # >10% shrinkage suggests removed characters
+                        return (
+                            False,
+                            "Blocked: Query contained problematic Unicode sequences removed by normalization",
+                        )
+            except Exception as e:
                 # ftfy failed, continue with manual checks
-                pass
+                logging.warning(f"ftfy normalization failed: {e}")
 
         # Null bytes (can truncate strings or bypass filters)
         if "\x00" in query:
@@ -387,7 +395,10 @@ class QuerySanitizer:
             try:
                 # Check if the query contains dangerous confusable characters
                 if confusables.is_dangerous(query):
-                    return False, "Blocked: Query contains dangerous confusable characters (homograph attack)"
+                    return (
+                        False,
+                        "Blocked: Query contains dangerous confusable characters (homograph attack)",
+                    )
 
                 # Check for mixed scripts (e.g., Latin + Cyrillic)
                 if confusables.is_mixed_script(query):
@@ -396,14 +407,16 @@ class QuerySanitizer:
                         if ord(char) > 127:  # Non-ASCII characters
                             try:
                                 # Check if this character is confusable with Latin
-                                if confusables.is_confusable(char, preferred_aliases=['LATIN']):
+                                if confusables.is_confusable(char, preferred_aliases=["LATIN"]):
                                     return (
                                         False,
                                         f"Blocked: Character '{char}' (U+{ord(char):04X}) is confusable with Latin characters (homograph attack)",
                                     )
-                            except Exception:
+                            except Exception as e:
                                 # Character not in confusables database, continue
-                                pass
+                                logging.debug(
+                                    f"Character U+{ord(char):04X} not in confusables database: {e}"
+                                )
             except Exception:
                 # If library fails, fall back to manual detection
                 homograph_result = self._manual_homograph_detection(query)

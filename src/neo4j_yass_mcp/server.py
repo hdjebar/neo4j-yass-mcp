@@ -268,7 +268,9 @@ def initialize_neo4j():
     neo4j_timeout = int(os.getenv("NEO4J_READ_TIMEOUT", "30"))
 
     # Security: Check for default/weak passwords using zxcvbn (DRY approach)
-    is_weak, weakness_reason = is_password_weak(neo4j_password, user_inputs=[neo4j_username, "neo4j"])
+    is_weak, weakness_reason = is_password_weak(
+        neo4j_password, user_inputs=[neo4j_username, "neo4j"]
+    )
     if is_weak:
         logger.error("🚨 SECURITY ERROR: Weak password detected!")
         logger.error(f"   Reason: {weakness_reason}")

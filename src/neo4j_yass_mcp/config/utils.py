@@ -34,7 +34,9 @@ def configure_logging():
 
     # Configure root logger
     logging.basicConfig(
-        level=level, format=log_format, force=True  # Override any existing configuration
+        level=level,
+        format=log_format,
+        force=True,  # Override any existing configuration
     )
 
     return logging.getLogger(__name__)
