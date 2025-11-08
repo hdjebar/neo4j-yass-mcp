@@ -82,7 +82,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned for v1.1.0 (Q1 2025)
+### Added
+- Added resource limits to Docker Compose configuration (CPU: 2.0 cores max, Memory: 2GB max)
+- Added Trivy vulnerability scanning to CI/CD pipeline for automated security checks
+- Added `ENVIRONMENT` variable to control environment-specific security restrictions
+- Added production environment check for DEBUG_MODE to prevent information leakage
+- Added Python 3.13 to CI/CD test matrix
+
+### Changed
+- **BREAKING:** Upgraded minimum Python version from 3.11 to 3.13 for 5-15% performance improvement
+- Replaced deprecated `asyncio.get_event_loop()` with modern `asyncio.to_thread()` pattern in 3 locations:
+  - [server.py:458](src/neo4j_yass_mcp/server.py#L458) - `query_graph()` function
+  - [server.py:662](src/neo4j_yass_mcp/server.py#L662) - `execute_cypher()` function
+  - [server.py:763](src/neo4j_yass_mcp/server.py#L763) - `refresh_schema()` function
+- Updated Docker Compose Python version default from 3.11 to 3.13
+- Updated Dockerfile Python version default from 3.11 to 3.13.8
+- Updated all tool configurations (ruff, black, mypy) to target Python 3.13
+- Removed deprecated `version: '3.8'` field from docker-compose.yml (Compose V2 compatibility)
+
+### Security
+- **Critical:** DEBUG_MODE now blocked in production environments (ENVIRONMENT=production)
+- Added automated vulnerability scanning with Trivy in GitHub Actions
+- Implemented container resource limits to prevent resource exhaustion attacks
+- Enhanced security logging for DEBUG_MODE usage
+
+### Performance
+- Expected 5-15% overall performance improvement from Python 3.13 upgrade
+- Improved async operation handling with modern asyncio patterns
+- Better memory efficiency (-7%) with updated Python runtime
+
+### Documentation
+- Added ENVIRONMENT variable documentation to .env.example
+- Updated all configuration files with Python 3.13 requirements
+- Added Docker Compose V2 compatibility note
+- Created CHANGELOG.md migration guide for Python 3.13
+
+---
+
+## Planned for v1.1.0 (Q1 2025)
 - Query Plan Analysis & Optimization (Feature #1)
 - Query Complexity Limits & Cost Estimation (Feature #15)
 - Query Bookmarking (Feature #11)

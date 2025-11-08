@@ -2,7 +2,7 @@
 # Production-ready, optimized, and secure
 
 # Build arguments for versioning and customization
-ARG PYTHON_VERSION=3.11
+ARG PYTHON_VERSION=3.13.8
 ARG APP_VERSION=1.0.0
 
 # =============================================================================

@@ -286,11 +286,18 @@ def initialize_neo4j():
                 f"⚠️  ALLOW_WEAK_PASSWORDS=true - Weak password allowed (DEVELOPMENT ONLY!): {weakness_reason}"
             )
 
-    # Debug mode
+    # Debug mode with production environment check
     _debug_mode = os.getenv("DEBUG_MODE", "false").lower() == "true"
     if _debug_mode:
+        environment = os.getenv("ENVIRONMENT", "development").lower()
+        if environment in ("production", "prod"):
+            logger.error("❌ DEBUG_MODE cannot be enabled in production environment")
+            raise ValueError(
+                "DEBUG_MODE=true is not allowed in production. "
+                "Set ENVIRONMENT=development to use DEBUG_MODE."
+            )
         logger.warning(
-            "⚠️  DEBUG_MODE=true - Detailed error messages will be returned (NOT for production!)"
+            "⚠️  DEBUG_MODE=true - Detailed error messages will be returned (DEVELOPMENT ONLY!)"
         )
     else:
         logger.info("Production mode: Error messages will be sanitized")
@@ -447,8 +454,8 @@ async def query_graph(query: str) -> dict[str, Any]:
         # Run LangChain's GraphCypherQAChain in thread pool (it's sync)
         start_time = time.time()
 
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(get_executor(), lambda: chain.invoke({"query": query}))
+        # Use modern asyncio.to_thread() pattern (Python 3.9+)
+        result = await asyncio.to_thread(chain.invoke, {"query": query})
 
         execution_time_ms = (time.time() - start_time) * 1000
 
@@ -651,10 +658,8 @@ async def _execute_cypher_impl(
         # Run query in thread pool (Neo4j driver is sync)
         start_time = time.time()
 
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            get_executor(), lambda: graph.query(cypher_query, params=params)
-        )
+        # Use modern asyncio.to_thread() pattern (Python 3.9+)
+        result = await asyncio.to_thread(graph.query, cypher_query, params=params)
 
         execution_time_ms = (time.time() - start_time) * 1000
 
@@ -754,8 +759,8 @@ async def refresh_schema() -> dict[str, Any]:
         logger.info("Refreshing graph schema")
 
         # Run schema refresh in thread pool
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(get_executor(), graph.refresh_schema)
+        # Use modern asyncio.to_thread() pattern (Python 3.9+)
+        await asyncio.to_thread(graph.refresh_schema)
         schema = graph.get_schema
 
         return {"schema": schema, "message": "Schema refreshed successfully", "success": True}
