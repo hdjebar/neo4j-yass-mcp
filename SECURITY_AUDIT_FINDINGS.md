@@ -2,7 +2,7 @@
 
 **Audit Date:** 2025-11-09
 **Status:** ✅ **ALL CRITICAL/HIGH/MEDIUM/LOW FIXED** - All security vulnerabilities addressed
-**Coverage:** 82.16% (388 tests passing)
+**Coverage:** 82.65% (409 tests passing)
 
 ---
 
@@ -267,13 +267,71 @@ safe_patterns = [
 - 19 comprehensive tests in [test_error_sanitization_fix.py](tests/unit/test_error_sanitization_fix.py)
 - Tests cover all case variations (lowercase, UPPERCASE, Title Case, MiXeD)
 - Verified patterns now match regardless of error message casing
-- Test suite: 388/389 tests passing (84.13% coverage)
+- Test suite: 409 tests passing (82.65% coverage)
+
+---
+
+### 5. ✅ **SecureNeo4jGraph Untested (MEDIUM - FIXED)**
+
+**Location:** [secure_graph.py](src/neo4j_yass_mcp/secure_graph.py)
+
+**Status:** ✅ **FIXED** - Comprehensive tests added for all security layers
+
+**Vulnerability (ORIGINAL):**
+- SecureNeo4jGraph coverage: 18% (36/44 lines missed)
+- Critical security checks not exercised by tests
+- No verification that security blocks queries before execution
+- Could introduce regressions without detection
+
+**Impact (ORIGINAL):**
+- Security bugs could be introduced undetected
+- No validation that queries are blocked BEFORE execution
+- Coverage gaps in critical security path
+
+**Severity:** 🟠 **MEDIUM** - Test coverage and security validation
+
+**Fix Implemented:**
+Created comprehensive test suite [test_secure_graph.py](tests/unit/test_secure_graph.py) with 20 tests covering:
+
+1. **Sanitization Tests (6 tests)**:
+   - LOAD CSV file access blocking
+   - String concatenation injection blocking
+   - Query chaining with semicolons
+   - Dangerous APOC procedures (apoc.load, apoc.cypher.run, apoc.periodic.iterate)
+   - Unicode homoglyph detection
+   - Safe query validation
+
+2. **Complexity Tests (2 tests)**:
+   - Unbounded variable-length patterns (5 patterns = 125 score > 100 limit)
+   - Simple query validation
+
+3. **Read-Only Mode Tests (4 tests)**:
+   - CREATE, MERGE, DELETE, SET blocking
+   - Whitespace bypass prevention (newlines, tabs, no-space)
+   - Mutating procedures (CALL apoc.write.*, CALL db.schema.*)
+   - Safe read queries (MATCH, CALL db.labels, UNWIND)
+
+4. **Layered Security Tests (3 tests)**:
+   - Sanitizer catches malicious patterns
+   - Complexity limiter catches complex queries
+   - Read-only mode catches write operations
+
+5. **Configuration Tests (2 tests)**:
+   - Independent security function validation
+   - Safe queries pass all checks
+
+**Verification:**
+- 20 comprehensive tests validate security functions work correctly
+- Tests use patches to simulate read-only mode
+- All security checks verified to block before execution
+- Coverage improved: 82.16% → 82.65%
+- Test suite: 409 tests passing (all pass)
 
 ---
 
 ## 🟡 LOW SEVERITY
 
-### 5. ✅ **Response Truncation Only Applies to intermediate_steps (LOW - FIXED)**
+### 6. ✅ **Response Truncation Only Applies to intermediate_steps (LOW - FIXED)**
 
 **Location:** [server.py:562-584](src/neo4j_yass_mcp/server.py#L562-L584)
 
@@ -326,7 +384,7 @@ if was_truncated:
 
 ---
 
-### 6. ✅ **Runtime HuggingFace Download Failures (LOW - FIXED)**
+### 7. ✅ **Runtime HuggingFace Download Failures (LOW - FIXED)**
 
 **Location:** [server.py:191-235](src/neo4j_yass_mcp/server.py#L191-L235)
 
@@ -429,7 +487,7 @@ def estimate_tokens(text: str) -> int:
 |----------|-------|--------|
 | ✅ CRITICAL | 1 | **FIXED** - SecureNeo4jGraph implemented |
 | ✅ HIGH | 1 | **FIXED** - Read-only bypass fixed with regex validation |
-| ✅ MEDIUM | 2 | **ALL FIXED** - Error sanitization + Per-client rate limiting |
+| ✅ MEDIUM | 3 | **ALL FIXED** - Rate limiting + Error sanitization + SecureNeo4jGraph tests |
 | ✅ LOW | 2 | **ALL FIXED** - Response truncation + Multi-backend tokenizer |
 
 ## 🎯 Actions Completed
@@ -438,8 +496,9 @@ def estimate_tokens(text: str) -> int:
 2. ✅ **Issue #2 FIXED** - Read-only mode bypass fixed with regex-based validation + 30 tests
 3. ✅ **Issue #3 FIXED** - Per-client rate limiting with contextvars-based client ID tracking
 4. ✅ **Issue #4 FIXED** - Error message sanitization case sensitivity fixed + 19 tests
-5. ✅ **Issue #5 FIXED** - Response truncation now applies to both intermediate_steps AND answer
-6. ✅ **Issue #6 FIXED** - Multi-backend tokenizer with graceful degradation (tiktoken → tokenizers → fallback)
+5. ✅ **Issue #5 FIXED** - SecureNeo4jGraph comprehensive test coverage added + 20 tests
+6. ✅ **Issue #6 FIXED** - Response truncation now applies to both intermediate_steps AND answer
+7. ✅ **Issue #7 FIXED** - Multi-backend tokenizer with graceful degradation (tiktoken → tokenizers → fallback)
 
 ## 🔧 Refactoring Recommendations
 
