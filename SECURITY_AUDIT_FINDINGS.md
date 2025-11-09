@@ -1,7 +1,7 @@
 # Security Audit Findings - CRITICAL VULNERABILITIES
 
 **Audit Date:** 2025-11-09
-**Status:** ✅ **ALL CRITICAL/HIGH/MEDIUM/LOW FIXED** - All security vulnerabilities addressed
+**Status:** ⚠️ **CRITICAL/HIGH FIXED, 1 MEDIUM PARTIALLY FIXED** - One issue remains (rate limiting per-session not per-request)
 **Coverage:** 84.74% (413 tests passing)
 
 ---
@@ -144,11 +144,11 @@ def check_read_only_access(cypher_query: str) -> str | None:
 
 ## 🟠 MEDIUM SEVERITY
 
-### 3. ✅ **Global Rate Limiting Breaks Per-Client Enforcement (MEDIUM - FIXED)**
+### 3. ⚠️ **Global Rate Limiting Breaks Per-Client Enforcement (MEDIUM - PARTIALLY FIXED)**
 
 **Location:** [server.py:569-571](src/neo4j_yass_mcp/server.py#L569-L571), [server.py:759-761](src/neo4j_yass_mcp/server.py#L759-L761)
 
-**Status:** ✅ **FIXED** - Per-request client ID tracking implemented
+**Status:** ⚠️ **PARTIALLY FIXED** - Client ID tracking implemented but still shares IDs within MCP session
 
 **Vulnerability (ORIGINAL):**
 ```python
@@ -207,12 +207,29 @@ if rate_limit_enabled:
     is_allowed, rate_info = check_rate_limit(client_id=client_id)
 ```
 
-**Verification:**
-- Each async task gets unique client ID based on task ID + counter
-- Rate limiting now isolated per-request/connection
-- Noisy clients can't block other clients
-- Audit trail shows which client exceeded quota
-- Test suite: 388/389 passing (82.16% coverage)
+**What Was Fixed:**
+- Replaced hard-coded `client_id="default"` with dynamic `get_client_id()` function
+- Each async task generates unique ID: `client_{counter}_{task_id}`
+- Audit trail now shows which async task exceeded quota
+
+**Remaining Issue:**
+- ContextVar is **not reset between requests** in the same MCP session
+- All sequential requests within one MCP session share the same client_id
+- Rate limiting is still effectively **global per MCP session**, not per-request
+- **Impact:** One MCP client making rapid requests can still exhaust quota for its entire session
+
+**Empirical Test:**
+```python
+# Sequential requests in same task:
+Request 1: client_1_4436705888  # Generated
+Request 2: client_1_4436705888  # REUSED (not reset!)
+Request 3: client_1_4436705888  # REUSED (not reset!)
+```
+
+**Required Fix:**
+- Reset ContextVar at the start of each MCP tool invocation, OR
+- Derive client_id from MCP session metadata instead of async task, OR
+- Accept that rate limiting is per-session (not per-request) and update documentation
 
 ---
 
@@ -490,16 +507,16 @@ def estimate_tokens(text: str) -> int:
 |----------|-------|--------|
 | ✅ CRITICAL | 1 | **FIXED** - SecureNeo4jGraph implemented |
 | ✅ HIGH | 1 | **FIXED** - Read-only bypass fixed with regex validation |
-| ✅ MEDIUM | 3 | **ALL FIXED** - Rate limiting + Error sanitization + SecureNeo4jGraph tests |
+| ⚠️ MEDIUM | 3 | **2 FIXED, 1 PARTIAL** - Rate limiting (partial) + Error sanitization (fixed) + SecureNeo4jGraph tests (fixed) |
 | ✅ LOW | 2 | **ALL FIXED** - Response truncation + Multi-backend tokenizer |
 
 ## 🎯 Actions Completed
 
 1. ✅ **Issue #1 FIXED** - `SecureNeo4jGraph` wrapper implemented with pre-execution validation
 2. ✅ **Issue #2 FIXED** - Read-only mode bypass fixed with regex-based validation + 30 tests
-3. ✅ **Issue #3 FIXED** - Per-client rate limiting with contextvars-based client ID tracking
+3. ⚠️ **Issue #3 PARTIALLY FIXED** - Rate limiting improved but still per-session (not per-request) - ContextVar not reset between requests
 4. ✅ **Issue #4 FIXED** - Error message sanitization case sensitivity fixed + 19 tests
-5. ✅ **Issue #5 FIXED** - SecureNeo4jGraph comprehensive test coverage added + 20 tests
+5. ✅ **Issue #5 FIXED** - SecureNeo4jGraph comprehensive test coverage added + 24 tests
 6. ✅ **Issue #6 FIXED** - Response truncation now applies to both intermediate_steps AND answer
 7. ✅ **Issue #7 FIXED** - Multi-backend tokenizer with graceful degradation (tiktoken → tokenizers → fallback)
 
