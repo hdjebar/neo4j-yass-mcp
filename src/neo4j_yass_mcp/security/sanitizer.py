@@ -78,6 +78,9 @@ class QuerySanitizer:
         r"//[^\n]*",  # Line comments (safer pattern)
         # Excessive operations
         r"(?i)FOREACH\s*\([^)]*\s+IN\s+range\s*\(\s*\d+\s*,\s*\d{6,}",  # Large range iterations
+        # String concatenation
+        r"'.*?'\s*\+\s*'.*?'",
+        r'".*?"\s*\+\s*".*?"',
         # Additional dangerous patterns
         r"(?i)apoc\.periodic\.iterate",  # Batch operations that can cause DoS
         r"(?i)apoc\.cypher\.parallel",  # Parallel execution abuse

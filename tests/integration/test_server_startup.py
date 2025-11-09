@@ -1,3 +1,4 @@
+# ruff: noqa: S603
 """
 Integration tests for server startup (main function).
 
@@ -6,17 +7,19 @@ Uses subprocess with coverage tracking - REAL tests, no mocks.
 """
 
 import os
-import subprocess
+import shutil
 import signal
-import time
-import pytest
+import subprocess
 import sys
+import time
+
+import pytest
 
 
 class TestServerStartup:
     """Test server main() function through actual startup."""
 
-    def test_server_starts_with_stdio_transport(self):
+    def test_server_starts_with_stdio_transport(self, tmp_path):
         """Lines 984-1048: Test server starts successfully with stdio transport"""
         # Create a simple script that imports and starts the server
         test_script = """
@@ -50,9 +53,8 @@ except Exception as e:
 """
 
         # Write test script
-        script_path = "/tmp/test_server_startup.py"
-        with open(script_path, "w") as f:
-            f.write(test_script)
+        script_path = tmp_path / "test_server_startup.py"
+        script_path.write_text(test_script)
 
         try:
             # Get coverage config path
@@ -66,7 +68,7 @@ except Exception as e:
             env['PYTHONPATH'] = cwd + os.pathsep + env.get('PYTHONPATH', '')
 
             proc = subprocess.Popen(
-                [sys.executable, script_path],  # sitecustomize.py auto-starts coverage
+                [sys.executable, str(script_path)],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 cwd=cwd,
@@ -88,7 +90,7 @@ except Exception as e:
 
             # Combine coverage data
             subprocess.run(
-                ["uv", "run", "coverage", "combine"],
+                [shutil.which("uv"), "run", "coverage", "combine"],
                 cwd=cwd,
                 capture_output=True,
             )
@@ -97,7 +99,7 @@ except Exception as e:
             if os.path.exists(script_path):
                 os.remove(script_path)
 
-    def test_server_main_initialization_error(self):
+    def test_server_main_initialization_error(self, tmp_path):
         """Lines 991-993: Test main() handles initialization errors"""
         test_script = """
 import sys
@@ -118,9 +120,8 @@ except Exception as e:
     sys.exit(1)
 """
 
-        script_path = "/tmp/test_server_init_error.py"
-        with open(script_path, "w") as f:
-            f.write(test_script)
+        script_path = tmp_path / "test_server_init_error.py"
+        script_path.write_text(test_script)
 
         try:
             cwd = "/Users/hdjebar/Projects/neo4j-yass-mcp"
@@ -132,7 +133,7 @@ except Exception as e:
 
             # Run and expect failure
             result = subprocess.run(
-                [sys.executable, script_path],  # sitecustomize.py auto-starts coverage
+                [sys.executable, str(script_path)],
                 capture_output=True,
                 timeout=10,
                 cwd=cwd,
@@ -144,7 +145,7 @@ except Exception as e:
 
             # Combine coverage data
             subprocess.run(
-                ["uv", "run", "coverage", "combine"],
+                [shutil.which("uv"), "run", "coverage", "combine"],
                 cwd=cwd,
                 capture_output=True,
             )
@@ -153,7 +154,7 @@ except Exception as e:
             if os.path.exists(script_path):
                 os.remove(script_path)
 
-    def test_server_main_read_only_mode(self):
+    def test_server_main_read_only_mode(self, tmp_path):
         """Lines 996-1000: Test main() in read-only mode"""
         test_script = """
 import sys
@@ -180,9 +181,8 @@ except KeyboardInterrupt:
     sys.exit(0)
 """
 
-        script_path = "/tmp/test_server_readonly.py"
-        with open(script_path, "w") as f:
-            f.write(test_script)
+        script_path = tmp_path / "test_server_readonly.py"
+        script_path.write_text(test_script)
 
         try:
             cwd = "/Users/hdjebar/Projects/neo4j-yass-mcp"
@@ -193,7 +193,7 @@ except KeyboardInterrupt:
             env['PYTHONPATH'] = cwd + os.pathsep + env.get('PYTHONPATH', '')
 
             proc = subprocess.Popen(
-                [sys.executable, script_path],  # sitecustomize.py auto-starts coverage
+                [sys.executable, str(script_path)],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 cwd=cwd,
@@ -211,7 +211,7 @@ except KeyboardInterrupt:
 
             # Combine coverage data
             subprocess.run(
-                ["uv", "run", "coverage", "combine"],
+                [shutil.which("uv"), "run", "coverage", "combine"],
                 cwd=cwd,
                 capture_output=True,
             )
@@ -223,3 +223,4 @@ except KeyboardInterrupt:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+

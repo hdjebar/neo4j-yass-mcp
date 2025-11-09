@@ -7,6 +7,7 @@ Run this to verify your configuration before starting the MCP server.
 
 import os
 import sys
+
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -57,7 +58,7 @@ try:
     with driver.session() as session:
         result = session.run("MATCH (n) RETURN count(n) as count")
         node_count = result.single()['count']
-        print(f"  ✓ Connected successfully!")
+        print("  ✓ Connected successfully!")
         print(f"  ✓ Database contains {node_count:,} nodes")
 
         # Check for Movie nodes
@@ -92,7 +93,7 @@ try:
 
     # Test with simple query
     result = llm.invoke("Say 'Hello from Gemini!' in exactly 3 words")
-    print(f"  ✓ Gemini API working!")
+    print("  ✓ Gemini API working!")
     print(f"  ✓ Response: {result.content[:100]}")
     print()
 
@@ -128,7 +129,7 @@ try:
     print("  Testing query: 'How many movies are there?'")
     result = chain.invoke({"query": "How many movies are in the database?"})
 
-    print(f"  ✓ Query successful!")
+    print("  ✓ Query successful!")
     print(f"  ✓ Answer: {result['result']}")
 
     if 'intermediate_steps' in result and result['intermediate_steps']:

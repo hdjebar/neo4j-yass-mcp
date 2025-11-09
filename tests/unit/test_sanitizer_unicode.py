@@ -6,6 +6,7 @@ Covers lines 336, 406-417, 444-445 in sanitizer.py
 """
 
 import pytest
+
 from neo4j_yass_mcp.security.sanitizer import QuerySanitizer
 
 
@@ -60,6 +61,7 @@ class TestConfusablesDetection:
 
         # Should be blocked due to confusable characters
         assert is_safe is False
+        assert error_msg is not None
         assert "confusable" in error_msg.lower() or "homograph" in error_msg.lower()
 
     def test_greek_homograph_attack(self):
@@ -74,6 +76,7 @@ class TestConfusablesDetection:
 
         # Should be blocked due to confusable characters
         assert is_safe is False
+        assert error_msg is not None
         assert "confusable" in error_msg.lower() or "homograph" in error_msg.lower()
 
     def test_multiple_confusable_chars(self):
@@ -87,6 +90,7 @@ class TestConfusablesDetection:
 
         # Should be blocked on first confusable character
         assert is_safe is False
+        assert error_msg is not None
         assert "confusable" in error_msg.lower() or "homograph" in error_msg.lower()
 
 
@@ -107,6 +111,7 @@ class TestUTF8EncodingValidation:
 
             # Should be blocked (may be caught by confusables check before UTF-8 encoding check)
             assert is_safe is False
+            assert error_msg is not None
             # Accept either confusables OR UTF-8 encoding error
             assert ("utf-8" in error_msg.lower() or
                     "encoding" in error_msg.lower() or
@@ -127,6 +132,7 @@ class TestUTF8EncodingValidation:
             is_safe, error_msg, warnings = sanitizer.sanitize_query(invalid_query)
 
             assert is_safe is False
+            assert error_msg is not None
             # Accept either confusables OR UTF-8 encoding error
             assert ("utf-8" in error_msg.lower() or
                     "encoding" in error_msg.lower() or

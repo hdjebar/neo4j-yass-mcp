@@ -605,8 +605,8 @@ class TestEdgeCases:
 
     def test_cleanup_logs_delete_exception(self, temp_log_dir):
         """Test exception handling during log cleanup (lines 145-146)."""
-        from unittest.mock import patch
         import time
+        from unittest.mock import patch
 
         logger = AuditLogger(enabled=True, log_dir=temp_log_dir, retention_days=1)
 

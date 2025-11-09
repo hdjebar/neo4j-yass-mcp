@@ -458,7 +458,7 @@ class TestStringInjection:
         for query in queries:
             is_safe, error, warnings = sanitizer.sanitize_query(query)
             assert is_safe is False
-            assert "string injection" in error.lower()
+            assert "dangerous pattern" in error.lower()
 
     def test_normal_strings_allowed(self):
         """Test normal string literals are allowed."""

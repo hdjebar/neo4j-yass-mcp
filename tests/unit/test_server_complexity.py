@@ -5,8 +5,9 @@ Covers complexity limit checking in query_graph and execute_cypher tools.
 Tests lines 562-587, 760-785 in server.py
 """
 
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 from neo4j_yass_mcp.security.complexity_limiter import ComplexityScore
 
@@ -24,7 +25,7 @@ class TestComplexityLimitEnforcement:
         from neo4j_yass_mcp import server
 
         # Setup: Complexity exceeded
-        complexity_score = ComplexityScore(is_within_limit=False, 
+        complexity_score = ComplexityScore(is_within_limit=False,
             total_score=150,
             max_allowed=100,
             breakdown={"matches": 50, "relationships": 100},
@@ -42,7 +43,6 @@ class TestComplexityLimitEnforcement:
 
         # Setup server state - SecureNeo4jGraph now raises ValueError when complexity exceeded
         mock_chain = Mock()
-        complex_cypher = "MATCH (n)-[r*1..10]->(m) RETURN n, r, m"
         # Chain will raise ValueError (what SecureNeo4jGraph does on complexity failure)
         mock_chain.invoke.side_effect = ValueError(
             "Query blocked by complexity limiter: Query complexity 150 exceeds limit of 100"
@@ -83,7 +83,7 @@ class TestComplexityLimitEnforcement:
         from neo4j_yass_mcp import server
 
         # Setup: Complexity exceeded
-        complexity_score = ComplexityScore(is_within_limit=False, 
+        complexity_score = ComplexityScore(is_within_limit=False,
             total_score=200,
             max_allowed=100,
             breakdown={"variable_length_paths": 150, "cartesian_products": 50},

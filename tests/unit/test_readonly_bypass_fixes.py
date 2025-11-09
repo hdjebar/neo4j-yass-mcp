@@ -11,9 +11,11 @@ These tests validate that the regex-based check_read_only_access() function
 properly detects ALL write operations regardless of formatting.
 """
 
-import pytest
-from neo4j_yass_mcp.server import check_read_only_access
 from unittest.mock import patch
+
+import pytest
+
+from neo4j_yass_mcp.server import check_read_only_access
 
 
 class TestReadOnlyBypassFixes:

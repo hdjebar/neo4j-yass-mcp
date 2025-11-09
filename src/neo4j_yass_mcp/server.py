@@ -14,7 +14,6 @@ Features:
 
 import asyncio
 import contextvars
-import hashlib
 import json
 import logging
 import os
@@ -26,6 +25,7 @@ from typing import Any
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 from langchain_neo4j import GraphCypherQAChain
+
 # Tokenizer imports - try tiktoken first (no download), fallback to tokenizers
 try:
     import tiktoken
@@ -39,8 +39,6 @@ except ImportError:
         Tokenizer = None
         TOKENIZER_BACKEND = "fallback"
 
-from neo4j_yass_mcp.secure_graph import SecureNeo4jGraph
-
 from neo4j_yass_mcp.config import (
     LLMConfig,
     chatLLM,
@@ -49,6 +47,7 @@ from neo4j_yass_mcp.config import (
     get_preferred_ports_from_env,
 )
 from neo4j_yass_mcp.config.security_config import is_password_weak
+from neo4j_yass_mcp.secure_graph import SecureNeo4jGraph
 from neo4j_yass_mcp.security import (
     check_query_complexity,
     check_rate_limit,
@@ -132,7 +131,7 @@ _tokenizer: Any = None
 
 # Context variable for per-request client ID tracking
 _current_client_id: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "current_client_id", default="default"
+    "current_client_id"  # NO default - force LookupError
 )
 
 # Counter for generating unique client IDs
@@ -700,7 +699,7 @@ async def query_graph(query: str) -> dict[str, Any]:
             # For now, just use the error message
             pass
         except Exception:
-            pass
+            logger.debug("Could not extract generated Cypher from error context.")
 
         # Determine which security check failed based on error message
         error_msg = str(e)

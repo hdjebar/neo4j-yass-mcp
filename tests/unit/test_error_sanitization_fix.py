@@ -5,8 +5,10 @@ Tests that sanitize_error_message() correctly matches error patterns
 regardless of case, fixing the bug where mixed-case patterns never matched.
 """
 
-import pytest
 from unittest.mock import patch
+
+import pytest
+
 from neo4j_yass_mcp.server import sanitize_error_message
 
 

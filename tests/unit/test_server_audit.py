@@ -5,8 +5,9 @@ Covers audit logging in exception handlers for query_graph and execute_cypher.
 Tests lines 653, 868 in server.py
 """
 
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 
 class TestErrorAuditLogging:

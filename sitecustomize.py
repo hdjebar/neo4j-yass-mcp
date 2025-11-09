@@ -8,7 +8,6 @@ Reference: https://coverage.readthedocs.io/en/latest/subprocess.html
 """
 
 import os
-import sys
 
 # Only start coverage if COVERAGE_PROCESS_START is set
 if 'COVERAGE_PROCESS_START' in os.environ:

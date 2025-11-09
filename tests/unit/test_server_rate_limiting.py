@@ -5,9 +5,10 @@ Covers rate limit checking in query_graph and execute_cypher tools.
 Tests lines 478-491, 704-717 in server.py
 """
 
-import pytest
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 from neo4j_yass_mcp.security.rate_limiter import RateLimitInfo
 
@@ -60,8 +61,12 @@ class TestRateLimitEnforcement:
             assert call_args["error_type"] == "rate_limit"
             assert "Rate limit exceeded" in call_args["error"]
 
-            # Verify rate limit check was called
-            mock_check_rate.assert_called_once_with(client_id="default")
+            # Verify rate limit check was called with unique client ID
+            mock_check_rate.assert_called_once()
+            call_kwargs = mock_check_rate.call_args[1]
+            assert "client_id" in call_kwargs
+            # Client ID should be unique (client_{counter}_{task_id})
+            assert call_kwargs["client_id"].startswith("client_")
 
         finally:
             # Restore original state
@@ -111,8 +116,12 @@ class TestRateLimitEnforcement:
             assert call_args["error_type"] == "rate_limit"
             assert "Rate limit exceeded" in call_args["error"]
 
-            # Verify rate limit check was called
-            mock_check_rate.assert_called_once_with(client_id="default")
+            # Verify rate limit check was called with unique client ID
+            mock_check_rate.assert_called_once()
+            call_kwargs = mock_check_rate.call_args[1]
+            assert "client_id" in call_kwargs
+            # Client ID should be unique (client_{counter}_{task_id})
+            assert call_kwargs["client_id"].startswith("client_")
 
         finally:
             # Restore original state
@@ -152,8 +161,12 @@ class TestRateLimitEnforcement:
             assert result["success"] is True
             assert "rate_limited" not in result or result.get("rate_limited") is False
 
-            # Verify rate limit check was called
-            mock_check_rate.assert_called_once_with(client_id="default")
+            # Verify rate limit check was called with unique client ID
+            mock_check_rate.assert_called_once()
+            call_kwargs = mock_check_rate.call_args[1]
+            assert "client_id" in call_kwargs
+            # Client ID should be unique (client_{counter}_{task_id})
+            assert call_kwargs["client_id"].startswith("client_")
 
         finally:
             # Restore original state
