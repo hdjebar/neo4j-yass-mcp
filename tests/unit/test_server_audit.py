@@ -33,9 +33,11 @@ class TestErrorAuditLogging:
         result = await server.query_graph.fn(query="MATCH (n) RETURN n")
 
         # Verify error response
+        # ValueError now triggers security_blocked response (SecureNeo4jGraph)
         assert result["success"] is False
         assert "error" in result
-        assert result["type"] == "ValueError"
+        assert result["security_blocked"] is True
+        assert "block_type" in result
 
         # Verify audit logging was called
         mock_audit_logger.log_error.assert_called_once()
@@ -44,7 +46,8 @@ class TestErrorAuditLogging:
         assert call_args["tool"] == "query_graph"
         assert call_args["query"] == "MATCH (n) RETURN n"
         assert "Database connection failed" in call_args["error"]
-        assert call_args["error_type"] == "ValueError"
+        # error_type should be security-related (sanitizer/complexity/read_only)
+        assert "blocked" in call_args["error_type"]
 
     @pytest.mark.asyncio
     @patch("neo4j_yass_mcp.server.get_audit_logger")

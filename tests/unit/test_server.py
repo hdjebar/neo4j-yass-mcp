@@ -643,18 +643,17 @@ class TestAuditLoggerIntegration:
 
     @pytest.mark.asyncio
     async def test_query_graph_sanitizer_logs_error(self, mock_neo4j_graph):
-        """Test query_graph logs sanitizer blocks to audit."""
+        """Test query_graph logs sanitizer blocks to audit.
+
+        With SecureNeo4jGraph, sanitizer failures raise ValueError.
+        """
         mock_audit_logger = Mock()
         mock_audit_logger.log_error = Mock()
 
+        # Chain raises ValueError (what SecureNeo4jGraph does on sanitizer failure)
         unsafe_chain = Mock()
         unsafe_chain.invoke = Mock(
-            return_value={
-                "result": "Data loaded",
-                "intermediate_steps": [
-                    {"query": "LOAD CSV FROM 'file:///etc/passwd' AS line RETURN line"}
-                ],
-            }
+            side_effect=ValueError("Query blocked by sanitizer: LOAD CSV is not allowed")
         )
 
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
@@ -672,16 +671,17 @@ class TestAuditLoggerIntegration:
 
     @pytest.mark.asyncio
     async def test_query_graph_read_only_mode_logs_error(self, mock_neo4j_graph):
-        """Test query_graph logs read-only violations."""
+        """Test query_graph logs read-only violations.
+
+        With SecureNeo4jGraph, read-only violations raise ValueError.
+        """
         mock_audit_logger = Mock()
         mock_audit_logger.log_error = Mock()
 
+        # Chain raises ValueError (what SecureNeo4jGraph does on read-only violation)
         write_chain = Mock()
         write_chain.invoke = Mock(
-            return_value={
-                "result": "Created",
-                "intermediate_steps": [{"query": "CREATE (n:Test) RETURN n"}],
-            }
+            side_effect=ValueError("Query blocked in read-only mode: CREATE operations are not allowed")
         )
 
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
