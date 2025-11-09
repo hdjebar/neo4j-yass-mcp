@@ -27,22 +27,14 @@ from dotenv import load_dotenv
 from fastmcp import Context, FastMCP
 from langchain_neo4j import GraphCypherQAChain
 
-# Tokenizer imports - try Hugging Face tokenizers first (handles most models)
+# Tokenizer imports - use Hugging Face tokenizers exclusively
 try:
     from tokenizers import Tokenizer
 
     TOKENIZER_BACKEND = "tokenizers"
-    Tokenizer = Tokenizer  # Keep reference
 except ImportError:
     Tokenizer = None  # type: ignore[assignment]
     TOKENIZER_BACKEND = "fallback"
-    try:
-        import tiktoken  # fallback to tiktoken
-
-        TOKENIZER_BACKEND = "tiktoken"
-    except ImportError:
-        tiktoken = None  # type: ignore[assignment]
-        TOKENIZER_BACKEND = "fallback"
 
 from neo4j_yass_mcp.config import (
     LLMConfig,
@@ -317,10 +309,9 @@ def get_tokenizer() -> Any:
     """
     Get or create tokenizer for token estimation.
 
-    Tries multiple backends in order of preference:
-    1. tokenizers (Hugging Face, handles most models)
-    2. tiktoken (fast, no download needed)
-    3. None (graceful degradation to character-based estimation)
+    Uses Hugging Face tokenizers library as the primary option:
+    1. tokenizers (Hugging Face, handles most models including GPT-2, GPT-3, Llama, etc.)
+    2. None (graceful degradation to character-based estimation)
 
     Returns:
         Tokenizer instance or None if unavailable
@@ -340,16 +331,7 @@ def get_tokenizer() -> Any:
                     "to download tokenizer data."
                 )
 
-        # Fall back to tiktoken (fast, no download needed)
-        if "tiktoken" in globals() and tiktoken is not None and _tokenizer is None:
-            try:
-                logger.info("Initializing tiktoken tokenizer (gpt2)")
-                _tokenizer = tiktoken.get_encoding("gpt2")
-                return _tokenizer
-            except Exception as e:
-                logger.warning(f"tiktoken initialization failed: {e}, using fallback")
-
-        # If both failed, use None to signal fallback mode
+        # If tokenizer failed, use None to signal fallback mode
         if _tokenizer is None:
             logger.warning(
                 "No tokenizer backend available. Using fallback character-based estimation (4 chars per token)."
@@ -362,7 +344,7 @@ def estimate_tokens(text: str) -> int:
     """
     Estimate token count for a text string using available tokenizer backend.
 
-    Tries backends in order: tokenizers (Hugging Face), tiktoken, character-based fallback.
+    Uses: tokenizers (Hugging Face) or character-based fallback.
 
     Args:
         text: The text to estimate tokens for

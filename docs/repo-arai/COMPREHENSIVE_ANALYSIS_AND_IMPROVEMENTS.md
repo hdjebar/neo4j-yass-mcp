@@ -17,7 +17,7 @@
   - [6. Testing Enhancements](#6-testing-enhancements)
   - [7. Code Quality Improvements](#7-code-quality-improvements)
   - [8. Advanced Features](#8-advanced-features)
-- [Token Consumption Optimization](#token-consumption-optimization)
+- [Token Consumption Optimization](#token-consumption-optimization)in SAD
   - [1. Context Window Optimization](#1-context-window-optimization)
   - [2. Caching Strategies](#2-caching-strategies)
   - [3. Query Optimization](#3-query-optimization)
@@ -354,29 +354,194 @@ def validate_query_against_schema(query: str, schema: dict) -> bool:
 ## Implementation Priorities
 
 ### High Priority (Critical)
-1. **Configuration validation and reload** - Ensures runtime configuration integrity
-2. **Circuit breaker for database connections** - Improves resilience and prevents cascade failures
-3. **Enhanced metrics and monitoring** - Critical for production observability
-4. **Additional security injection detection patterns** - Expands protection against new attack vectors
-5. **Token consumption optimization** - Essential for cost management and performance with LLM integration
-6. **Runtime security policy validation** - Validates security configurations at startup
+1. Configuration validation and reload
+2. Circuit breaker for database connections
+3. Enhanced metrics and monitoring
+4. Additional security injection detection patterns
+5. Token consumption optimization
 
 ### Medium Priority (Important)
-1. **Query result caching** - Performance improvement through reduced database load
-2. **Property-based testing** - Enhances test coverage and robustness
-3. **Schema validation** - Improves input validation and prevents invalid queries
-4. **Query plan analysis** - Prevents performance issues from inefficient queries
-5. **Connection pooling optimization** - Better resource utilization
-6. **Context window optimization** - Reduces LLM token consumption for input context
-7. **Adaptive response processing** - Manages output token usage intelligently
+1. Query result caching
+2. Property-based testing
+3. Schema validation
+4. Query plan analysis
+5. Connection pooling optimization
 
 ### Low Priority (Nice to Have)
-1. **Comprehensive health checks** - Additional operational monitoring
-2. **Advanced error types** - Better error categorization and handling
-3. **Type safety improvements** - Enhanced code reliability and maintainability
-4. **Container security enhancements** - Additional runtime security measures
-5. **Batch processing for queries** - Further token optimization through consolidation
-6. **Model selection optimization** - Dynamic LLM model selection for cost/performance balance
+1. Comprehensive health checks
+2. Advanced error types
+3. Type safety improvements
+4. Container security enhancements
+
+
+## Token Consumption Optimization
+
+Given that the application integrates with LLMs through LangChain, token consumption optimization is critical for cost management and performance. Here are specific strategies:
+
+### 1. Context Window Optimization
+
+**Current State**: The application already has response truncation, but we can optimize input contexts as well.
+
+**Recommendations**:
+1. **Schema Context Reduction**:
+```python
+def get_minimal_schema_for_query(query: str, full_schema: str) -> str:
+    """Extract only the schema elements relevant to a specific query"""
+    # Parse the query to identify needed labels and relationships
+    # Return only the relevant schema subset
+    pass
+```
+
+2. **Dynamic Prompt Truncation**:
+```python
+def optimize_prompt_context(query: str, schema: str, history: list) -> str:
+    """Dynamically truncate context to stay within token limits"""
+    # Calculate available tokens for context
+    # Prioritize most relevant schema elements
+    # Truncate chat history intelligently
+    pass
+```
+
+### 2. Caching Strategies
+
+**Recommendations**:
+1. **Query Result Caching**:
+```python
+# Cache LLM responses for common queries
+from functools import lru_cache
+import hashlib
+
+class LLMTokensCache:
+    def __init__(self, max_size=1000, ttl_seconds=3600):
+        self.cache = {}
+        self.ttl = ttl_seconds
+    
+    def get_cache_key(self, query: str, schema: str) -> str:
+        """Generate cache key from query and schema"""
+        content = f"{query}_{schema}"
+        return hashlib.sha256(content.encode()).hexdigest()[:16]
+```
+
+2. **Schema Caching with Intelligent Updates**:
+```python
+# Cache schema and only update when database changes
+class SmartSchemaCache:
+    def __init__(self):
+        self.schema_cache = None
+        self.last_updated = None
+        self.node_count_cache = {}
+    
+    async def get_schema_if_changed(self) -> str:
+        """Only refresh schema if database structure has changed"""
+        current_counts = await self.get_node_counts()
+        if current_counts != self.node_count_cache:
+            self.schema_cache = await self.refresh_schema()
+            self.node_count_cache = current_counts
+        return self.schema_cache
+```
+
+### 3. Query Optimization
+
+**Recommendations**:
+1. **LLM-Aware Query Generation**:
+```python
+def generate_llm_optimized_query(user_query: str) -> str:
+    """Generate Cypher queries that minimize LLM token consumption"""
+    # Optimize for clarity and conciseness
+    # Use explicit rather than implicit patterns
+    # Minimize complex nested operations
+    pass
+```
+
+### 4. Adaptive Response Processing
+
+**Recommendations**:
+1. **Intelligent Result Sampling**:
+```python
+def sample_results_intelligently(results: list, max_tokens: int) -> list:
+    """Sample results to stay within token limits while preserving meaning"""
+    # If results are too large, return representative samples
+    # Preserve first/last items, include statistical summaries
+    # Provide metadata about total counts
+    pass
+```
+
+2. **Progressive Querying**:
+```python
+async def progressive_query_execution(query: str, max_tokens: int) -> dict:
+    """Execute query progressively to manage token consumption"""
+    # Start with LIMIT 10, then 50, then 100, etc.
+    # Stop when approaching token limits
+    # Return progressive results with continuation hints
+    pass
+```
+
+### 5. Token Estimation & Budget Management
+
+**Recommendations**:
+1. **Real-time Token Tracking**:
+```python
+class TokenBudgetManager:
+    def __init__(self, model_name: str, budget_per_minute: int = 1000000):
+        self.model_name = model_name
+        self.budget = budget_per_minute
+        self.used_tokens = 0
+        self.refill_time = time.time()
+    
+    def estimate_tokens(self, text: str) -> int:
+        """Accurate token estimation per model"""
+        pass
+    
+    def check_token_budget(self, estimated_cost: int) -> bool:
+        """Check if operation fits in token budget"""
+        pass
+```
+
+### 6. Model Selection Optimization
+
+**Recommendations**:
+1. **Intelligent Model Selection**:
+```python
+def select_model_by_complexity(query_complexity: int, response_size: int) -> str:
+    """Choose appropriate LLM model based on task requirements"""
+    if query_complexity < 50 and response_size < 100:
+        return "gpt-3.5-turbo"  # Cheaper for simple tasks
+    elif query_complexity < 200:
+        return "gpt-4-turbo"    # Balance cost/performance
+    else:
+        return "gpt-4"          # Power for complex tasks
+```
+
+### 7. Batch Processing
+
+**Recommendations**:
+1. **Query Batching**:
+```python
+async def batch_process_queries(queries: list, max_tokens: int) -> list:
+    """Process multiple queries in batch to optimize token usage"""
+    # Combine related queries into single LLM calls
+    # Share schema context between related queries
+    # Reduce per-query overhead
+    pass
+```
+
+### 8. Configuration-Driven Optimization
+
+**Recommendations**:
+Add these environment variables for token control:
+
+```bash
+# Token consumption controls
+LLM_TOKEN_BUDGET_PER_MINUTE=1000000    # Rate limiting for token consumption
+LLM_MAX_INPUT_TOKENS=4000              # Limit context size
+LLM_MAX_OUTPUT_TOKENS=1000             # Limit response size  
+LLM_TOKEN_ESTIMATION_MODE=precise      # accurate vs. fast token counting
+LLM_CACHE_ENABLED=true                 # Enable response caching
+LLM_CACHE_TTL_SECONDS=3600             # Cache duration
+LLM_QUERY_SAMPLING_RATE=0.8            # Sample large result sets
+```
+
+These token optimization strategies would significantly reduce operational costs while maintaining the application's functionality and performance.
 
 ## Security Assessment Summary
 
