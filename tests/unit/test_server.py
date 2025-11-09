@@ -50,16 +50,21 @@ class TestQueryGraph:
 
     @pytest.mark.asyncio
     async def test_query_graph_with_sanitizer_enabled(self, mock_neo4j_graph):
-        """Test query with sanitizer blocking unsafe LLM output."""
-        # Mock chain that generates unsafe query (use a clearly dangerous pattern)
+        """Test query with sanitizer blocking unsafe LLM output.
+
+        With SecureNeo4jGraph, security checks happen at graph.query() level.
+        Mock the graph to raise ValueError when sanitizer blocks the query.
+        """
+        # Mock graph that raises ValueError (what SecureNeo4jGraph does)
+        mock_neo4j_graph.query = Mock(
+            side_effect=ValueError("Query blocked by sanitizer: LOAD CSV is not allowed")
+        )
+
+        # Mock chain that would generate unsafe query
         unsafe_chain = Mock()
+        # Chain's invoke will call graph.query() which will raise ValueError
         unsafe_chain.invoke = Mock(
-            return_value={
-                "result": "Data loaded",
-                "intermediate_steps": [
-                    {"query": "LOAD CSV FROM 'file:///etc/passwd' AS line RETURN line"}
-                ],
-            }
+            side_effect=ValueError("Query blocked by sanitizer: LOAD CSV is not allowed")
         )
 
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
@@ -402,7 +407,7 @@ class TestInitializeNeo4j:
                 "LLM_API_KEY": "test-key",
             },
         ):
-            with patch("neo4j_yass_mcp.server.Neo4jGraph") as mock_graph:
+            with patch("neo4j_yass_mcp.server.SecureNeo4jGraph") as mock_graph:
                 with patch("neo4j_yass_mcp.server.chatLLM"):
                     with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
                         from neo4j_yass_mcp.server import initialize_neo4j
@@ -439,7 +444,7 @@ class TestInitializeNeo4j:
                 "LLM_API_KEY": "test-key",
             },
         ):
-            with patch("neo4j_yass_mcp.server.Neo4jGraph") as mock_graph:
+            with patch("neo4j_yass_mcp.server.SecureNeo4jGraph") as mock_graph:
                 with patch("neo4j_yass_mcp.server.chatLLM"):
                     with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
                         from neo4j_yass_mcp.server import initialize_neo4j
@@ -458,7 +463,7 @@ class TestInitializeNeo4j:
                 "LLM_API_KEY": "test-key",
             },
         ):
-            with patch("neo4j_yass_mcp.server.Neo4jGraph"):
+            with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
                 with patch("neo4j_yass_mcp.server.chatLLM"):
                     with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
                         from neo4j_yass_mcp.server import initialize_neo4j
@@ -480,7 +485,7 @@ class TestInitializeNeo4j:
                 "LLM_API_KEY": "test-key",
             },
         ):
-            with patch("neo4j_yass_mcp.server.Neo4jGraph"):
+            with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
                 with patch("neo4j_yass_mcp.server.chatLLM"):
                     with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
                         from neo4j_yass_mcp.server import initialize_neo4j
@@ -501,7 +506,7 @@ class TestInitializeNeo4j:
                 "LLM_API_KEY": "test-key",
             },
         ):
-            with patch("neo4j_yass_mcp.server.Neo4jGraph"):
+            with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
                 with patch("neo4j_yass_mcp.server.chatLLM"):
                     with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
                         from neo4j_yass_mcp.server import initialize_neo4j
@@ -519,7 +524,7 @@ class TestInitializeNeo4j:
                 "LLM_API_KEY": "test-key",
             },
         ):
-            with patch("neo4j_yass_mcp.server.Neo4jGraph"):
+            with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
                 with patch("neo4j_yass_mcp.server.chatLLM"):
                     with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm") as mock_chain:
                         from neo4j_yass_mcp.server import initialize_neo4j

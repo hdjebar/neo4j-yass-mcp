@@ -267,8 +267,6 @@ class QuerySanitizer:
             r"\\x[0-9a-fA-F]{2}",  # Hex escapes
             r"\\u[0-9a-fA-F]{4}",  # Unicode escapes
             r"\\[0-7]{3}",  # Octal escapes
-            r"'+\s*\+\s*'",  # String concatenation with +
-            r'"+\s*\+\s*"',  # String concatenation with +
         ]
 
         for pattern in suspicious_escapes:

@@ -22,8 +22,10 @@ from typing import Any
 
 from dotenv import load_dotenv
 from fastmcp import FastMCP
-from langchain_neo4j import GraphCypherQAChain, Neo4jGraph
+from langchain_neo4j import GraphCypherQAChain
 from tokenizers import Tokenizer
+
+from neo4j_yass_mcp.secure_graph import SecureNeo4jGraph
 
 from neo4j_yass_mcp.config import (
     LLMConfig,
@@ -96,7 +98,7 @@ else:  # pragma: no cover - Module initialization, tested in production
 mcp = FastMCP("neo4j-yass-mcp", version="1.1.0")
 
 # Global variables for Neo4j and LangChain components
-graph: Neo4jGraph | None = None
+graph: SecureNeo4jGraph | None = None
 chain: GraphCypherQAChain | None = None
 
 # Thread pool for async operations (LangChain is sync)
@@ -347,12 +349,15 @@ def initialize_neo4j():
             logger.warning(f"Invalid NEO4J_RESPONSE_TOKEN_LIMIT value: {token_limit_str}")
 
     logger.info(f"Connecting to Neo4j at {neo4j_uri} (timeout: {neo4j_timeout}s)")
-    graph = Neo4jGraph(
+    graph = SecureNeo4jGraph(
         url=neo4j_uri,
         username=neo4j_username,
         password=neo4j_password,
         database=neo4j_database,
         timeout=neo4j_timeout,
+        sanitizer_enabled=sanitizer_enabled,
+        complexity_limit_enabled=complexity_limit_enabled,
+        read_only_mode=_read_only_mode,
     )
 
     # LLM configuration
@@ -505,6 +510,8 @@ async def query_graph(query: str) -> dict[str, Any]:
         logger.info(f"Processing natural language query: {query}")
 
         # Run LangChain's GraphCypherQAChain in thread pool (it's sync)
+        # Security checks (sanitization, complexity, read-only) now happen
+        # at the SecureNeo4jGraph layer BEFORE query execution
         start_time = time.time()
 
         # Use modern asyncio.to_thread() pattern (Python 3.9+)
@@ -512,7 +519,7 @@ async def query_graph(query: str) -> dict[str, Any]:
 
         execution_time_ms = (time.time() - start_time) * 1000
 
-        # Extract generated Cypher query from intermediate steps
+        # Extract generated Cypher query from intermediate steps (for logging/audit)
         generated_cypher = ""
         if "intermediate_steps" in result and result["intermediate_steps"]:
             if (
@@ -522,96 +529,6 @@ async def query_graph(query: str) -> dict[str, Any]:
                 first_step = result["intermediate_steps"][0]
                 if isinstance(first_step, dict) and "query" in first_step:
                     generated_cypher = first_step["query"]
-
-        # Sanitize LLM-generated Cypher (SISO prevention)
-        if generated_cypher and sanitizer_enabled:
-            is_safe, sanitize_error, warnings = sanitize_query(generated_cypher, None)
-
-            if not is_safe:
-                logger.warning(f"LLM generated unsafe Cypher: {sanitize_error}")
-                error_response = {
-                    "error": f"LLM-generated query blocked by sanitizer: {sanitize_error}",
-                    "generated_cypher": generated_cypher,
-                    "sanitizer_blocked": True,
-                    "success": False,
-                }
-
-                # Audit log the blocked query
-                if audit_logger:
-                    audit_logger.log_error(
-                        tool="query_graph",
-                        query=query,
-                        error=sanitize_error or "Query blocked by sanitizer",
-                        metadata={"generated_cypher": generated_cypher, "sanitizer_blocked": True},
-                    )
-
-                return error_response
-
-            # Log warnings if any
-            if warnings:
-                for warning in warnings:
-                    logger.warning(f"LLM-generated Cypher warning: {warning}")
-
-        # Check generated Cypher complexity
-        if generated_cypher and complexity_limit_enabled:
-            is_allowed, complexity_error, complexity_score = check_query_complexity(
-                generated_cypher
-            )
-
-            if not is_allowed:
-                logger.warning(f"LLM generated complex query: {complexity_error}")
-                error_response = {
-                    "error": f"LLM-generated query blocked by complexity limiter: {complexity_error}",
-                    "generated_cypher": generated_cypher,
-                    "complexity_score": complexity_score.total_score if complexity_score else None,
-                    "complexity_limit": complexity_score.max_allowed if complexity_score else None,
-                    "complexity_blocked": True,
-                    "success": False,
-                }
-
-                # Audit log the blocked query
-                if audit_logger:
-                    audit_logger.log_error(
-                        tool="query_graph",
-                        query=query,
-                        error=complexity_error or "Query blocked by complexity limiter",
-                        metadata={
-                            "generated_cypher": generated_cypher,
-                            "complexity_blocked": True,
-                            "complexity_score": complexity_score.total_score
-                            if complexity_score
-                            else None,
-                        },
-                    )
-
-                return error_response
-
-            # Log complexity warnings if any
-            if complexity_score and complexity_score.warnings:
-                for warning in complexity_score.warnings:
-                    logger.info(f"LLM-generated Cypher complexity warning: {warning}")
-
-        # Check if generated Cypher is allowed in read-only mode
-        if generated_cypher:
-            read_only_error = check_read_only_access(generated_cypher)
-            if read_only_error:
-                error_response = {
-                    "error": "LLM generated a write operation, but server is in read-only mode",
-                    "generated_cypher": generated_cypher,
-                    "read_only_mode": True,
-                    "success": False,
-                }
-
-                # Audit log the error
-                if audit_logger:
-                    audit_logger.log_error(
-                        tool="query_graph",
-                        query=query,
-                        error=str(error_response["error"]),
-                        metadata={"generated_cypher": generated_cypher},
-                    )
-
-                return error_response
 
         # Apply response size limiting to intermediate steps
         truncated_steps, was_truncated = truncate_response(result.get("intermediate_steps", []))
@@ -639,6 +556,50 @@ async def query_graph(query: str) -> dict[str, Any]:
             )
 
         return response
+
+    except ValueError as e:
+        # ValueError raised by SecureNeo4jGraph when security checks fail
+        # (sanitization, complexity, or read-only mode violations)
+        logger.warning(f"Security check blocked query: {str(e)}")
+
+        # Extract generated Cypher if available for audit logging
+        generated_cypher = ""
+        try:
+            # Try to extract from error context if possible
+            # For now, just use the error message
+            pass
+        except Exception:
+            pass
+
+        # Determine which security check failed based on error message
+        error_msg = str(e)
+        if "sanitizer" in error_msg.lower():
+            error_type = "sanitizer_blocked"
+        elif "complexity" in error_msg.lower():
+            error_type = "complexity_blocked"
+        elif "read-only" in error_msg.lower():
+            error_type = "read_only_blocked"
+        else:
+            error_type = "security_blocked"
+
+        error_response = {
+            "error": error_msg,
+            "security_blocked": True,
+            "block_type": error_type,
+            "success": False,
+        }
+
+        # Audit log the security block
+        if audit_logger:
+            audit_logger.log_error(
+                tool="query_graph",
+                query=query,
+                error=error_msg,
+                error_type=error_type,
+                metadata={"security_blocked": True},
+            )
+
+        return error_response
 
     except Exception as e:
         logger.error(f"Error in query_graph: {str(e)}", exc_info=True)

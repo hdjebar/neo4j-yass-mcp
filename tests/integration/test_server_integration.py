@@ -38,7 +38,7 @@ class TestServerInitialization:
 
         with patch.dict(os.environ, env_vars, clear=True):
             # Mock Neo4j and LangChain components
-            with patch("neo4j_yass_mcp.server.Neo4jGraph") as mock_graph_class:
+            with patch("neo4j_yass_mcp.server.SecureNeo4jGraph") as mock_graph_class:
                 with patch("neo4j_yass_mcp.server.chatLLM") as mock_llm_func:
                     with patch(
                         "neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"
@@ -58,13 +58,16 @@ class TestServerInitialization:
 
                         initialize_neo4j()
 
-                        # Verify Neo4j connection was created
+                        # Verify SecureNeo4jGraph was created with security params
                         mock_graph_class.assert_called_once_with(
                             url="bolt://testhost:7687",
                             username="testuser",
                             password="StrongP@ssw0rd!123",
                             database="testdb",
                             timeout=60,
+                            sanitizer_enabled=True,
+                            complexity_limit_enabled=True,
+                            read_only_mode=False,
                         )
 
                         # Verify LLM was created
@@ -110,7 +113,7 @@ class TestServerInitialization:
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
-            with patch("neo4j_yass_mcp.server.Neo4jGraph"):
+            with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
                 with patch("neo4j_yass_mcp.server.chatLLM"):
                     with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
                         from neo4j_yass_mcp.server import _debug_mode, initialize_neo4j

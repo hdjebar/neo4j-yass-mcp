@@ -40,13 +40,13 @@ class TestComplexityLimitEnforcement:
         mock_audit_logger = MagicMock()
         mock_get_audit.return_value = mock_audit_logger
 
-        # Setup server state - need to generate Cypher first
+        # Setup server state - SecureNeo4jGraph now raises ValueError when complexity exceeded
         mock_chain = Mock()
         complex_cypher = "MATCH (n)-[r*1..10]->(m) RETURN n, r, m"
-        mock_chain.invoke.return_value = {
-            "result": "Would execute complex query",
-            "intermediate_steps": [{"query": complex_cypher}],
-        }
+        # Chain will raise ValueError (what SecureNeo4jGraph does on complexity failure)
+        mock_chain.invoke.side_effect = ValueError(
+            "Query blocked by complexity limiter: Query complexity 150 exceeds limit of 100"
+        )
 
         server.chain = mock_chain
         server.graph = MagicMock()
@@ -59,24 +59,15 @@ class TestComplexityLimitEnforcement:
 
             # Verify complexity block response
             assert result["success"] is False
-            assert result["complexity_blocked"] is True
-            assert "LLM-generated query blocked by complexity limiter" in result["error"]
-            assert result["complexity_score"] == 150
-            assert result["complexity_limit"] == 100
-            assert "generated_cypher" in result
-            assert result["generated_cypher"] == complex_cypher
+            assert result["security_blocked"] is True
+            assert "complexity" in result["block_type"]
+            assert "complexity limiter" in result["error"].lower()
 
             # Verify audit logging
             mock_audit_logger.log_error.assert_called_once()
             call_args = mock_audit_logger.log_error.call_args[1]
             assert call_args["tool"] == "query_graph"
-            assert "metadata" in call_args
-            assert call_args["metadata"]["complexity_blocked"] is True
-            assert call_args["metadata"]["complexity_score"] == 150
-            assert call_args["metadata"]["generated_cypher"] == complex_cypher
-
-            # Verify complexity check was called
-            mock_check_complexity.assert_called_once_with(complex_cypher)
+            assert call_args["error_type"] == "complexity_blocked"
 
         finally:
             # Restore original state
@@ -143,21 +134,15 @@ class TestComplexityLimitEnforcement:
             server.complexity_limit_enabled = original_complexity_enabled
 
     @pytest.mark.asyncio
-    @patch("neo4j_yass_mcp.server.check_query_complexity")
-    async def test_query_graph_complexity_allowed(self, mock_check_complexity):
-        """Test query_graph proceeds when complexity is within limits"""
+    async def test_query_graph_complexity_allowed(self):
+        """Test query_graph proceeds when complexity is within limits.
+
+        With SecureNeo4jGraph, complexity checks happen automatically.
+        This test verifies that simple queries (within limits) succeed.
+        """
         from neo4j_yass_mcp import server
 
-        # Setup: Complexity allowed
-        complexity_score = ComplexityScore(is_within_limit=True, 
-            total_score=50,
-            max_allowed=100,
-            breakdown={"matches": 25, "relationships": 25},
-            warnings=[],
-        )
-        mock_check_complexity.return_value = (True, None, complexity_score)
-
-        # Setup server state
+        # Setup server state - simple query that should pass complexity check
         simple_cypher = "MATCH (n:Person) RETURN n LIMIT 10"
         mock_chain = Mock()
         mock_chain.invoke.return_value = {
@@ -165,9 +150,6 @@ class TestComplexityLimitEnforcement:
             "intermediate_steps": [{"query": simple_cypher}],
         }
         mock_graph = MagicMock()
-        mock_session = Mock()
-        mock_graph.query = mock_session
-        mock_session.return_value = [{"n": {"name": "Alice"}}]
 
         server.chain = mock_chain
         server.graph = mock_graph
@@ -180,10 +162,7 @@ class TestComplexityLimitEnforcement:
 
             # Verify it proceeded past complexity check
             assert result["success"] is True
-            assert "complexity_blocked" not in result or result.get("complexity_blocked") is False
-
-            # Verify complexity check was called
-            mock_check_complexity.assert_called_once_with(simple_cypher)
+            assert "security_blocked" not in result or result.get("security_blocked") is False
 
         finally:
             # Restore original state
