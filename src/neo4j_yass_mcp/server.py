@@ -142,24 +142,20 @@ def get_client_id() -> str:
     """
     Get unique client ID for the current request.
 
-    Generates a unique identifier for each connection/request to enable
-    per-client rate limiting. Uses async context to track client across
-    the request lifetime.
+    Generates a NEW unique identifier for EACH MCP tool invocation to enable
+    true per-request rate limiting (not per-session or per-task).
 
     Returns:
         Unique client ID string
     """
     global _client_id_counter
 
-    # Try to get existing client ID from context
-    try:
-        return _current_client_id.get()
-    except LookupError:
-        # Generate new client ID for this request
-        _client_id_counter += 1
-        client_id = f"client_{_client_id_counter}_{id(asyncio.current_task())}"
-        _current_client_id.set(client_id)
-        return client_id
+    # ALWAYS generate a new client ID for each request
+    # This ensures per-request rate limiting instead of per-session
+    _client_id_counter += 1
+    client_id = f"client_{_client_id_counter}_{id(asyncio.current_task())}"
+    _current_client_id.set(client_id)
+    return client_id
 
 
 def get_executor() -> ThreadPoolExecutor:

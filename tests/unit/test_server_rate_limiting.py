@@ -203,6 +203,62 @@ class TestRateLimitEnforcement:
             # Restore original state
             server.rate_limit_enabled = original_rate_limit_enabled
 
+    @pytest.mark.asyncio
+    @patch("neo4j_yass_mcp.server.check_rate_limit")
+    async def test_sequential_requests_get_different_client_ids(self, mock_check_rate):
+        """Test that sequential requests in same task get DIFFERENT client IDs (per-request rate limiting)"""
+        from neo4j_yass_mcp import server
+
+        # Setup: Always allow requests
+        rate_info = RateLimitInfo(
+            allowed=True,
+            requests_remaining=10,
+            reset_time=datetime.now() + timedelta(seconds=60),
+            retry_after_seconds=None,
+        )
+        mock_check_rate.return_value = (True, rate_info)
+
+        # Setup server state
+        mock_chain = Mock()
+        mock_chain.invoke.return_value = {
+            "result": "Query executed",
+            "intermediate_steps": [{"query": "MATCH (n) RETURN n"}],
+        }
+        server.chain = mock_chain
+        server.graph = MagicMock()
+        original_rate_limit_enabled = server.rate_limit_enabled
+        server.rate_limit_enabled = True
+
+        try:
+            # Make 3 sequential requests
+            await server.query_graph.fn(query="Request 1")
+            await server.query_graph.fn(query="Request 2")
+            await server.query_graph.fn(query="Request 3")
+
+            # Verify check_rate_limit was called 3 times
+            assert mock_check_rate.call_count == 3
+
+            # Extract all client_ids from the calls
+            client_ids = [
+                call_kwargs["client_id"]
+                for call_args, call_kwargs in mock_check_rate.call_args_list
+            ]
+
+            # CRITICAL ASSERTION: All client IDs must be different (per-request limiting)
+            assert len(set(client_ids)) == 3, (
+                f"Expected 3 different client IDs for 3 requests, "
+                f"but got: {client_ids}. "
+                "This means rate limiting is still per-session, not per-request!"
+            )
+
+            # Verify all IDs follow the expected format
+            for client_id in client_ids:
+                assert client_id.startswith("client_")
+
+        finally:
+            # Restore original state
+            server.rate_limit_enabled = original_rate_limit_enabled
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
