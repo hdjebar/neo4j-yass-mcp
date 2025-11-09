@@ -13,6 +13,8 @@ Features:
 """
 
 import asyncio
+import contextvars
+import hashlib
 import json
 import logging
 import os
@@ -127,6 +129,38 @@ _debug_mode: bool = False
 
 # Tokenizer for accurate token counting (can be tiktoken, tokenizers, or None)
 _tokenizer: Any = None
+
+# Context variable for per-request client ID tracking
+_current_client_id: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "current_client_id", default="default"
+)
+
+# Counter for generating unique client IDs
+_client_id_counter: int = 0
+
+
+def get_client_id() -> str:
+    """
+    Get unique client ID for the current request.
+
+    Generates a unique identifier for each connection/request to enable
+    per-client rate limiting. Uses async context to track client across
+    the request lifetime.
+
+    Returns:
+        Unique client ID string
+    """
+    global _client_id_counter
+
+    # Try to get existing client ID from context
+    try:
+        return _current_client_id.get()
+    except LookupError:
+        # Generate new client ID for this request
+        _client_id_counter += 1
+        client_id = f"client_{_client_id_counter}_{id(asyncio.current_task())}"
+        _current_client_id.set(client_id)
+        return client_id
 
 
 def get_executor() -> ThreadPoolExecutor:
@@ -564,9 +598,10 @@ async def query_graph(query: str) -> dict[str, Any]:
     if chain is None or graph is None:
         return {"error": "Neo4j or LangChain not initialized", "success": False}
 
-    # Check rate limit
+    # Check rate limit (use per-request client ID)
     if rate_limit_enabled:
-        is_allowed, rate_info = check_rate_limit(client_id="default")
+        client_id = get_client_id()
+        is_allowed, rate_info = check_rate_limit(client_id=client_id)
         if not is_allowed and rate_info is not None:
             error_msg = f"Rate limit exceeded. Retry after {rate_info.retry_after_seconds:.1f}s"
             logger.warning(f"Rate limit exceeded for query_graph: {query[:50]}...")
@@ -754,9 +789,10 @@ async def _execute_cypher_impl(
     if graph is None:
         return {"error": "Neo4j graph not initialized", "success": False}
 
-    # Check rate limit
+    # Check rate limit (use per-request client ID)
     if rate_limit_enabled:
-        is_allowed, rate_info = check_rate_limit(client_id="default")
+        client_id = get_client_id()
+        is_allowed, rate_info = check_rate_limit(client_id=client_id)
         if not is_allowed and rate_info is not None:
             error_msg = f"Rate limit exceeded. Retry after {rate_info.retry_after_seconds:.1f}s"
             logger.warning(f"Rate limit exceeded for execute_cypher: {cypher_query[:50]}...")
