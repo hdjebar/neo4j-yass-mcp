@@ -1,42 +1,40 @@
 # Archived Documentation
 
-This directory contains historical documentation that is no longer actively maintained but preserved for reference.
+This directory contains documentation that has been archived due to implementation changes.
 
-## Contents
+## Rate Limiting Refactoring (2025-11-09)
 
-### GitHub Publication Process (v1.0.0)
-These files document the initial publication process of neo4j-yass-mcp to GitHub:
+The following files were archived after the rate limiting implementation was refactored from function-based to decorator-based architecture:
 
-- `GITHUB_PRE_PUBLICATION_CHECKLIST.md` - Pre-publication verification checklist
-- `GITHUB_PUBLICATION_CHECKLIST.md` - Step-by-step publication guide
-- `GITHUB_PUBLICATION_SUMMARY.md` - Summary of what was published
-- `GITHUB_REPOSITORY_SETTINGS.md` - Repository configuration guide
-- `PUBLICATION_READY_SUMMARY.md` - Readiness assessment for v1.0.0
-- `PUBLISH_TO_GITHUB.md` - Publication instructions
+### Outdated Coverage Documentation
 
-**Status**: ✅ Completed on 2025-11-07 for v1.0.0
+- **UNCOVERED_LINES_SUMMARY.md** - References old function-based rate limiting (lines 478-491, 704-717 in server.py)
+- **COVERAGE_ANALYSIS.md** - Coverage analysis based on old implementation
+- **COVERAGE_ANALYSIS_INDEX.md** - Index of coverage documentation
+- **TEST_IMPLEMENTATION_GUIDE.md** - Test templates for old patterns
+- **COVERAGE_REFERENCE_CARD.md** - Quick reference with old line numbers
+- **ANALYSIS_COMPLETE.txt** - Summary document referencing the above outdated coverage docs
 
-**Note**: These documents reference v1.0.0. The project is now at v1.1.0 (as of 2025-11-08).
+### Why Archived
 
-### Testing Documentation
-- `QUICKSTART_TEST.md` - Specific test guide for Movie database with Gemini
+These files reference the **old function-based rate limiting approach** where:
+- Rate limit checks were manual function calls in each tool
+- Tests used `@patch("neo4j_yass_mcp.server.check_rate_limit")`
+- Line numbers referenced specific rate limiting code blocks
 
-**Status**: Superseded by [QUICK_START.md](../../QUICK_START.md)
+### New Implementation
+
+See [REFACTORING_SUMMARY.md](../../REFACTORING_SUMMARY.md) for details on the new decorator-based architecture.
+
+**New rate limiting files:**
+- `src/neo4j_yass_mcp/tool_wrappers.py` - `RateLimiterService` and decorators
+- `tests/unit/test_server_rate_limiting.py` - Updated tests
+- `examples/rate_limiting_example.py` - Standalone example
+
+### Other Archived Files
+
+This directory also contains historical documentation from GitHub publication preparation and other project milestones.
 
 ---
 
-## Current Documentation
-
-For up-to-date documentation, see:
-
-- **Main README**: [README.md](../../README.md)
-- **Quick Start Guide**: [QUICK_START.md](../../QUICK_START.md)
-- **Docker Guide**: [DOCKER.md](../../DOCKER.md)
-- **Security Documentation**: [docs/SECURITY.md](../SECURITY.md)
-- **Architecture**: [docs/SOFTWARE_ARCHITECTURE.md](../SOFTWARE_ARCHITECTURE.md)
-- **Contributing**: [CONTRIBUTING.md](../../CONTRIBUTING.md)
-
----
-
-**Archive Created**: 2025-11-08
-**Last Updated**: 2025-11-08
+**Last Updated**: 2025-11-09

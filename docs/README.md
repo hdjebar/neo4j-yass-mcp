@@ -121,6 +121,17 @@ Neo4j YASS MCP provides enterprise-grade security with multiple layers of protec
   - Community guidelines
   - Expected behavior
 
+- **Developer Documentation**: [development/](./development/)
+  - [Refactoring Summary](./development/REFACTORING_SUMMARY.md) - Rate limiting refactoring
+  - [Cleanup Summary](./development/CLEANUP_SUMMARY.md) - Documentation cleanup
+  - [Next Steps to 90%](./development/NEXT_STEPS_TO_90_PERCENT.md) - Coverage roadmap
+  - [Security Audit Findings](./development/SECURITY_AUDIT_FINDINGS.md) - Audit results
+
+- **Examples**: [examples/](../examples/)
+  - [Rate Limiting Example](../examples/rate_limiting_example.py) - Standalone demo
+  - [Rate Limiting Guide](../examples/README_RATE_LIMITING.md) - Comprehensive guide
+  - [Architecture Note](../examples/ARCHITECTURE_NOTE.md) - Production vs examples
+
 ---
 
 ## 🔐 Security Documentation Summary

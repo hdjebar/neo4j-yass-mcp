@@ -116,7 +116,7 @@ class TestComplexityLimitEnforcement:
         try:
             # Call execute_cypher with complex query
             complex_query = "MATCH (n)-[r*1..20]->(m) RETURN n, r, m"
-            result = await server.execute_cypher(cypher_query=complex_query, ctx=create_mock_context())
+            result = await server.execute_cypher.fn(cypher_query=complex_query, ctx=create_mock_context())
 
             # Verify complexity block response
             assert result["success"] is False
@@ -194,7 +194,7 @@ class TestComplexityLimitEnforcement:
 
         try:
             # Call execute_cypher
-            result = await server.execute_cypher(cypher_query="MATCH (n) RETURN n LIMIT 1", ctx=create_mock_context())
+            result = await server.execute_cypher.fn(cypher_query="MATCH (n) RETURN n LIMIT 1", ctx=create_mock_context())
 
             # Verify complexity check was NOT called
             mock_check_complexity.assert_not_called()
@@ -222,7 +222,7 @@ class TestComplexityLimitEnforcement:
 
         try:
             # Call execute_cypher
-            result = await server.execute_cypher(cypher_query="MATCH (n) RETURN n", ctx=create_mock_context())
+            result = await server.execute_cypher.fn(cypher_query="MATCH (n) RETURN n", ctx=create_mock_context())
 
             # Verify error response handles None score
             assert result["success"] is False

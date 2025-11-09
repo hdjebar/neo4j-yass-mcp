@@ -153,3 +153,6 @@ def reset_global_state():
     server_module.graph = original_graph
     server_module.chain = original_chain
     server_module._executor = original_executor
+    # Reset decorator-based rate limiter state
+    if hasattr(server_module, "tool_rate_limiter"):
+        server_module.tool_rate_limiter.reset()

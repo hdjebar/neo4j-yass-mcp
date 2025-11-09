@@ -390,6 +390,43 @@ flowchart TD
     style Error fill:#ff5252,color:#fff
 ```
 
+### 4.3 Decorator-Based Cross-Cutting Concerns
+
+The `src/neo4j_yass_mcp/tool_wrappers.py` module centralizes cross-cutting behaviors (structured logging, per-session throttling) through lightweight decorators that wrap every MCP tool and resource. This eliminates duplicated logic inside `server.py` and allows dynamic toggling via environment variables such as `MCP_TOOL_RATE_LIMIT_ENABLED`, `MCP_RESOURCE_RATE_LIMIT_ENABLED`, and the per-tool/window knobs.
+
+- **`log_tool_invocation`**: Emits structured start/finish logs with client/session metadata derived from `ctx.session_id`, including execution latency and success flags.
+- **`rate_limit_tool`**: Uses `RateLimiterService` (async-safe sliding window) to enforce per-session limits. It supports lazy dependency injection (passing callables for limiter/enabled flags) so tests and runtime configuration can replace these components without re-registering the tool.
+- **Error Builders**: Each tool/resource provides a tailored response for rate-limit violations (JSON payload for tools, human-readable string for resources) so clients can display actionable retry details.
+
+```mermaid
+flowchart LR
+    Client[Client\n(MCP session)] --> Decorators
+    subgraph Decorators["Decorator Stack (per tool/resource)"]
+        RL["rate_limit_tool\n- Resolver → RateLimiterService\n- Uses ctx.session_id/client_id/request_id\n- Env toggles per tool"]
+        Log["log_tool_invocation\n- Start/finish log\n- Duration & success"]
+    end
+    Decorators -->|allowed| Impl["Tool Implementation\n(query_graph / execute_cypher /\nrefresh_schema / resources)"]
+    RL -->|blocked| Error["Structured rate-limit response\n(success=false, retry_after, limit, window)"]
+
+    style Decorators fill:#e3f2fd
+    style RL fill:#fffde7
+    style Log fill:#ede7f6
+    style Impl fill:#e8f5e9
+    style Error fill:#ffebee
+```
+
+**Runtime Control Surface**
+
+| Layer | Environment Variables | Default | Purpose |
+|-------|----------------------|---------|---------|
+| Tool gating | `MCP_TOOL_RATE_LIMIT_ENABLED` | `true` | Master switch for decorators on MCP tools. |
+| Natural language queries | `MCP_QUERY_GRAPH_LIMIT`, `MCP_QUERY_GRAPH_WINDOW` | `10 / 60s` | Guard `query_graph` calls per session. |
+| Direct Cypher | `MCP_EXECUTE_CYPHER_LIMIT`, `MCP_EXECUTE_CYPHER_WINDOW` | `10 / 60s` | Guard `execute_cypher`. |
+| Schema refresh | `MCP_REFRESH_SCHEMA_LIMIT`, `MCP_REFRESH_SCHEMA_WINDOW` | `5 / 120s` | Prevent resource-heavy schema refresh storms. |
+| Resource reads | `MCP_RESOURCE_RATE_LIMIT_ENABLED`, `MCP_RESOURCE_LIMIT`, `MCP_RESOURCE_WINDOW` | `true / 20 / 60s` | Protect schema + database-info resources. |
+
+All limits are enforced per-session (via `ctx.session_id`, falling back to client/request IDs) ensuring fair multi-tenant behavior even when many MCP clients connect simultaneously.
+
 ---
 
 ## 5. Data Flow
@@ -487,6 +524,27 @@ flowchart TD
     style CacheStore fill:#e8f5e9
     style UseSchema2 fill:#c8e6c9
     style Result2 fill:#a5d6a7
+```
+
+### 5.4 Rate Limiter Decision Flow
+
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client
+    participant Decorators as Decorator Stack
+    participant Limiter as RateLimiterService
+    participant Tool as Tool Impl
+
+    Client->>Decorators: Tool invocation (ctx includes session_id)
+    Decorators->>Limiter: check_and_record(session_id, limit, window)
+    alt Allowed
+        Limiter-->>Decorators: allowed=true, metadata
+        Decorators->>Tool: Execute business logic
+        Tool-->>Client: Success response
+    else Blocked
+        Limiter-->>Decorators: allowed=false, retry_after metadata
+        Decorators-->>Client: Error JSON/text with retry details
+    end
 ```
 
 ---

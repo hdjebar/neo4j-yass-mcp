@@ -674,6 +674,21 @@ LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
 LOG_FORMAT=%(asctime)s - %(name)s - %(levelname)s - %(message)s
 ```
 
+### MCP Tool & Resource Rate Limiting
+
+All MCP tools and resources now share the same decorator stack for structured logging and per-session throttling (keyed via `ctx.session_id`). Tune or disable each entrypoint independently with these environment variables:
+
+| Variable | Default | Applies To | Description |
+|----------|---------|------------|-------------|
+| `MCP_TOOL_RATE_LIMIT_ENABLED` | `true` | All MCP tools | Master switch for decorator-based tool limits. |
+| `MCP_QUERY_GRAPH_LIMIT` / `MCP_QUERY_GRAPH_WINDOW` | `10` / `60` | `query_graph` | Max natural-language queries allowed per client per window (seconds). |
+| `MCP_EXECUTE_CYPHER_LIMIT` / `MCP_EXECUTE_CYPHER_WINDOW` | `10` / `60` | `execute_cypher` | Direct Cypher execution throttle. |
+| `MCP_REFRESH_SCHEMA_LIMIT` / `MCP_REFRESH_SCHEMA_WINDOW` | `5` / `120` | `refresh_schema` | Protects schema refresh calls; slower cadence by default. |
+| `MCP_RESOURCE_RATE_LIMIT_ENABLED` | `true` | MCP resources | Enables decorator limits on resources such as schema/database info. |
+| `MCP_RESOURCE_LIMIT` / `MCP_RESOURCE_WINDOW` | `20` / `60` | `get_schema`, `get_database_info` | Caps how often metadata resources can be fetched per client. |
+
+When a limit is reached, the decorators return structured JSON (for tools) or a plain-text message (for resources) with retry-after metadata.
+
 ## Complete Configuration Reference
 
 See [.env.example](.env.example) for all available configuration options with detailed comments.
@@ -856,7 +871,10 @@ For security issues, please email security@[your-domain] instead of using the pu
 ---
 
 **📖 For detailed documentation:**
+- **[DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)** - Complete documentation guide
 - Security Architecture: [docs/SECURITY.md](docs/SECURITY.md)
 - Software Architecture: [docs/SOFTWARE_ARCHITECTURE.md](docs/SOFTWARE_ARCHITECTURE.md)
 - Docker Deployment: [DOCKER.md](DOCKER.md)
 - Configuration Reference: [.env.example](.env.example)
+- Rate Limiting Example: [examples/README_RATE_LIMITING.md](examples/README_RATE_LIMITING.md)
+- Development Docs: [docs/development/](docs/development/)

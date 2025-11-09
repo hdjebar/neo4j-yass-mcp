@@ -226,7 +226,7 @@ class TestEndToEndQueryFlow:
                     from neo4j_yass_mcp.server import execute_cypher
 
                     query = "MATCH (p:Person) RETURN p.name AS name, p.age AS age"
-                    result = await execute_cypher(query, ctx=create_mock_context())
+                    result = await execute_cypher.fn(query, ctx=create_mock_context())
 
                     # Verify successful execution
                     assert result["success"] is True
@@ -257,7 +257,7 @@ class TestEndToEndQueryFlow:
 
                     # Attempt unsafe query
                     unsafe_query = "LOAD CSV FROM 'file:///etc/passwd' AS line RETURN line"
-                    result = await execute_cypher(unsafe_query, ctx=create_mock_context())
+                    result = await execute_cypher.fn(unsafe_query, ctx=create_mock_context())
 
                     # Verify query was blocked
                     assert result["success"] is False
@@ -298,7 +298,7 @@ class TestReadOnlyModeIntegration:
                     ]
 
                     for query in write_queries:
-                        result = await execute_cypher(query, ctx=create_mock_context())
+                        result = await execute_cypher.fn(query, ctx=create_mock_context())
 
                         # Check for error (read-only mode returns {"error": msg})
                         assert "error" in result
@@ -323,7 +323,7 @@ class TestReadOnlyModeIntegration:
                     ]
 
                     for query in read_queries:
-                        result = await execute_cypher(query, ctx=create_mock_context())
+                        result = await execute_cypher.fn(query, ctx=create_mock_context())
 
                         assert result["success"] is True
                         mock_graph.query.assert_called()
@@ -346,7 +346,7 @@ class TestResponseTruncationIntegration:
                 with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
                     from neo4j_yass_mcp.server import execute_cypher
 
-                    result = await execute_cypher("MATCH (n) RETURN n", ctx=create_mock_context())
+                    result = await execute_cypher.fn("MATCH (n) RETURN n", ctx=create_mock_context())
 
                     # Verify truncation
                     assert result["success"] is True
@@ -434,7 +434,7 @@ class TestAuditLoggerIntegration:
 
                     # Execute query
                     query = "MATCH (n:Test) RETURN n"
-                    result = await execute_cypher(query, ctx=create_mock_context())
+                    result = await execute_cypher.fn(query, ctx=create_mock_context())
 
                     assert result["success"] is True
 

@@ -75,6 +75,23 @@ See [SECURITY_FIXES.md](docs/SECURITY_FIXES.md) for details.
 - Optional PII redaction
 - Configurable retention policies
 
+### Rate Limiting & Abuse Prevention
+
+- Decorator-driven throttling for every MCP tool (`query_graph`, `execute_cypher`, `refresh_schema`) and resource (`get_schema`, `get_database_info`)
+- Sliding-window enforcement powered by `RateLimiterService` with async locks to prevent race conditions
+- Per-session buckets derived from `ctx.session_id` (falls back to `client_id`/`request_id`)
+- Independent knobs for each surface:
+
+| Surface | Limit Variables | Default |
+|---------|-----------------|---------|
+| All tools (global toggle) | `MCP_TOOL_RATE_LIMIT_ENABLED` | `true` |
+| Natural language queries | `MCP_QUERY_GRAPH_LIMIT`, `MCP_QUERY_GRAPH_WINDOW` | `10 / 60s` |
+| Raw Cypher | `MCP_EXECUTE_CYPHER_LIMIT`, `MCP_EXECUTE_CYPHER_WINDOW` | `10 / 60s` |
+| Schema refresh | `MCP_REFRESH_SCHEMA_LIMIT`, `MCP_REFRESH_SCHEMA_WINDOW` | `5 / 120s` |
+| Resources (schema & db info) | `MCP_RESOURCE_RATE_LIMIT_ENABLED`, `MCP_RESOURCE_LIMIT`, `MCP_RESOURCE_WINDOW` | `true / 20 / 60s` |
+
+These limits mitigate credential stuffing, scripted scraping of schema metadata, and accidental denial-of-service by runaway agents.
+
 ### Error Handling
 
 - Sanitized error messages (production)

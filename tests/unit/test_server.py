@@ -131,7 +131,7 @@ class TestExecuteCypher:
         with patch("neo4j_yass_mcp.server.graph", None):
             from neo4j_yass_mcp.server import execute_cypher
 
-            result = await execute_cypher("MATCH (n) RETURN n LIMIT 1", ctx=create_mock_context())
+            result = await execute_cypher.fn("MATCH (n) RETURN n LIMIT 1", ctx=create_mock_context())
 
             assert result["success"] is False
             assert "not initialized" in result["error"].lower()
@@ -143,7 +143,7 @@ class TestExecuteCypher:
             with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
                 from neo4j_yass_mcp.server import execute_cypher
 
-                result = await execute_cypher("MATCH (n:Movie) RETURN n.title LIMIT 1", ctx=create_mock_context())
+                result = await execute_cypher.fn("MATCH (n:Movie) RETURN n.title LIMIT 1", ctx=create_mock_context())
 
                 assert result["success"] is True
                 assert "result" in result
@@ -157,7 +157,7 @@ class TestExecuteCypher:
                 from neo4j_yass_mcp.server import execute_cypher
 
                 params = {"title": "Top Gun", "year": 1986}
-                result = await execute_cypher(
+                result = await execute_cypher.fn(
                     "MATCH (m:Movie {title: $title}) RETURN m", parameters=params, ctx=create_mock_context()
                 )
 
@@ -173,7 +173,7 @@ class TestExecuteCypher:
                     from neo4j_yass_mcp.server import execute_cypher
 
                     # Try to execute a write query
-                    result = await execute_cypher("CREATE (n:Test) RETURN n", ctx=create_mock_context())
+                    result = await execute_cypher.fn("CREATE (n:Test) RETURN n", ctx=create_mock_context())
 
                     assert "error" in result
                     assert "read-only" in result["error"].lower()
@@ -187,7 +187,7 @@ class TestExecuteCypher:
                     from neo4j_yass_mcp.server import execute_cypher
 
                     # Unsafe query - use a clearly dangerous pattern
-                    result = await execute_cypher("LOAD CSV FROM 'file.csv' AS line RETURN line", ctx=create_mock_context())
+                    result = await execute_cypher.fn("LOAD CSV FROM 'file.csv' AS line RETURN line", ctx=create_mock_context())
 
                     assert result["success"] is False
                     assert (
@@ -204,7 +204,7 @@ class TestExecuteCypher:
             with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
                 from neo4j_yass_mcp.server import execute_cypher
 
-                result = await execute_cypher("MATCH (n) RETURN n", ctx=create_mock_context())
+                result = await execute_cypher.fn("MATCH (n) RETURN n", ctx=create_mock_context())
 
                 assert result["success"] is False
                 assert "error" in result
@@ -219,7 +219,7 @@ class TestRefreshSchema:
         with patch("neo4j_yass_mcp.server.graph", None):
             from neo4j_yass_mcp.server import refresh_schema
 
-            result = await refresh_schema.fn()
+            result = await refresh_schema.fn(ctx=create_mock_context())
 
             assert result["success"] is False
             assert "not initialized" in result["error"].lower()
@@ -230,7 +230,7 @@ class TestRefreshSchema:
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
             from neo4j_yass_mcp.server import refresh_schema
 
-            result = await refresh_schema.fn()
+            result = await refresh_schema.fn(ctx=create_mock_context())
 
             assert result["success"] is True
             assert "schema" in result
@@ -245,7 +245,7 @@ class TestRefreshSchema:
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
             from neo4j_yass_mcp.server import refresh_schema
 
-            result = await refresh_schema.fn()
+            result = await refresh_schema.fn(ctx=create_mock_context())
 
             assert result["success"] is False
             assert "error" in result
@@ -254,27 +254,30 @@ class TestRefreshSchema:
 class TestGetSchema:
     """Test get_schema MCP resource."""
 
-    def test_get_schema_not_initialized(self):
+    @pytest.mark.asyncio
+    async def test_get_schema_not_initialized(self):
         """Test get_schema when graph not initialized."""
         with patch("neo4j_yass_mcp.server.graph", None):
             from neo4j_yass_mcp.server import get_schema
 
-            result = get_schema.fn()
+            result = await get_schema.fn()
 
             assert "error" in result.lower()
             assert "not initialized" in result.lower()
 
-    def test_get_schema_success(self, mock_neo4j_graph):
+    @pytest.mark.asyncio
+    async def test_get_schema_success(self, mock_neo4j_graph):
         """Test successful schema retrieval."""
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
             from neo4j_yass_mcp.server import get_schema
 
-            result = get_schema.fn()
+            result = await get_schema.fn()
 
             assert "Node: Movie" in result
             assert "Relationship: ACTED_IN" in result
 
-    def test_get_schema_exception(self, mock_neo4j_graph):
+    @pytest.mark.asyncio
+    async def test_get_schema_exception(self, mock_neo4j_graph):
         """Test get_schema handles exceptions (lines 415-416)."""
         # Make get_schema property raise an exception when accessed
         type(mock_neo4j_graph).get_schema = PropertyMock(side_effect=Exception("Schema error"))
@@ -282,7 +285,7 @@ class TestGetSchema:
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
             from neo4j_yass_mcp.server import get_schema
 
-            result = get_schema.fn()
+            result = await get_schema.fn()
 
             assert "Error retrieving schema" in result
             assert "Schema error" in result
@@ -291,26 +294,28 @@ class TestGetSchema:
 class TestGetDatabaseInfo:
     """Test get_database_info MCP resource."""
 
-    def test_get_database_info_not_initialized(self):
+    @pytest.mark.asyncio
+    async def test_get_database_info_not_initialized(self):
         """Test database info when graph not initialized."""
         with patch("neo4j_yass_mcp.server.graph", None):
             from neo4j_yass_mcp.server import get_database_info
 
-            result = get_database_info.fn()
+            result = await get_database_info.fn()
 
             # get_database_info.fn() doesn't check if graph is initialized
             # It just returns environment configuration
             assert isinstance(result, str)
             assert "neo4j" in result.lower()
 
-    def test_get_database_info_success(self, mock_neo4j_graph):
+    @pytest.mark.asyncio
+    async def test_get_database_info_success(self, mock_neo4j_graph):
         """Test successful database info retrieval."""
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
             with patch("neo4j_yass_mcp.server.sanitizer_enabled", True):
                 with patch("neo4j_yass_mcp.server._read_only_mode", False):
                     from neo4j_yass_mcp.server import get_database_info
 
-                    result = get_database_info.fn()
+                    result = await get_database_info.fn()
 
                     assert isinstance(result, str)
                     # Should contain configuration info
@@ -717,7 +722,7 @@ class TestAuditLoggerIntegration:
             with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=mock_audit_logger):
                 from neo4j_yass_mcp.server import execute_cypher
 
-                await execute_cypher("MATCH (n) RETURN n", ctx=create_mock_context())
+                await execute_cypher.fn("MATCH (n) RETURN n", ctx=create_mock_context())
 
                 # Verify audit logging
                 mock_audit_logger.log_query.assert_called_once()
@@ -736,7 +741,7 @@ class TestAuditLoggerIntegration:
                 ):
                     from neo4j_yass_mcp.server import execute_cypher
 
-                    await execute_cypher("LOAD CSV FROM 'file.csv' AS line RETURN line", ctx=create_mock_context())
+                    await execute_cypher.fn("LOAD CSV FROM 'file.csv' AS line RETURN line", ctx=create_mock_context())
 
                     # Verify error was logged
                     mock_audit_logger.log_error.assert_called_once()
@@ -754,7 +759,7 @@ class TestAuditLoggerIntegration:
                 ):
                     from neo4j_yass_mcp.server import execute_cypher
 
-                    await execute_cypher("CREATE (n:Test) RETURN n", ctx=create_mock_context())
+                    await execute_cypher.fn("CREATE (n:Test) RETURN n", ctx=create_mock_context())
 
                     # Verify error was logged
                     mock_audit_logger.log_error.assert_called_once()
@@ -780,7 +785,7 @@ class TestResponseTruncation:
                 ):
                     from neo4j_yass_mcp.server import execute_cypher
 
-                    result = await execute_cypher("MATCH (n) RETURN n", ctx=create_mock_context())
+                    result = await execute_cypher.fn("MATCH (n) RETURN n", ctx=create_mock_context())
 
                     # Should include truncation metadata
                     assert result.get("truncated") is True
@@ -831,7 +836,7 @@ class TestSanitizerWarnings:
 
                         from neo4j_yass_mcp.server import execute_cypher
 
-                        result = await execute_cypher("MATCH (n)-->(m) RETURN n, m", ctx=create_mock_context())
+                        result = await execute_cypher.fn("MATCH (n)-->(m) RETURN n, m", ctx=create_mock_context())
 
                         # Query should succeed but log warnings
                         assert result["success"] is True

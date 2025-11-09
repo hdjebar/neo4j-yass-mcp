@@ -154,6 +154,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `ENVIRONMENT` variable to control environment-specific security restrictions
 - Added production environment check for DEBUG_MODE to prevent information leakage
 - Added Python 3.13 to CI/CD test matrix
+- Added per-tool MCP rate limiter configuration knobs:
+  - `MCP_TOOL_RATE_LIMIT_ENABLED`
+  - `MCP_QUERY_GRAPH_LIMIT` / `MCP_QUERY_GRAPH_WINDOW`
+  - `MCP_EXECUTE_CYPHER_LIMIT` / `MCP_EXECUTE_CYPHER_WINDOW`
+  - `MCP_REFRESH_SCHEMA_LIMIT` / `MCP_REFRESH_SCHEMA_WINDOW`
+  - `MCP_RESOURCE_RATE_LIMIT_ENABLED`
+  - `MCP_RESOURCE_LIMIT` / `MCP_RESOURCE_WINDOW`
 
 ### Changed
 - **BREAKING:** Upgraded minimum Python version from 3.11 to 3.13 for 5-15% performance improvement
@@ -182,6 +189,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated all configuration files with Python 3.13 requirements
 - Added Docker Compose V2 compatibility note
 - Created CHANGELOG.md migration guide for Python 3.13
+- Documented decorator-based rate limiting across README, `.env`, `.env.example`, `docs/SOFTWARE_ARCHITECTURE.md`, and `docs/SECURITY.md`, including new mermaid diagrams and configuration tables.
 
 ---
 

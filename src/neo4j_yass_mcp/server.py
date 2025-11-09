@@ -19,7 +19,8 @@ import os
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any
+from typing import Any, Callable
+from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 from fastmcp import Context, FastMCP
@@ -49,13 +50,17 @@ from neo4j_yass_mcp.config.security_config import is_password_weak
 from neo4j_yass_mcp.secure_graph import SecureNeo4jGraph
 from neo4j_yass_mcp.security import (
     check_query_complexity,
-    check_rate_limit,
     get_audit_logger,
     initialize_audit_logger,
     initialize_complexity_limiter,
     initialize_rate_limiter,
     initialize_sanitizer,
     sanitize_query,
+)
+from neo4j_yass_mcp.tool_wrappers import (
+    RateLimiterService,
+    log_tool_invocation,
+    rate_limit_tool,
 )
 
 # Load environment variables first (needed for logging config)
@@ -105,6 +110,71 @@ if rate_limit_enabled:
     logger.info("Rate limiter enabled (prevents abuse through excessive requests)")
 else:  # pragma: no cover - Module initialization, tested in production
     logger.warning("⚠️  Rate limiter disabled - no protection against request flooding!")
+
+# Decorator-based MCP tool rate limiter
+tool_rate_limiter = RateLimiterService()
+tool_rate_limit_enabled = os.getenv("MCP_TOOL_RATE_LIMIT_ENABLED", "true").lower() == "true"
+QUERY_GRAPH_RATE_LIMIT = int(os.getenv("MCP_QUERY_GRAPH_LIMIT", "10"))
+QUERY_GRAPH_RATE_WINDOW = int(os.getenv("MCP_QUERY_GRAPH_WINDOW", "60"))
+EXECUTE_CYPHER_RATE_LIMIT = int(os.getenv("MCP_EXECUTE_CYPHER_LIMIT", "10"))
+EXECUTE_CYPHER_RATE_WINDOW = int(os.getenv("MCP_EXECUTE_CYPHER_WINDOW", "60"))
+REFRESH_SCHEMA_RATE_LIMIT = int(os.getenv("MCP_REFRESH_SCHEMA_LIMIT", "5"))
+REFRESH_SCHEMA_RATE_WINDOW = int(os.getenv("MCP_REFRESH_SCHEMA_WINDOW", "120"))
+resource_rate_limit_enabled = os.getenv("MCP_RESOURCE_RATE_LIMIT_ENABLED", "true").lower() == "true"
+RESOURCE_RATE_LIMIT = int(os.getenv("MCP_RESOURCE_LIMIT", "20"))
+RESOURCE_RATE_WINDOW = int(os.getenv("MCP_RESOURCE_WINDOW", "60"))
+
+
+def _format_reset_time(timestamp: float) -> str:
+    """Convert a UNIX timestamp to ISO 8601."""
+    return datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
+
+
+def _build_query_graph_rate_limit_error(info: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "error": f"Rate limit exceeded. Retry after {info['retry_after']:.1f}s",
+        "rate_limited": True,
+        "retry_after_seconds": info["retry_after"],
+        "reset_time": _format_reset_time(info["reset_time"]),
+        "limit": info["limit"],
+        "window": info["window"],
+        "success": False,
+    }
+
+
+def _build_execute_rate_limit_error(info: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "error": f"Rate limit exceeded. Retry after {info['retry_after']:.1f}s",
+        "rate_limited": True,
+        "retry_after_seconds": info["retry_after"],
+        "reset_time": _format_reset_time(info["reset_time"]),
+        "limit": info["limit"],
+        "window": info["window"],
+        "success": False,
+    }
+
+
+def _build_refresh_schema_rate_limit_error(info: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "error": f"Rate limit exceeded. Retry after {info['retry_after']:.1f}s",
+        "rate_limited": True,
+        "retry_after_seconds": info["retry_after"],
+        "reset_time": _format_reset_time(info["reset_time"]),
+        "limit": info["limit"],
+        "window": info["window"],
+        "success": False,
+    }
+
+
+def _resource_rate_limit_message(resource_label: str) -> Callable[[dict[str, Any]], str]:
+    def builder(info: dict[str, Any]) -> str:
+        return (
+            f"{resource_label} rate limit exceeded. "
+            f"Retry after {info['retry_after']:.1f}s "
+            f"(limit {info['limit']} per {info['window']}s)."
+        )
+
+    return builder
 
 # Initialize FastMCP server
 mcp = FastMCP("neo4j-yass-mcp", version="1.1.0")
@@ -541,7 +611,17 @@ def initialize_neo4j():
 
 
 @mcp.resource("neo4j://schema")
-def get_schema() -> str:
+@log_tool_invocation("get_schema")
+@rate_limit_tool(
+    limiter=lambda: tool_rate_limiter,
+    client_id_extractor=get_client_id_from_context,
+    limit=RESOURCE_RATE_LIMIT,
+    window=RESOURCE_RATE_WINDOW,
+    enabled=lambda: resource_rate_limit_enabled,
+    tool_name="get_schema",
+    build_error_response=_resource_rate_limit_message("Schema access"),
+)
+async def get_schema(ctx: Context = None) -> str:
     """
     Get the Neo4j graph database schema.
 
@@ -559,7 +639,17 @@ def get_schema() -> str:
 
 
 @mcp.resource("neo4j://database-info")
-def get_database_info() -> str:
+@log_tool_invocation("get_database_info")
+@rate_limit_tool(
+    limiter=lambda: tool_rate_limiter,
+    client_id_extractor=get_client_id_from_context,
+    limit=RESOURCE_RATE_LIMIT,
+    window=RESOURCE_RATE_WINDOW,
+    enabled=lambda: resource_rate_limit_enabled,
+    tool_name="get_database_info",
+    build_error_response=_resource_rate_limit_message("Database info access"),
+)
+async def get_database_info(ctx: Context = None) -> str:
     """
     Get information about the Neo4j database connection.
 
@@ -582,7 +672,17 @@ Status: Connected
 
 
 @mcp.tool()
-async def query_graph(query: str, ctx: Context) -> dict[str, Any]:
+@log_tool_invocation("query_graph")
+@rate_limit_tool(
+    limiter=lambda: tool_rate_limiter,
+    client_id_extractor=get_client_id_from_context,
+    limit=QUERY_GRAPH_RATE_LIMIT,
+    window=QUERY_GRAPH_RATE_WINDOW,
+    enabled=lambda: tool_rate_limit_enabled,
+    tool_name="query_graph",
+    build_error_response=_build_query_graph_rate_limit_error,
+)
+async def query_graph(query: str, ctx: Context | None = None) -> dict[str, Any]:
     """
     Query the Neo4j graph database using natural language.
 
@@ -612,32 +712,6 @@ async def query_graph(query: str, ctx: Context) -> dict[str, Any]:
     """
     if chain is None or graph is None:
         return {"error": "Neo4j or LangChain not initialized", "success": False}
-
-    # Check rate limit (extract client ID from FastMCP Context)
-    if rate_limit_enabled:
-        client_id = get_client_id_from_context(ctx)
-        is_allowed, rate_info = check_rate_limit(client_id=client_id)
-        if not is_allowed and rate_info is not None:
-            error_msg = f"Rate limit exceeded. Retry after {rate_info.retry_after_seconds:.1f}s"
-            logger.warning(f"Rate limit exceeded for query_graph: {query[:50]}...")
-
-            # Log rate limit violation
-            audit_logger = get_audit_logger()
-            if audit_logger:
-                audit_logger.log_error(
-                    tool="query_graph",
-                    query=query,
-                    error=error_msg,
-                    error_type="rate_limit",
-                )
-
-            return {
-                "error": error_msg,
-                "rate_limited": True,
-                "retry_after_seconds": rate_info.retry_after_seconds,
-                "reset_time": rate_info.reset_time.isoformat(),
-                "success": False,
-            }
 
     # Audit log the query
     audit_logger = get_audit_logger()
@@ -768,7 +842,9 @@ async def query_graph(query: str, ctx: Context) -> dict[str, Any]:
 
 
 async def _execute_cypher_impl(
-    cypher_query: str, ctx: Context, parameters: dict[str, Any | None] | None = None
+    cypher_query: str,
+    ctx: Context | None,
+    parameters: dict[str, Any | None] | None = None,
 ) -> dict[str, Any]:
     """
     Internal implementation of execute_cypher.
@@ -804,32 +880,6 @@ async def _execute_cypher_impl(
     """
     if graph is None:
         return {"error": "Neo4j graph not initialized", "success": False}
-
-    # Check rate limit (extract client ID from FastMCP Context)
-    if rate_limit_enabled:
-        client_id = get_client_id_from_context(ctx)
-        is_allowed, rate_info = check_rate_limit(client_id=client_id)
-        if not is_allowed and rate_info is not None:
-            error_msg = f"Rate limit exceeded. Retry after {rate_info.retry_after_seconds:.1f}s"
-            logger.warning(f"Rate limit exceeded for execute_cypher: {cypher_query[:50]}...")
-
-            # Log rate limit violation
-            audit_logger = get_audit_logger()
-            if audit_logger:
-                audit_logger.log_error(
-                    tool="execute_cypher",
-                    query=cypher_query,
-                    error=error_msg,
-                    error_type="rate_limit",
-                )
-
-            return {
-                "error": error_msg,
-                "rate_limited": True,
-                "retry_after_seconds": rate_info.retry_after_seconds,
-                "reset_time": rate_info.reset_time.isoformat(),
-                "success": False,
-            }
 
     # Sanitize query and parameters (SISO prevention)
     if sanitizer_enabled:
@@ -988,8 +1038,21 @@ async def _execute_cypher_impl(
 # the MCP runtime only after `initialize_neo4j()` runs in `main()`. This
 # ensures `_read_only_mode` is set correctly before deciding whether to
 # expose the tool to MCP clients.
+@mcp.tool()
+@log_tool_invocation("execute_cypher")
+@rate_limit_tool(
+    limiter=lambda: tool_rate_limiter,
+    client_id_extractor=get_client_id_from_context,
+    limit=EXECUTE_CYPHER_RATE_LIMIT,
+    window=EXECUTE_CYPHER_RATE_WINDOW,
+    enabled=lambda: tool_rate_limit_enabled,
+    tool_name="execute_cypher",
+    build_error_response=_build_execute_rate_limit_error,
+)
 async def execute_cypher(
-    cypher_query: str, ctx: Context, parameters: dict[str, Any | None] | None = None
+    cypher_query: str,
+    ctx: Context | None = None,
+    parameters: dict[str, Any | None] | None = None,
 ) -> dict[str, Any]:
     """
     Execute a raw Cypher query against the Neo4j database.
@@ -1003,7 +1066,17 @@ async def execute_cypher(
 
 
 @mcp.tool()
-async def refresh_schema() -> dict[str, Any]:
+@log_tool_invocation("refresh_schema")
+@rate_limit_tool(
+    limiter=lambda: tool_rate_limiter,
+    client_id_extractor=get_client_id_from_context,
+    limit=REFRESH_SCHEMA_RATE_LIMIT,
+    window=REFRESH_SCHEMA_RATE_WINDOW,
+    enabled=lambda: tool_rate_limit_enabled,
+    tool_name="refresh_schema",
+    build_error_response=_build_refresh_schema_rate_limit_error,
+)
+async def refresh_schema(ctx: Context | None = None) -> dict[str, Any]:
     """
     Refresh the cached schema information from the Neo4j database.
 
