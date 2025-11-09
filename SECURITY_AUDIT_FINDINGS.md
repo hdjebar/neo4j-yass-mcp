@@ -1,8 +1,8 @@
 # Security Audit Findings - CRITICAL VULNERABILITIES
 
 **Audit Date:** 2025-11-09
-**Status:** ✅ **CRITICAL ISSUE FIXED** - SecureNeo4jGraph wrapper implemented
-**Coverage:** 87.06% (340 tests passing, 8 tests need updating for new architecture)
+**Status:** ✅ **CRITICAL + HIGH ISSUES FIXED** - SecureNeo4jGraph wrapper + Read-only bypass fixes implemented
+**Coverage:** 84.13% (369 tests passing)
 
 ---
 
@@ -57,11 +57,13 @@ Created [SecureNeo4jGraph](src/neo4j_yass_mcp/secure_graph.py) wrapper that:
 
 ## 🔴 HIGH SEVERITY
 
-### 2. **Read-Only Mode Bypass via Whitespace/Procedures (HIGH)**
+### 2. ✅ **Read-Only Mode Bypass via Whitespace/Procedures (HIGH - FIXED)**
 
-**Location:** [server.py:126-145](src/neo4j_yass_mcp/server.py#L126-L145)
+**Location:** [server.py:129-177](src/neo4j_yass_mcp/server.py#L129-L177)
 
-**Vulnerability:**
+**Status:** ✅ **FIXED** - Regex-based validation with whitespace normalization
+
+**Vulnerability (ORIGINAL):**
 ```python
 def check_read_only_access(cypher: str) -> tuple[bool, str | None]:
     cypher_upper = cypher.upper()
@@ -71,7 +73,7 @@ def check_read_only_access(cypher: str) -> tuple[bool, str | None]:
         if f" {keyword} " in cypher_upper or cypher_upper.startswith(f"{keyword} "):
 ```
 
-**Bypasses:**
+**Bypasses (ORIGINAL):**
 ```cypher
 -- Works (detected):
 MATCH (n) CREATE (m:Node) RETURN m
@@ -86,7 +88,7 @@ LOAD CSV FROM 'file:///etc/passwd'   -- File access
 FOREACH (x in [1,2] | CREATE ...)    -- Iteration with mutation
 ```
 
-**Impact:**
+**Impact (ORIGINAL):**
 - Read-only mode completely bypassable
 - Schema manipulation possible
 - File system access via LOAD CSV
@@ -94,39 +96,49 @@ FOREACH (x in [1,2] | CREATE ...)    -- Iteration with mutation
 
 **Severity:** 🔴 **HIGH** - Complete read-only bypass
 
-**Recommended Fix:**
+**Fix Implemented:**
 ```python
-def check_read_only_access(cypher: str) -> tuple[bool, str | None]:
-    # Normalize whitespace
-    normalized = re.sub(r'\s+', ' ', cypher.strip()).upper()
+def check_read_only_access(cypher_query: str) -> str | None:
+    # Normalize whitespace (collapse tabs, newlines, multiple spaces)
+    normalized = re.sub(r'\s+', ' ', cypher_query.strip()).upper()
 
-    # Check write keywords
-    write_keywords = ["CREATE", "MERGE", "DELETE", "REMOVE", "SET", "DETACH"]
-    for keyword in write_keywords:
-        # Match keyword followed by ANY whitespace or punctuation
-        if re.search(rf'\b{keyword}\b', normalized):
-            return False, f"Blocked: {keyword} operation not allowed in read-only mode"
+    # Check FOREACH and LOAD CSV FIRST (contain write keywords)
+    if re.search(r'\bFOREACH\b', normalized):
+        return "Read-only mode: FOREACH not allowed"
+    if re.search(r'\bLOAD\s+CSV\b', normalized):
+        return "Read-only mode: LOAD CSV not allowed"
 
-    # Check mutating procedures
+    # Check mutating procedures (before write keywords)
     mutating_procedures = [
-        r'\bCALL\s+db\.schema\.',
-        r'\bCALL\s+apoc\.write\.',
-        r'\bCALL\s+apoc\.create\.',
-        r'\bCALL\s+apoc\.merge\.',
-        r'\bCALL\s+apoc\.refactor\.',
+        r'\bCALL\s+DB\.SCHEMA\.',
+        r'\bCALL\s+APOC\.WRITE\.',
+        r'\bCALL\s+APOC\.CREATE\.',
+        r'\bCALL\s+APOC\.MERGE\.',
+        r'\bCALL\s+APOC\.REFACTOR\.',
     ]
     for pattern in mutating_procedures:
-        if re.search(pattern, normalized, re.IGNORECASE):
-            return False, "Blocked: Mutating procedure not allowed in read-only mode"
+        if re.search(pattern, normalized):
+            return "Read-only mode: Mutating procedure not allowed"
 
-    # Check dangerous operations
-    if re.search(r'\bLOAD\s+CSV\b', normalized):
-        return False, "Blocked: LOAD CSV not allowed in read-only mode"
-    if re.search(r'\bFOREACH\b', normalized):
-        return False, "Blocked: FOREACH not allowed in read-only mode"
+    # Check write keywords using word boundaries
+    write_keywords = ["CREATE", "MERGE", "DELETE", "REMOVE", "SET", "DETACH", "DROP"]
+    for keyword in write_keywords:
+        if re.search(rf'\b{keyword}\b', normalized):
+            return f"Read-only mode: {keyword} operations are not allowed"
 
-    return True, None
+    return None
 ```
+
+**Verification:**
+- 30 comprehensive tests in [test_readonly_bypass_fixes.py](tests/unit/test_readonly_bypass_fixes.py)
+- All bypass scenarios now blocked:
+  - ✅ Whitespace bypass (newlines, tabs, multiple spaces)
+  - ✅ No-space bypass (CREATE(node))
+  - ✅ Mutating procedures (CALL apoc.write.*, CALL db.schema.*)
+  - ✅ Dangerous operations (LOAD CSV, FOREACH)
+  - ✅ Case insensitivity (create, DeLeTe)
+- Valid read operations still allowed (MATCH, RETURN, UNWIND, WITH)
+- Word boundary detection prevents false positives (n.created_at allowed)
 
 ---
 
@@ -311,16 +323,16 @@ def get_tokenizer():
 | Severity | Count | Status |
 |----------|-------|--------|
 | ✅ CRITICAL | 1 | **FIXED** - SecureNeo4jGraph implemented |
-| 🔴 HIGH | 1 | Fix before production use |
+| ✅ HIGH | 1 | **FIXED** - Read-only bypass fixed with regex validation |
 | 🟠 MEDIUM | 2 | Fix in next sprint |
 | 🟡 LOW | 2 | Backlog |
 
 ## 🎯 Immediate Actions
 
 1. ✅ **Issue #1 FIXED** - `SecureNeo4jGraph` wrapper implemented with pre-execution validation
-2. **Next: Fix read-only mode bypass** (Issue #2) - Whitespace/procedures/LOAD CSV vulnerabilities
-3. Fix remaining 8 test failures due to new security architecture
-4. Add integration tests for all bypass scenarios
+2. ✅ **Issue #2 FIXED** - Read-only mode bypass fixed with regex-based validation + 30 new tests
+3. **Next: Fix rate limiting** (Issue #3) - Global client_id breaking per-client enforcement
+4. Fix sanitize_error_message case sensitivity (Issue #4)
 5. Document security limitations in README
 
 ## 🔧 Refactoring Recommendations
