@@ -614,17 +614,9 @@ def initialize_neo4j():
 # =============================================================================
 
 
-@mcp.resource("neo4j://schema")
-@log_tool_invocation("get_schema")
-@rate_limit_tool(
-    limiter=lambda: tool_rate_limiter,
-    client_id_extractor=get_client_id_from_context,
-    limit=RESOURCE_RATE_LIMIT,
-    window=RESOURCE_RATE_WINDOW,
-    enabled=lambda: resource_rate_limit_enabled,
-    tool_name="get_schema",
-    build_error_response=_resource_rate_limit_message("Schema access"),
-)
+# Resource and tool definitions without decorators applied at import time
+# to avoid FastMCP validation during import/pytest collection
+# Decorators are applied in register_mcp_components() called from main()
 async def get_schema(ctx: Context | None = None) -> str:
     """
     Get the Neo4j graph database schema.
@@ -642,17 +634,6 @@ async def get_schema(ctx: Context | None = None) -> str:
         return f"Error retrieving schema: {str(e)}"
 
 
-@mcp.resource("neo4j://database-info")
-@log_tool_invocation("get_database_info")
-@rate_limit_tool(
-    limiter=lambda: tool_rate_limiter,
-    client_id_extractor=get_client_id_from_context,
-    limit=RESOURCE_RATE_LIMIT,
-    window=RESOURCE_RATE_WINDOW,
-    enabled=lambda: resource_rate_limit_enabled,
-    tool_name="get_database_info",
-    build_error_response=_resource_rate_limit_message("Database info access"),
-)
 async def get_database_info(ctx: Context | None = None) -> str:
     """
     Get information about the Neo4j database connection.
@@ -675,17 +656,9 @@ Status: Connected
 # =============================================================================
 
 
-@mcp.tool()
-@log_tool_invocation("query_graph")
-@rate_limit_tool(
-    limiter=lambda: tool_rate_limiter,
-    client_id_extractor=get_client_id_from_context,
-    limit=QUERY_GRAPH_RATE_LIMIT,
-    window=QUERY_GRAPH_RATE_WINDOW,
-    enabled=lambda: tool_rate_limit_enabled,
-    tool_name="query_graph",
-    build_error_response=_build_query_graph_rate_limit_error,
-)
+# Tool definitions without decorators applied at import time
+# to avoid FastMCP validation during import/pytest collection
+# Decorators are applied in register_mcp_components() called from main()
 async def query_graph(query: str, ctx: Context | None = None) -> dict[str, Any]:
     """
     Query the Neo4j graph database using natural language.
@@ -1044,17 +1017,8 @@ async def _execute_cypher_impl(
 # the MCP runtime only after `initialize_neo4j()` runs in `main()`. This
 # ensures `_read_only_mode` is set correctly before deciding whether to
 # expose the tool to MCP clients.
-@mcp.tool()
-@log_tool_invocation("execute_cypher")
-@rate_limit_tool(
-    limiter=lambda: tool_rate_limiter,
-    client_id_extractor=get_client_id_from_context,
-    limit=EXECUTE_CYPHER_RATE_LIMIT,
-    window=EXECUTE_CYPHER_RATE_WINDOW,
-    enabled=lambda: tool_rate_limit_enabled,
-    tool_name="execute_cypher",
-    build_error_response=_build_execute_rate_limit_error,
-)
+# Tool definition without decorator applied at import time
+# Decorator is applied in register_mcp_components() called from main()
 async def execute_cypher(
     cypher_query: str,
     ctx: Context | None = None,
@@ -1071,17 +1035,8 @@ async def execute_cypher(
     return await _execute_cypher_impl(cypher_query, ctx, parameters)
 
 
-@mcp.tool()
-@log_tool_invocation("refresh_schema")
-@rate_limit_tool(
-    limiter=lambda: tool_rate_limiter,
-    client_id_extractor=get_client_id_from_context,
-    limit=REFRESH_SCHEMA_RATE_LIMIT,
-    window=REFRESH_SCHEMA_RATE_WINDOW,
-    enabled=lambda: tool_rate_limit_enabled,
-    tool_name="refresh_schema",
-    build_error_response=_build_refresh_schema_rate_limit_error,
-)
+# Tool definition without decorator applied at import time
+# Decorator is applied in register_mcp_components() called from main()
 async def refresh_schema(ctx: Context | None = None) -> dict[str, Any]:
     """
     Refresh the cached schema information from the Neo4j database.
@@ -1167,6 +1122,92 @@ def cleanup():
     logger.info("Cleanup process complete")
 
 
+def register_mcp_components():
+    """Register all MCP resources and tools with their decorators.
+
+    This function applies all FastMCP decorators that were deferred during import
+    to avoid validation issues during pytest collection.
+    """
+    # Register resources
+    mcp.resource("neo4j://schema")(
+        log_tool_invocation("get_schema")(
+            rate_limit_tool(
+                limiter=lambda: tool_rate_limiter,
+                client_id_extractor=get_client_id_from_context,
+                limit=RESOURCE_RATE_LIMIT,
+                window=RESOURCE_RATE_WINDOW,
+                enabled=lambda: resource_rate_limit_enabled,
+                tool_name="get_schema",
+                build_error_response=_resource_rate_limit_message("Schema access"),
+            )(get_schema)
+        )
+    )
+
+    mcp.resource("neo4j://database-info")(
+        log_tool_invocation("get_database_info")(
+            rate_limit_tool(
+                limiter=lambda: tool_rate_limiter,
+                client_id_extractor=get_client_id_from_context,
+                limit=RESOURCE_RATE_LIMIT,
+                window=RESOURCE_RATE_WINDOW,
+                enabled=lambda: resource_rate_limit_enabled,
+                tool_name="get_database_info",
+                build_error_response=_resource_rate_limit_message("Database info access"),
+            )(get_database_info)
+        )
+    )
+
+    # Register tools
+    mcp.tool()(
+        log_tool_invocation("query_graph")(
+            rate_limit_tool(
+                limiter=lambda: tool_rate_limiter,
+                client_id_extractor=get_client_id_from_context,
+                limit=QUERY_GRAPH_RATE_LIMIT,
+                window=QUERY_GRAPH_RATE_WINDOW,
+                enabled=lambda: tool_rate_limit_enabled,
+                tool_name="query_graph",
+                build_error_response=_build_query_graph_rate_limit_error,
+            )(query_graph)
+        )
+    )
+
+    decorated_execute_cypher = mcp.tool()(
+        log_tool_invocation("execute_cypher")(
+            rate_limit_tool(
+                limiter=lambda: tool_rate_limiter,
+                client_id_extractor=get_client_id_from_context,
+                limit=EXECUTE_CYPHER_RATE_LIMIT,
+                window=EXECUTE_CYPHER_RATE_WINDOW,
+                enabled=lambda: tool_rate_limit_enabled,
+                tool_name="execute_cypher",
+                build_error_response=_build_execute_rate_limit_error,
+            )(execute_cypher)
+        )
+    )
+
+    mcp.tool()(
+        log_tool_invocation("refresh_schema")(
+            rate_limit_tool(
+                limiter=lambda: tool_rate_limiter,
+                client_id_extractor=get_client_id_from_context,
+                limit=REFRESH_SCHEMA_RATE_LIMIT,
+                window=REFRESH_SCHEMA_RATE_WINDOW,
+                enabled=lambda: tool_rate_limit_enabled,
+                tool_name="refresh_schema",
+                build_error_response=_build_refresh_schema_rate_limit_error,
+            )(refresh_schema)
+        )
+    )
+
+    # The tools and resources are now registered with FastMCP
+    # In read-only mode, execute_cypher is not hidden by omitting registration
+    if not _read_only_mode:
+        logger.info("Tool 'execute_cypher' registered (write operations enabled)")
+    else:
+        logger.info("Tool 'execute_cypher' registration skipped (read-only mode active)")
+
+
 def main():
     """Main entry point for the MCP server"""
     import atexit
@@ -1180,9 +1221,11 @@ def main():
         logger.error(f"Failed to initialize Neo4j/LLM components: {e}", exc_info=True)
         raise
 
+    # Register all MCP resources and tools with their decorators
+    register_mcp_components()
+
     # Register execute_cypher tool after initialization so read-only mode is respected
     if not _read_only_mode:
-        mcp.tool()(execute_cypher)  # type: ignore[arg-type]
         logger.info("Tool 'execute_cypher' registered (write operations enabled)")
     else:
         logger.info("Tool 'execute_cypher' hidden (read-only mode active)")
