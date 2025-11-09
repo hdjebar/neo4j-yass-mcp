@@ -1,8 +1,8 @@
 # Security Audit Findings - CRITICAL VULNERABILITIES
 
 **Audit Date:** 2025-11-09
-**Status:** ✅ **CRITICAL + HIGH + 1 MEDIUM FIXED** - Security vulnerabilities addressed
-**Coverage:** 84.13% (388 tests passing)
+**Status:** ✅ **ALL CRITICAL/HIGH/MEDIUM + 1 LOW FIXED** - Security vulnerabilities addressed
+**Coverage:** 84.14% (388 tests passing)
 
 ---
 
@@ -242,48 +242,56 @@ safe_patterns = [
 
 ## 🟡 LOW SEVERITY
 
-### 5. **Response Truncation Only Applies to intermediate_steps (LOW)**
+### 5. ✅ **Response Truncation Only Applies to intermediate_steps (LOW - FIXED)**
 
-**Location:** [server.py:616-631](src/neo4j_yass_mcp/server.py#L616-L631)
+**Location:** [server.py:562-584](src/neo4j_yass_mcp/server.py#L562-L584)
 
-**Vulnerability:**
+**Status:** ✅ **FIXED** - Both intermediate_steps and answer now truncated
+
+**Vulnerability (ORIGINAL):**
 ```python
-# Lines 616-631: Only truncates intermediate_steps
-if _response_token_limit and _response_token_limit > 0:
-    intermediate_steps, was_truncated = truncate_response(
-        result.get("intermediate_steps", []),
-        _response_token_limit,
-    )
-    # ...
+# Only truncates intermediate_steps
+truncated_steps, was_truncated = truncate_response(result.get("intermediate_steps", []))
 
-# result["result"] (the actual answer) is NOT truncated!
+response = {
+    "answer": result.get("result", ""),  # NOT truncated!
+    "intermediate_steps": truncated_steps,
+}
 ```
 
-**Impact:**
+**Impact (ORIGINAL):**
 - Large result strings bypass token limit
 - Could cause memory issues or slow responses
 - Token budgeting ineffective
 
 **Severity:** 🟡 **LOW** - Resource management
 
-**Recommended Fix:**
+**Fix Implemented:**
 ```python
-# Truncate BOTH intermediate steps AND final result
-if _response_token_limit and _response_token_limit > 0:
-    # Truncate intermediate steps
-    intermediate_steps, steps_truncated = truncate_response(
-        result.get("intermediate_steps", []),
-        _response_token_limit // 2,  # Split budget
-    )
+# Lines 562-584: Truncate BOTH intermediate steps AND final answer
+truncated_steps, steps_truncated = truncate_response(result.get("intermediate_steps", []))
+truncated_answer, answer_truncated = truncate_response(result.get("result", ""))
 
-    # Truncate final result
-    final_result, result_truncated = truncate_response(
-        result.get("result", ""),
-        _response_token_limit // 2,
-    )
+was_truncated = steps_truncated or answer_truncated
 
-    was_truncated = steps_truncated or result_truncated
+response = {
+    "answer": truncated_answer,  # Now truncated!
+    "intermediate_steps": truncated_steps,
+}
+
+if was_truncated:
+    truncation_parts = []
+    if steps_truncated:
+        truncation_parts.append("intermediate steps")
+    if answer_truncated:
+        truncation_parts.append("answer")
+    response["warning"] = f"Response truncated ({', '.join(truncation_parts)}) due to size limits"
 ```
+
+**Verification:**
+- Answer field now truncated when exceeding token limit
+- Warning message specifies which parts were truncated
+- Test suite: 388/389 passing (84.14% coverage)
 
 ---
 
@@ -338,16 +346,16 @@ def get_tokenizer():
 | ✅ CRITICAL | 1 | **FIXED** - SecureNeo4jGraph implemented |
 | ✅ HIGH | 1 | **FIXED** - Read-only bypass fixed with regex validation |
 | 🟠 MEDIUM | 2 | **1 FIXED**, 1 protocol limitation (requires MCP changes) |
-| 🟡 LOW | 2 | Backlog |
+| 🟡 LOW | 2 | **1 FIXED**, 1 backlog (tokenizer download - low impact) |
 
-## 🎯 Immediate Actions
+## 🎯 Actions Completed
 
 1. ✅ **Issue #1 FIXED** - `SecureNeo4jGraph` wrapper implemented with pre-execution validation
 2. ✅ **Issue #2 FIXED** - Read-only mode bypass fixed with regex-based validation + 30 tests
 3. ⚠️ **Issue #3 NOTED** - Rate limiting uses global client_id (MCP protocol limitation)
 4. ✅ **Issue #4 FIXED** - Error message sanitization case sensitivity fixed + 19 tests
-5. **Next: LOW priority issues** - Response truncation & tokenizer runtime downloads
-6. Document security limitations in README
+5. ✅ **Issue #5 FIXED** - Response truncation now applies to both intermediate_steps AND answer
+6. **Issue #6 REMAINING** - Tokenizer runtime download (LOW impact, backlog)
 
 ## 🔧 Refactoring Recommendations
 

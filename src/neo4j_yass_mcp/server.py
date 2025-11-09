@@ -559,12 +559,15 @@ async def query_graph(query: str) -> dict[str, Any]:
                 if isinstance(first_step, dict) and "query" in first_step:
                     generated_cypher = first_step["query"]
 
-        # Apply response size limiting to intermediate steps
-        truncated_steps, was_truncated = truncate_response(result.get("intermediate_steps", []))
+        # Apply response size limiting to both intermediate steps AND final answer
+        truncated_steps, steps_truncated = truncate_response(result.get("intermediate_steps", []))
+        truncated_answer, answer_truncated = truncate_response(result.get("result", ""))
+
+        was_truncated = steps_truncated or answer_truncated
 
         response = {
             "question": query,
-            "answer": result.get("result", ""),
+            "answer": truncated_answer,
             "generated_cypher": generated_cypher,
             "intermediate_steps": truncated_steps,
             "success": True,
@@ -572,8 +575,13 @@ async def query_graph(query: str) -> dict[str, Any]:
 
         if was_truncated:
             response["truncated"] = True
-            response["warning"] = "Intermediate steps were truncated due to size limits"
-            logger.info("query_graph response truncated due to size limits")
+            truncation_parts = []
+            if steps_truncated:
+                truncation_parts.append("intermediate steps")
+            if answer_truncated:
+                truncation_parts.append("answer")
+            response["warning"] = f"Response truncated ({', '.join(truncation_parts)}) due to size limits"
+            logger.info(f"query_graph response truncated: {', '.join(truncation_parts)}")
 
         # Audit log the response
         if audit_logger:
