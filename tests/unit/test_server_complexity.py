@@ -34,7 +34,8 @@ class TestComplexityLimitEnforcement:
         from neo4j_yass_mcp import server
 
         # Setup: Complexity exceeded
-        complexity_score = ComplexityScore(is_within_limit=False,
+        complexity_score = ComplexityScore(
+            is_within_limit=False,
             total_score=150,
             max_allowed=100,
             breakdown={"matches": 50, "relationships": 100},
@@ -64,7 +65,9 @@ class TestComplexityLimitEnforcement:
 
         try:
             # Call query_graph
-            result = await server.query_graph.fn(query="Show me everything connected", ctx=create_mock_context())
+            result = await server.query_graph.fn(
+                query="Show me everything connected", ctx=create_mock_context()
+            )
 
             # Verify complexity block response
             assert result["success"] is False
@@ -85,14 +88,13 @@ class TestComplexityLimitEnforcement:
     @pytest.mark.asyncio
     @patch("neo4j_yass_mcp.server.check_query_complexity")
     @patch("neo4j_yass_mcp.server.get_audit_logger")
-    async def test_execute_cypher_complexity_exceeded(
-        self, mock_get_audit, mock_check_complexity
-    ):
+    async def test_execute_cypher_complexity_exceeded(self, mock_get_audit, mock_check_complexity):
         """Lines 760-785: Test execute_cypher blocks complex queries"""
         from neo4j_yass_mcp import server
 
         # Setup: Complexity exceeded
-        complexity_score = ComplexityScore(is_within_limit=False,
+        complexity_score = ComplexityScore(
+            is_within_limit=False,
             total_score=200,
             max_allowed=100,
             breakdown={"variable_length_paths": 150, "cartesian_products": 50},
@@ -116,7 +118,9 @@ class TestComplexityLimitEnforcement:
         try:
             # Call execute_cypher with complex query
             complex_query = "MATCH (n)-[r*1..20]->(m) RETURN n, r, m"
-            result = await server.execute_cypher.fn(cypher_query=complex_query, ctx=create_mock_context())
+            result = await server.execute_cypher.fn(
+                cypher_query=complex_query, ctx=create_mock_context()
+            )
 
             # Verify complexity block response
             assert result["success"] is False
@@ -167,7 +171,9 @@ class TestComplexityLimitEnforcement:
 
         try:
             # Call query_graph
-            result = await server.query_graph.fn(query="Show me 10 people", ctx=create_mock_context())
+            result = await server.query_graph.fn(
+                query="Show me 10 people", ctx=create_mock_context()
+            )
 
             # Verify it proceeded past complexity check
             assert result["success"] is True
@@ -194,7 +200,9 @@ class TestComplexityLimitEnforcement:
 
         try:
             # Call execute_cypher
-            result = await server.execute_cypher.fn(cypher_query="MATCH (n) RETURN n LIMIT 1", ctx=create_mock_context())
+            result = await server.execute_cypher.fn(
+                cypher_query="MATCH (n) RETURN n LIMIT 1", ctx=create_mock_context()
+            )
 
             # Verify complexity check was NOT called
             mock_check_complexity.assert_not_called()
@@ -222,7 +230,9 @@ class TestComplexityLimitEnforcement:
 
         try:
             # Call execute_cypher
-            result = await server.execute_cypher.fn(cypher_query="MATCH (n) RETURN n", ctx=create_mock_context())
+            result = await server.execute_cypher.fn(
+                cypher_query="MATCH (n) RETURN n", ctx=create_mock_context()
+            )
 
             # Verify error response handles None score
             assert result["success"] is False

@@ -985,7 +985,7 @@ class TestEdgeCases:
         # Create a query with many zero-width characters that will be removed
         # Using zero-width space (U+200B) - caught earlier by zero-width check
         # So the assertion should check for zero-width character message
-        query = "MATCH" + "\u200B" * 50 + " (n) RETURN n"  # 50 zero-width spaces
+        query = "MATCH" + "\u200b" * 50 + " (n) RETURN n"  # 50 zero-width spaces
 
         is_safe, error, warnings = sanitizer.sanitize_query(query)
 

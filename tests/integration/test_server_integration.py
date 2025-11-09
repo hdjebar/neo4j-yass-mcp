@@ -160,7 +160,9 @@ class TestEndToEndQueryFlow:
                     with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
                         from neo4j_yass_mcp.server import query_graph
 
-                        result = await query_graph.fn("How old is John Doe?", ctx=create_mock_context())
+                        result = await query_graph.fn(
+                            "How old is John Doe?", ctx=create_mock_context()
+                        )
 
                         # Verify result structure
                         assert result["success"] is True
@@ -200,7 +202,9 @@ class TestEndToEndQueryFlow:
                     with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
                         from neo4j_yass_mcp.server import query_graph
 
-                        result = await query_graph.fn("Show me the apoc count function", ctx=create_mock_context())
+                        result = await query_graph.fn(
+                            "Show me the apoc count function", ctx=create_mock_context()
+                        )
 
                         # Should succeed but with warnings logged
                         assert result["success"] is True
@@ -346,7 +350,9 @@ class TestResponseTruncationIntegration:
                 with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
                     from neo4j_yass_mcp.server import execute_cypher
 
-                    result = await execute_cypher.fn("MATCH (n) RETURN n", ctx=create_mock_context())
+                    result = await execute_cypher.fn(
+                        "MATCH (n) RETURN n", ctx=create_mock_context()
+                    )
 
                     # Verify truncation
                     assert result["success"] is True

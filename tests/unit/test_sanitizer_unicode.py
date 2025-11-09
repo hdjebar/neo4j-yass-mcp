@@ -39,10 +39,12 @@ class TestUnicodeNormalizationShrinkage:
         # We're testing that the code path exists and doesn't crash
         if not is_safe and error_msg:
             # If blocked, verify it's for a Unicode-related reason
-            assert ("problematic Unicode" in error_msg or
-                    "normalization" in error_msg or
-                    "character" in error_msg or
-                    "UTF" in error_msg)
+            assert (
+                "problematic Unicode" in error_msg
+                or "normalization" in error_msg
+                or "character" in error_msg
+                or "UTF" in error_msg
+            )
 
 
 class TestConfusablesDetection:
@@ -113,10 +115,12 @@ class TestUTF8EncodingValidation:
             assert is_safe is False
             assert error_msg is not None
             # Accept either confusables OR UTF-8 encoding error
-            assert ("utf-8" in error_msg.lower() or
-                    "encoding" in error_msg.lower() or
-                    "confusable" in error_msg.lower() or
-                    "homograph" in error_msg.lower())
+            assert (
+                "utf-8" in error_msg.lower()
+                or "encoding" in error_msg.lower()
+                or "confusable" in error_msg.lower()
+                or "homograph" in error_msg.lower()
+            )
         except UnicodeEncodeError:
             # Some Python versions may raise this earlier
             pytest.skip("Python version handles surrogates differently")
@@ -134,10 +138,12 @@ class TestUTF8EncodingValidation:
             assert is_safe is False
             assert error_msg is not None
             # Accept either confusables OR UTF-8 encoding error
-            assert ("utf-8" in error_msg.lower() or
-                    "encoding" in error_msg.lower() or
-                    "confusable" in error_msg.lower() or
-                    "homograph" in error_msg.lower())
+            assert (
+                "utf-8" in error_msg.lower()
+                or "encoding" in error_msg.lower()
+                or "confusable" in error_msg.lower()
+                or "homograph" in error_msg.lower()
+            )
         except UnicodeEncodeError:
             pytest.skip("Python version handles surrogates differently")
 

@@ -2,7 +2,7 @@
 Tests for decorator-based rate limiting on MCP tools.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, Mock, PropertyMock, patch
 
 import pytest
@@ -22,7 +22,7 @@ class TestRateLimitDecorators:
     """Test the rate limiting decorators applied to MCP tools."""
 
     def _rate_info(self, retry_after: float) -> dict:
-        reset = datetime.now(tz=timezone.utc).timestamp() + retry_after
+        reset = datetime.now(tz=UTC).timestamp() + retry_after
         return {
             "requests_remaining": 0,
             "reset_time": reset,
@@ -77,7 +77,7 @@ class TestRateLimitDecorators:
                 True,
                 {
                     "requests_remaining": 5,
-                    "reset_time": datetime.now(tz=timezone.utc).timestamp() + 60,
+                    "reset_time": datetime.now(tz=UTC).timestamp() + 60,
                     "retry_after": 0.0,
                     "limit": 10,
                     "window": 60,
@@ -120,7 +120,9 @@ class TestRateLimitDecorators:
                 "check_and_record",
                 AsyncMock(return_value=(True, {})),
             ) as mock_check:
-                result = await server.query_graph.fn(query="Show me nodes", ctx=create_mock_context())
+                result = await server.query_graph.fn(
+                    query="Show me nodes", ctx=create_mock_context()
+                )
 
             assert result["success"] is True
             mock_check.assert_not_called()

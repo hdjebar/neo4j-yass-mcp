@@ -639,9 +639,7 @@ class TestEdgeCases:
         logger = AuditLogger(enabled=True, log_dir=temp_log_dir, log_format="text")
 
         # Log an error
-        logger.log_error(
-            tool="test_tool", query="MATCH (n) RETURN n", error="Test error message"
-        )
+        logger.log_error(tool="test_tool", query="MATCH (n) RETURN n", error="Test error message")
 
         # Read the log file
         log_files = list(Path(temp_log_dir).glob("audit_*.log"))

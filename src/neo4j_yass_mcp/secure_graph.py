@@ -68,7 +68,12 @@ class SecureNeo4jGraph(Neo4jGraph):
         )
         logger.info(f"  - Read-only mode: {'ENABLED' if read_only_mode else 'DISABLED'}")
 
-    def query(self, query: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    def query(
+        self,
+        query: str,
+        params: dict[Any, Any] | None = None,
+        session_params: dict[Any, Any] | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Execute a Cypher query with security checks BEFORE execution.
 
@@ -130,4 +135,9 @@ class SecureNeo4jGraph(Neo4jGraph):
 
         # ALL SECURITY CHECKS PASSED - Execute query
         logger.debug("All security checks passed, executing query")
-        return super().query(query, params)
+        # Call parent with appropriate arguments - pass only what's expected
+        if session_params is not None:
+            return super().query(query, params or {}, session_params)
+        else:
+            # If session_params is None, call with only the first two arguments (default in parent)
+            return super().query(query, params or {})

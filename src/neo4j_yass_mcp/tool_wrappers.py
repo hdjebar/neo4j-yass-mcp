@@ -13,8 +13,9 @@ import asyncio
 import logging
 import time
 from collections import defaultdict
+from collections.abc import Callable, Coroutine
 from functools import wraps
-from typing import Any, Awaitable, Callable, Coroutine
+from typing import Any
 
 from fastmcp import Context
 
@@ -93,9 +94,7 @@ def log_tool_invocation(tool_name: str) -> Callable:
             try:
                 result = await func(*args, **kwargs)
             except Exception:
-                logger.exception(
-                    "Tool '%s' raised exception (client=%s)", tool_name, client_label
-                )
+                logger.exception("Tool '%s' raised exception (client=%s)", tool_name, client_label)
                 raise
 
             duration_ms = (time.perf_counter() - start) * 1000

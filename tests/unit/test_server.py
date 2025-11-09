@@ -50,7 +50,9 @@ class TestQueryGraph:
                 with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
                     from neo4j_yass_mcp.server import query_graph
 
-                    result = await query_graph.fn("Who starred in Top Gun?", ctx=create_mock_context())
+                    result = await query_graph.fn(
+                        "Who starred in Top Gun?", ctx=create_mock_context()
+                    )
 
                     assert result["success"] is True
                     assert "Tom Cruise" in result["answer"]
@@ -82,7 +84,9 @@ class TestQueryGraph:
                     with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
                         from neo4j_yass_mcp.server import query_graph
 
-                        result = await query_graph.fn("Load system files", ctx=create_mock_context())
+                        result = await query_graph.fn(
+                            "Load system files", ctx=create_mock_context()
+                        )
 
                         # Should fail due to sanitizer
                         assert result["success"] is False
@@ -131,7 +135,9 @@ class TestExecuteCypher:
         with patch("neo4j_yass_mcp.server.graph", None):
             from neo4j_yass_mcp.server import execute_cypher
 
-            result = await execute_cypher.fn("MATCH (n) RETURN n LIMIT 1", ctx=create_mock_context())
+            result = await execute_cypher.fn(
+                "MATCH (n) RETURN n LIMIT 1", ctx=create_mock_context()
+            )
 
             assert result["success"] is False
             assert "not initialized" in result["error"].lower()
@@ -143,7 +149,9 @@ class TestExecuteCypher:
             with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
                 from neo4j_yass_mcp.server import execute_cypher
 
-                result = await execute_cypher.fn("MATCH (n:Movie) RETURN n.title LIMIT 1", ctx=create_mock_context())
+                result = await execute_cypher.fn(
+                    "MATCH (n:Movie) RETURN n.title LIMIT 1", ctx=create_mock_context()
+                )
 
                 assert result["success"] is True
                 assert "result" in result
@@ -158,7 +166,9 @@ class TestExecuteCypher:
 
                 params = {"title": "Top Gun", "year": 1986}
                 result = await execute_cypher.fn(
-                    "MATCH (m:Movie {title: $title}) RETURN m", parameters=params, ctx=create_mock_context()
+                    "MATCH (m:Movie {title: $title}) RETURN m",
+                    parameters=params,
+                    ctx=create_mock_context(),
                 )
 
                 assert result["success"] is True
@@ -173,7 +183,9 @@ class TestExecuteCypher:
                     from neo4j_yass_mcp.server import execute_cypher
 
                     # Try to execute a write query
-                    result = await execute_cypher.fn("CREATE (n:Test) RETURN n", ctx=create_mock_context())
+                    result = await execute_cypher.fn(
+                        "CREATE (n:Test) RETURN n", ctx=create_mock_context()
+                    )
 
                     assert "error" in result
                     assert "read-only" in result["error"].lower()
@@ -187,7 +199,9 @@ class TestExecuteCypher:
                     from neo4j_yass_mcp.server import execute_cypher
 
                     # Unsafe query - use a clearly dangerous pattern
-                    result = await execute_cypher.fn("LOAD CSV FROM 'file.csv' AS line RETURN line", ctx=create_mock_context())
+                    result = await execute_cypher.fn(
+                        "LOAD CSV FROM 'file.csv' AS line RETURN line", ctx=create_mock_context()
+                    )
 
                     assert result["success"] is False
                     assert (
@@ -695,7 +709,9 @@ class TestAuditLoggerIntegration:
         # Chain raises ValueError (what SecureNeo4jGraph does on read-only violation)
         write_chain = Mock()
         write_chain.invoke = Mock(
-            side_effect=ValueError("Query blocked in read-only mode: CREATE operations are not allowed")
+            side_effect=ValueError(
+                "Query blocked in read-only mode: CREATE operations are not allowed"
+            )
         )
 
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
@@ -741,7 +757,9 @@ class TestAuditLoggerIntegration:
                 ):
                     from neo4j_yass_mcp.server import execute_cypher
 
-                    await execute_cypher.fn("LOAD CSV FROM 'file.csv' AS line RETURN line", ctx=create_mock_context())
+                    await execute_cypher.fn(
+                        "LOAD CSV FROM 'file.csv' AS line RETURN line", ctx=create_mock_context()
+                    )
 
                     # Verify error was logged
                     mock_audit_logger.log_error.assert_called_once()
@@ -785,7 +803,9 @@ class TestResponseTruncation:
                 ):
                     from neo4j_yass_mcp.server import execute_cypher
 
-                    result = await execute_cypher.fn("MATCH (n) RETURN n", ctx=create_mock_context())
+                    result = await execute_cypher.fn(
+                        "MATCH (n) RETURN n", ctx=create_mock_context()
+                    )
 
                     # Should include truncation metadata
                     assert result.get("truncated") is True
@@ -836,7 +856,9 @@ class TestSanitizerWarnings:
 
                         from neo4j_yass_mcp.server import execute_cypher
 
-                        result = await execute_cypher.fn("MATCH (n)-->(m) RETURN n, m", ctx=create_mock_context())
+                        result = await execute_cypher.fn(
+                            "MATCH (n)-->(m) RETURN n, m", ctx=create_mock_context()
+                        )
 
                         # Query should succeed but log warnings
                         assert result["success"] is True

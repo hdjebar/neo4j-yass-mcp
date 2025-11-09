@@ -18,25 +18,30 @@ import logging
 import os
 import re
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
 
 from dotenv import load_dotenv
 from fastmcp import Context, FastMCP
 from langchain_neo4j import GraphCypherQAChain
 
-# Tokenizer imports - try tiktoken first (no download), fallback to tokenizers
+# Tokenizer imports - try Hugging Face tokenizers first (handles most models)
 try:
-    import tiktoken
-    TOKENIZER_BACKEND = "tiktoken"
+    from tokenizers import Tokenizer
+
+    TOKENIZER_BACKEND = "tokenizers"
+    Tokenizer = Tokenizer  # Keep reference
 except ImportError:
-    tiktoken = None
+    Tokenizer = None  # type: ignore[assignment]
+    TOKENIZER_BACKEND = "fallback"
     try:
-        from tokenizers import Tokenizer
-        TOKENIZER_BACKEND = "tokenizers"
+        import tiktoken  # fallback to tiktoken
+
+        TOKENIZER_BACKEND = "tiktoken"
     except ImportError:
-        Tokenizer = None
+        tiktoken = None  # type: ignore[assignment]
         TOKENIZER_BACKEND = "fallback"
 
 from neo4j_yass_mcp.config import (
@@ -127,7 +132,7 @@ RESOURCE_RATE_WINDOW = int(os.getenv("MCP_RESOURCE_WINDOW", "60"))
 
 def _format_reset_time(timestamp: float) -> str:
     """Convert a UNIX timestamp to ISO 8601."""
-    return datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
+    return datetime.fromtimestamp(timestamp, tz=UTC).isoformat()
 
 
 def _build_query_graph_rate_limit_error(info: dict[str, Any]) -> dict[str, Any]:
@@ -175,6 +180,7 @@ def _resource_rate_limit_message(resource_label: str) -> Callable[[dict[str, Any
         )
 
     return builder
+
 
 # Initialize FastMCP server
 mcp = FastMCP("neo4j-yass-mcp", version="1.1.0")
@@ -274,24 +280,24 @@ def check_read_only_access(cypher_query: str) -> str | None:
         return None
 
     # Normalize whitespace (collapse tabs, newlines, multiple spaces into single space)
-    normalized = re.sub(r'\s+', ' ', cypher_query.strip()).upper()
+    normalized = re.sub(r"\s+", " ", cypher_query.strip()).upper()
 
     # Check for dangerous operations FIRST (before write keywords)
     # FOREACH and procedures often contain write keywords, so check them first
-    if re.search(r'\bFOREACH\b', normalized):
+    if re.search(r"\bFOREACH\b", normalized):
         return "Read-only mode: FOREACH not allowed"
 
-    if re.search(r'\bLOAD\s+CSV\b', normalized):
+    if re.search(r"\bLOAD\s+CSV\b", normalized):
         return "Read-only mode: LOAD CSV not allowed"
 
     # Check for mutating procedures (before write keywords)
     # These procedures can modify the database even without explicit write keywords
     mutating_procedures = [
-        r'\bCALL\s+DB\.SCHEMA\.',
-        r'\bCALL\s+APOC\.WRITE\.',
-        r'\bCALL\s+APOC\.CREATE\.',
-        r'\bCALL\s+APOC\.MERGE\.',
-        r'\bCALL\s+APOC\.REFACTOR\.',
+        r"\bCALL\s+DB\.SCHEMA\.",
+        r"\bCALL\s+APOC\.WRITE\.",
+        r"\bCALL\s+APOC\.CREATE\.",
+        r"\bCALL\s+APOC\.MERGE\.",
+        r"\bCALL\s+APOC\.REFACTOR\.",
     ]
     for pattern in mutating_procedures:
         if re.search(pattern, normalized):
@@ -301,7 +307,7 @@ def check_read_only_access(cypher_query: str) -> str | None:
     # \b ensures we match whole words, not parts of identifiers
     write_keywords = ["CREATE", "MERGE", "DELETE", "REMOVE", "SET", "DETACH", "DROP"]
     for keyword in write_keywords:
-        if re.search(rf'\b{keyword}\b', normalized):
+        if re.search(rf"\b{keyword}\b", normalized):
             return f"Read-only mode: {keyword} operations are not allowed"
 
     return None
@@ -312,8 +318,8 @@ def get_tokenizer() -> Any:
     Get or create tokenizer for token estimation.
 
     Tries multiple backends in order of preference:
-    1. tiktoken (fast, no download needed)
-    2. tokenizers with local_files_only (no network call)
+    1. tokenizers (Hugging Face, handles most models)
+    2. tiktoken (fast, no download needed)
     3. None (graceful degradation to character-based estimation)
 
     Returns:
@@ -321,16 +327,7 @@ def get_tokenizer() -> Any:
     """
     global _tokenizer
     if _tokenizer is None:
-        # Try tiktoken first (no download needed)
-        if tiktoken is not None:
-            try:
-                logger.info("Initializing tiktoken tokenizer (gpt2)")
-                _tokenizer = tiktoken.get_encoding("gpt2")
-                return _tokenizer
-            except Exception as e:
-                logger.warning(f"tiktoken initialization failed: {e}, trying next backend")
-
-        # Fall back to tokenizers with local cache only
+        # Try Hugging Face tokenizers first (handles most models including GPT-2, GPT-3, Llama, etc.)
         if Tokenizer is not None:
             try:
                 logger.info("Initializing Hugging Face tokenizer (gpt2, local files only)")
@@ -338,12 +335,19 @@ def get_tokenizer() -> Any:
                 return _tokenizer
             except Exception as e:
                 logger.warning(
-                    f"Tokenizer initialization failed (local_files_only): {e}. "
-                    "Using fallback character-based estimation (4 chars per token). "
-                    "Run 'python -c \"from tokenizers import Tokenizer; Tokenizer.from_pretrained('gpt2')\"' "
+                    f"Hugging Face tokenizer initialization failed (local_files_only): {e}, trying next backend. "
+                    "Consider running 'python -c \"from tokenizers import Tokenizer; Tokenizer.from_pretrained('gpt2')\"' "
                     "to download tokenizer data."
                 )
-                _tokenizer = None  # Will use fallback estimation
+
+        # Fall back to tiktoken (fast, no download needed)
+        if tiktoken is not None and _tokenizer is None:
+            try:
+                logger.info("Initializing tiktoken tokenizer (gpt2)")
+                _tokenizer = tiktoken.get_encoding("gpt2")
+                return _tokenizer
+            except Exception as e:
+                logger.warning(f"tiktoken initialization failed: {e}, using fallback")
 
         # If both failed, use None to signal fallback mode
         if _tokenizer is None:
@@ -358,7 +362,7 @@ def estimate_tokens(text: str) -> int:
     """
     Estimate token count for a text string using available tokenizer backend.
 
-    Tries backends in order: tiktoken, tokenizers, character-based fallback.
+    Tries backends in order: tokenizers (Hugging Face), tiktoken, character-based fallback.
 
     Args:
         text: The text to estimate tokens for
@@ -621,7 +625,7 @@ def initialize_neo4j():
     tool_name="get_schema",
     build_error_response=_resource_rate_limit_message("Schema access"),
 )
-async def get_schema(ctx: Context = None) -> str:
+async def get_schema(ctx: Context | None = None) -> str:
     """
     Get the Neo4j graph database schema.
 
@@ -649,7 +653,7 @@ async def get_schema(ctx: Context = None) -> str:
     tool_name="get_database_info",
     build_error_response=_resource_rate_limit_message("Database info access"),
 )
-async def get_database_info(ctx: Context = None) -> str:
+async def get_database_info(ctx: Context | None = None) -> str:
     """
     Get information about the Neo4j database connection.
 
@@ -763,7 +767,9 @@ async def query_graph(query: str, ctx: Context | None = None) -> dict[str, Any]:
                 truncation_parts.append("intermediate steps")
             if answer_truncated:
                 truncation_parts.append("answer")
-            response["warning"] = f"Response truncated ({', '.join(truncation_parts)}) due to size limits"
+            response["warning"] = (
+                f"Response truncated ({', '.join(truncation_parts)}) due to size limits"
+            )
             logger.info(f"query_graph response truncated: {', '.join(truncation_parts)}")
 
         # Audit log the response
@@ -1176,7 +1182,7 @@ def main():
 
     # Register execute_cypher tool after initialization so read-only mode is respected
     if not _read_only_mode:
-        mcp.tool()(execute_cypher)
+        mcp.tool()(execute_cypher)  # type: ignore[arg-type]
         logger.info("Tool 'execute_cypher' registered (write operations enabled)")
     else:
         logger.info("Tool 'execute_cypher' hidden (read-only mode active)")

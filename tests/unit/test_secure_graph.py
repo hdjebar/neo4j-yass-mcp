@@ -31,13 +31,14 @@ class TestSecureNeo4jGraphInterception:
 
         # Mock parent to track if it's called
         parent_query_called = False
+
         def mock_parent_query(query, params=None):
             nonlocal parent_query_called
             parent_query_called = True
             return []
 
         # Patch the parent class query method
-        with patch.object(type(graph).__bases__[0], 'query', mock_parent_query):
+        with patch.object(type(graph).__bases__[0], "query", mock_parent_query):
             # Attempt dangerous query
             malicious_query = "LOAD CSV FROM 'file:///etc/passwd' AS line RETURN line"
 
@@ -47,7 +48,9 @@ class TestSecureNeo4jGraphInterception:
             # Verify parent query() was NEVER called (security blocked it first)
             # This is the key assertion - if SecureNeo4jGraph is bypassed,
             # the parent query() would be called
-            assert not parent_query_called, "Parent query() should not be called when sanitizer blocks"
+            assert not parent_query_called, (
+                "Parent query() should not be called when sanitizer blocks"
+            )
 
     def test_complex_query_blocked_before_execution(self):
         """SecureNeo4jGraph blocks overly complex queries before driver execution"""
@@ -58,13 +61,14 @@ class TestSecureNeo4jGraphInterception:
 
         # Mock parent to track if it's called
         parent_query_called = False
+
         def mock_parent_query(query, params=None):
             nonlocal parent_query_called
             parent_query_called = True
             return []
 
         # Patch the parent class query method
-        with patch.object(type(graph).__bases__[0], 'query', mock_parent_query):
+        with patch.object(type(graph).__bases__[0], "query", mock_parent_query):
             # Attempt overly complex query (5 unbounded patterns = 125 score > 100)
             complex_query = "MATCH (a)-[*]->(b)-[*]->(c)-[*]->(d)-[*]->(e)-[*]->(f) RETURN *"
 
@@ -72,7 +76,9 @@ class TestSecureNeo4jGraphInterception:
                 graph.query(complex_query)
 
             # Verify parent was NOT called
-            assert not parent_query_called, "Parent query() should not be called when complexity check fails"
+            assert not parent_query_called, (
+                "Parent query() should not be called when complexity check fails"
+            )
 
     def test_readonly_mode_blocks_before_execution(self):
         """SecureNeo4jGraph blocks write queries in read-only mode before execution"""
@@ -84,12 +90,13 @@ class TestSecureNeo4jGraphInterception:
 
             # Mock parent to track if it's called
             parent_query_called = False
+
             def mock_parent_query(query, params=None):
                 nonlocal parent_query_called
                 parent_query_called = True
                 return []
 
-            with patch.object(type(graph).__bases__[0], 'query', mock_parent_query):
+            with patch.object(type(graph).__bases__[0], "query", mock_parent_query):
                 # Attempt write query
                 write_query = "CREATE (n:Person {name: 'Test'}) RETURN n"
 
@@ -97,7 +104,9 @@ class TestSecureNeo4jGraphInterception:
                     graph.query(write_query)
 
                 # Verify parent was NOT called
-                assert not parent_query_called, "Parent query() should not be called in read-only mode"
+                assert not parent_query_called, (
+                    "Parent query() should not be called in read-only mode"
+                )
 
     def test_safe_query_reaches_driver(self):
         """SecureNeo4jGraph allows safe queries to reach the driver"""
@@ -108,12 +117,13 @@ class TestSecureNeo4jGraphInterception:
 
         # Mock parent to verify it IS called for safe queries
         parent_query_called = False
+
         def mock_parent_query(self, query, params=None):
             nonlocal parent_query_called
             parent_query_called = True
             return [{"n": {"name": "Alice"}}]
 
-        with patch.object(type(graph).__bases__[0], 'query', mock_parent_query):
+        with patch.object(type(graph).__bases__[0], "query", mock_parent_query):
             # Safe query
             safe_query = "MATCH (n:Person) RETURN n LIMIT 10"
             result = graph.query(safe_query)
@@ -196,15 +206,16 @@ class TestSecureNeo4jGraphComplexity:
         # Query with unbounded variable-length patterns (scores 25 each)
         # Need 5+ unbounded patterns to exceed limit of 100
         complex_query = (
-            "MATCH (a)-[*]->(b)-[*]->(c)-[*]->(d)-[*]->(e)-[*]->(f) "
-            "WHERE a.id = 1 RETURN *"
+            "MATCH (a)-[*]->(b)-[*]->(c)-[*]->(d)-[*]->(e)-[*]->(f) WHERE a.id = 1 RETURN *"
         )
         is_allowed, error, score = check_query_complexity(complex_query)
 
         # Should be blocked for complexity (5 unbounded patterns = 125 score)
         assert not is_allowed
         assert error is not None
-        assert "complexity" in error.lower() or "limit" in error.lower() or "exceeded" in error.lower()
+        assert (
+            "complexity" in error.lower() or "limit" in error.lower() or "exceeded" in error.lower()
+        )
 
     def test_allows_simple_query(self):
         """Complexity limiter allows simple queries"""
@@ -320,12 +331,13 @@ class TestSecureNeo4jGraphLayeredSecurity:
         graph.read_only_mode = False
 
         parent_called = False
+
         def mock_parent(query, params=None):
             nonlocal parent_called
             parent_called = True
             return []
 
-        with patch.object(type(graph).__bases__[0], 'query', mock_parent):
+        with patch.object(type(graph).__bases__[0], "query", mock_parent):
             malicious_query = "LOAD CSV FROM 'file:///etc/passwd' AS line RETURN line"
 
             with pytest.raises(ValueError, match="blocked by sanitizer"):
@@ -341,12 +353,13 @@ class TestSecureNeo4jGraphLayeredSecurity:
         graph.read_only_mode = False
 
         parent_called = False
+
         def mock_parent(query, params=None):
             nonlocal parent_called
             parent_called = True
             return []
 
-        with patch.object(type(graph).__bases__[0], 'query', mock_parent):
+        with patch.object(type(graph).__bases__[0], "query", mock_parent):
             complex_query = "MATCH (a)-[*]->(b)-[*]->(c)-[*]->(d)-[*]->(e)-[*]->(f) RETURN *"
 
             with pytest.raises(ValueError, match="blocked by complexity limiter"):
@@ -363,12 +376,13 @@ class TestSecureNeo4jGraphLayeredSecurity:
             graph.read_only_mode = True
 
             parent_called = False
+
             def mock_parent(query, params=None):
                 nonlocal parent_called
                 parent_called = True
                 return []
 
-            with patch.object(type(graph).__bases__[0], 'query', mock_parent):
+            with patch.object(type(graph).__bases__[0], "query", mock_parent):
                 write_query = "CREATE (n:Person {name: 'Test'}) RETURN n"
 
                 with pytest.raises(ValueError, match="blocked in read-only mode"):

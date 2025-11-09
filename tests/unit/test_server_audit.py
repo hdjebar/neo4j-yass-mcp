@@ -79,7 +79,9 @@ class TestErrorAuditLogging:
 
         # Call execute_cypher (should catch exception)
         cypher_query = "INVALID CYPHER QUERY"
-        result = await server.execute_cypher.fn(cypher_query=cypher_query, ctx=create_mock_context())
+        result = await server.execute_cypher.fn(
+            cypher_query=cypher_query, ctx=create_mock_context()
+        )
 
         # Verify error response
         assert result["success"] is False
@@ -140,7 +142,9 @@ class TestErrorAuditLogging:
         server.graph = mock_graph
 
         # Call execute_cypher (should not crash without audit logger)
-        result = await server.execute_cypher.fn(cypher_query="test query", ctx=create_mock_context())
+        result = await server.execute_cypher.fn(
+            cypher_query="test query", ctx=create_mock_context()
+        )
 
         # Verify error response (should still work)
         assert result["success"] is False

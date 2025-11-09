@@ -5,7 +5,6 @@ Covers edge cases in estimate_tokens, sanitize_error_message, and truncate_respo
 Tests lines 176, 178, 225, 249-250 in server.py
 """
 
-
 from unittest.mock import patch
 
 import pytest

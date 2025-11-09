@@ -63,9 +63,9 @@ except Exception as e:
 
             # Start server process with coverage
             env = os.environ.copy()
-            env['COVERAGE_PROCESS_START'] = coverage_rc
+            env["COVERAGE_PROCESS_START"] = coverage_rc
             # Add project root to PYTHONPATH so sitecustomize.py is found
-            env['PYTHONPATH'] = cwd + os.pathsep + env.get('PYTHONPATH', '')
+            env["PYTHONPATH"] = cwd + os.pathsep + env.get("PYTHONPATH", "")
 
             proc = subprocess.Popen(
                 [sys.executable, str(script_path)],
@@ -128,8 +128,8 @@ except Exception as e:
             coverage_rc = os.path.join(cwd, ".coveragerc")
 
             env = os.environ.copy()
-            env['COVERAGE_PROCESS_START'] = coverage_rc
-            env['PYTHONPATH'] = cwd + os.pathsep + env.get('PYTHONPATH', '')
+            env["COVERAGE_PROCESS_START"] = coverage_rc
+            env["PYTHONPATH"] = cwd + os.pathsep + env.get("PYTHONPATH", "")
 
             # Run and expect failure
             result = subprocess.run(
@@ -189,8 +189,8 @@ except KeyboardInterrupt:
             coverage_rc = os.path.join(cwd, ".coveragerc")
 
             env = os.environ.copy()
-            env['COVERAGE_PROCESS_START'] = coverage_rc
-            env['PYTHONPATH'] = cwd + os.pathsep + env.get('PYTHONPATH', '')
+            env["COVERAGE_PROCESS_START"] = coverage_rc
+            env["PYTHONPATH"] = cwd + os.pathsep + env.get("PYTHONPATH", "")
 
             proc = subprocess.Popen(
                 [sys.executable, str(script_path)],
@@ -223,4 +223,3 @@ except KeyboardInterrupt:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-
