@@ -2,7 +2,7 @@
 Integration tests for server startup (main function).
 
 Tests actual server startup to cover lines 984-1048 in server.py
-Uses subprocess with timeout - REAL tests, no mocks.
+Uses subprocess with coverage tracking - REAL tests, no mocks.
 """
 
 import os
@@ -10,6 +10,7 @@ import subprocess
 import signal
 import time
 import pytest
+import sys
 
 
 class TestServerStartup:
@@ -21,12 +22,19 @@ class TestServerStartup:
         test_script = """
 import sys
 import os
+import signal
 
 # Set environment for test
 os.environ['MCP_TRANSPORT'] = 'stdio'
 os.environ['NEO4J_URI'] = 'bolt://localhost:7687'
 os.environ['NEO4J_USER'] = 'neo4j'
 os.environ['NEO4J_PASSWORD'] = 'test-password'
+
+# Handle SIGTERM gracefully
+def handle_sigterm(signum, frame):
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, handle_sigterm)
 
 try:
     from neo4j_yass_mcp.server import main
@@ -36,6 +44,9 @@ except SystemExit:
     pass
 except KeyboardInterrupt:
     sys.exit(0)
+except Exception as e:
+    print(f"Server startup error: {e}", file=sys.stderr)
+    sys.exit(1)
 """
 
         # Write test script
@@ -44,16 +55,24 @@ except KeyboardInterrupt:
             f.write(test_script)
 
         try:
+            # Get coverage config path
+            cwd = "/Users/hdjebar/Projects/neo4j-yass-mcp"
+            coverage_rc = os.path.join(cwd, "pyproject.toml")
+
             # Start server process with coverage
+            env = os.environ.copy()
+            env['COVERAGE_PROCESS_START'] = coverage_rc
+
             proc = subprocess.Popen(
-                ["uv", "run", "python", script_path],
+                [sys.executable, "-m", "coverage", "run", "--parallel-mode", script_path],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                cwd="/Users/hdjebar/Projects/neo4j-yass-mcp",
+                cwd=cwd,
+                env=env,
             )
 
             # Give it time to start and execute initialization code
-            time.sleep(2)
+            time.sleep(3)
 
             # Terminate gracefully
             proc.send_signal(signal.SIGTERM)
@@ -65,9 +84,12 @@ except KeyboardInterrupt:
                 proc.kill()
                 proc.wait()
 
-            # Check that it at least started (return code indicates termination, not startup failure)
-            # A SIGTERM should give return code != 0, but that's expected
-            # We're just verifying it didn't crash during initialization
+            # Combine coverage data
+            subprocess.run(
+                ["uv", "run", "coverage", "combine"],
+                cwd=cwd,
+                capture_output=True,
+            )
 
         finally:
             if os.path.exists(script_path):
@@ -90,7 +112,7 @@ try:
     main()
 except Exception as e:
     # Expected to fail during initialization
-    print(f"Expected error: {e}")
+    print(f"Expected error: {e}", file=sys.stderr)
     sys.exit(1)
 """
 
@@ -99,16 +121,96 @@ except Exception as e:
             f.write(test_script)
 
         try:
+            cwd = "/Users/hdjebar/Projects/neo4j-yass-mcp"
+            coverage_rc = os.path.join(cwd, "pyproject.toml")
+
+            env = os.environ.copy()
+            env['COVERAGE_PROCESS_START'] = coverage_rc
+
             # Run and expect failure
             result = subprocess.run(
-                ["uv", "run", "python", script_path],
+                [sys.executable, "-m", "coverage", "run", "--parallel-mode", script_path],
                 capture_output=True,
                 timeout=10,
-                cwd="/Users/hdjebar/Projects/neo4j-yass-mcp",
+                cwd=cwd,
+                env=env,
             )
 
             # Should exit with error code (initialization failed as expected)
             assert result.returncode != 0
+
+            # Combine coverage data
+            subprocess.run(
+                ["uv", "run", "coverage", "combine"],
+                cwd=cwd,
+                capture_output=True,
+            )
+
+        finally:
+            if os.path.exists(script_path):
+                os.remove(script_path)
+
+    def test_server_main_read_only_mode(self):
+        """Lines 996-1000: Test main() in read-only mode"""
+        test_script = """
+import sys
+import os
+import signal
+
+os.environ['MCP_TRANSPORT'] = 'stdio'
+os.environ['NEO4J_URI'] = 'bolt://localhost:7687'
+os.environ['NEO4J_USER'] = 'neo4j'
+os.environ['NEO4J_PASSWORD'] = 'test-password'
+os.environ['READ_ONLY_MODE'] = 'true'  # Enable read-only mode
+
+def handle_sigterm(signum, frame):
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, handle_sigterm)
+
+try:
+    from neo4j_yass_mcp.server import main
+    main()
+except SystemExit:
+    pass
+except KeyboardInterrupt:
+    sys.exit(0)
+"""
+
+        script_path = "/tmp/test_server_readonly.py"
+        with open(script_path, "w") as f:
+            f.write(test_script)
+
+        try:
+            cwd = "/Users/hdjebar/Projects/neo4j-yass-mcp"
+            coverage_rc = os.path.join(cwd, "pyproject.toml")
+
+            env = os.environ.copy()
+            env['COVERAGE_PROCESS_START'] = coverage_rc
+
+            proc = subprocess.Popen(
+                [sys.executable, "-m", "coverage", "run", "--parallel-mode", script_path],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=cwd,
+                env=env,
+            )
+
+            time.sleep(3)
+            proc.send_signal(signal.SIGTERM)
+
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.communicate()
+
+            # Combine coverage data
+            subprocess.run(
+                ["uv", "run", "coverage", "combine"],
+                cwd=cwd,
+                capture_output=True,
+            )
 
         finally:
             if os.path.exists(script_path):
