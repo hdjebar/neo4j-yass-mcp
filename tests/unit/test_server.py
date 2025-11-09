@@ -11,7 +11,7 @@ Tests cover:
 - Security validations
 """
 
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, PropertyMock
 
 import pytest
 
@@ -259,6 +259,19 @@ class TestGetSchema:
 
             assert "Node: Movie" in result
             assert "Relationship: ACTED_IN" in result
+
+    def test_get_schema_exception(self, mock_neo4j_graph):
+        """Test get_schema handles exceptions (lines 415-416)."""
+        # Make get_schema property raise an exception when accessed
+        type(mock_neo4j_graph).get_schema = PropertyMock(side_effect=Exception("Schema error"))
+
+        with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
+            from neo4j_yass_mcp.server import get_schema
+
+            result = get_schema.fn()
+
+            assert "Error retrieving schema" in result
+            assert "Schema error" in result
 
 
 class TestGetDatabaseInfo:
@@ -560,6 +573,18 @@ class TestCleanup:
 
         with patch("neo4j_yass_mcp.server.graph", mock_graph):
             # Should not raise error
+            cleanup()
+
+    def test_cleanup_with_attribute_error(self):
+        """Test cleanup handles AttributeError when accessing driver (line 973)."""
+        from neo4j_yass_mcp.server import cleanup
+
+        # Create mock graph that raises AttributeError when accessing _driver
+        mock_graph = Mock()
+        type(mock_graph)._driver = PropertyMock(side_effect=AttributeError("No _driver"))
+
+        with patch("neo4j_yass_mcp.server.graph", mock_graph):
+            # Should not raise error, should log warning
             cleanup()
 
     def test_cleanup_with_executor_error(self):

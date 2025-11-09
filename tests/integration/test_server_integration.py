@@ -165,6 +165,36 @@ class TestEndToEndQueryFlow:
                         assert "How old is John Doe?" in call_args["query"]
 
     @pytest.mark.asyncio
+    async def test_query_graph_with_suspicious_cypher_warning(self):
+        """Test query_graph logs warnings for suspicious LLM-generated Cypher (lines 552-553)."""
+        # Mock graph and chain
+        mock_graph = Mock()
+        mock_graph.get_schema = "Node: Person\nRelationship: KNOWS"
+
+        # Mock chain to return Cypher with CALL apoc (triggers SUSPICIOUS_PATTERNS)
+        mock_chain = Mock()
+        mock_chain.invoke = Mock(
+            return_value={
+                "result": "Database info retrieved",
+                "intermediate_steps": [
+                    {"query": "CALL apoc.help('count')"}  # Triggers warning
+                ],
+            }
+        )
+
+        with patch("neo4j_yass_mcp.server.graph", mock_graph):
+            with patch("neo4j_yass_mcp.server.chain", mock_chain):
+                with patch("neo4j_yass_mcp.server.sanitizer_enabled", True):
+                    with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+                        from neo4j_yass_mcp.server import query_graph
+
+                        result = await query_graph.fn("Show me the apoc count function")
+
+                        # Should succeed but with warnings logged
+                        assert result["success"] is True
+                        assert "CALL apoc.help('count')" in result["generated_cypher"]
+
+    @pytest.mark.asyncio
     async def test_execute_cypher_end_to_end(self):
         """Test complete execute_cypher flow with sanitizer and audit."""
         mock_graph = Mock()
