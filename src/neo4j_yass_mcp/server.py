@@ -24,7 +24,18 @@ from typing import Any
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 from langchain_neo4j import GraphCypherQAChain
-from tokenizers import Tokenizer
+# Tokenizer imports - try tiktoken first (no download), fallback to tokenizers
+try:
+    import tiktoken
+    TOKENIZER_BACKEND = "tiktoken"
+except ImportError:
+    tiktoken = None
+    try:
+        from tokenizers import Tokenizer
+        TOKENIZER_BACKEND = "tokenizers"
+    except ImportError:
+        Tokenizer = None
+        TOKENIZER_BACKEND = "fallback"
 
 from neo4j_yass_mcp.secure_graph import SecureNeo4jGraph
 
@@ -114,8 +125,8 @@ _response_token_limit: int | None = None
 # Debug mode for detailed error messages (disable in production)
 _debug_mode: bool = False
 
-# Hugging Face tokenizers for accurate token counting
-_tokenizer: Tokenizer | None = None
+# Tokenizer for accurate token counting (can be tiktoken, tokenizers, or None)
+_tokenizer: Any = None
 
 
 def get_executor() -> ThreadPoolExecutor:
@@ -177,24 +188,58 @@ def check_read_only_access(cypher_query: str) -> str | None:
     return None
 
 
-def get_tokenizer() -> Tokenizer:
+def get_tokenizer() -> Any:
     """
-    Get or create Hugging Face tokenizer.
+    Get or create tokenizer for token estimation.
 
-    Uses GPT-2 tokenizer which provides similar token counts to cl100k_base
-    and works well for general text estimation.
+    Tries multiple backends in order of preference:
+    1. tiktoken (fast, no download needed)
+    2. tokenizers with local_files_only (no network call)
+    3. None (graceful degradation to character-based estimation)
+
+    Returns:
+        Tokenizer instance or None if unavailable
     """
     global _tokenizer
     if _tokenizer is None:
-        logger.info("Initializing Hugging Face tokenizer (gpt2)")
-        # Use GPT-2 tokenizer as a reasonable approximation
-        _tokenizer = Tokenizer.from_pretrained("gpt2")
+        # Try tiktoken first (no download needed)
+        if tiktoken is not None:
+            try:
+                logger.info("Initializing tiktoken tokenizer (gpt2)")
+                _tokenizer = tiktoken.get_encoding("gpt2")
+                return _tokenizer
+            except Exception as e:
+                logger.warning(f"tiktoken initialization failed: {e}, trying next backend")
+
+        # Fall back to tokenizers with local cache only
+        if Tokenizer is not None:
+            try:
+                logger.info("Initializing Hugging Face tokenizer (gpt2, local files only)")
+                _tokenizer = Tokenizer.from_pretrained("gpt2", local_files_only=True)
+                return _tokenizer
+            except Exception as e:
+                logger.warning(
+                    f"Tokenizer initialization failed (local_files_only): {e}. "
+                    "Using fallback character-based estimation (4 chars per token). "
+                    "Run 'python -c \"from tokenizers import Tokenizer; Tokenizer.from_pretrained('gpt2')\"' "
+                    "to download tokenizer data."
+                )
+                _tokenizer = None  # Will use fallback estimation
+
+        # If both failed, use None to signal fallback mode
+        if _tokenizer is None:
+            logger.warning(
+                "No tokenizer backend available. Using fallback character-based estimation (4 chars per token)."
+            )
+
     return _tokenizer
 
 
 def estimate_tokens(text: str) -> int:
     """
-    Estimate token count for a text string using Hugging Face tokenizers.
+    Estimate token count for a text string using available tokenizer backend.
+
+    Tries backends in order: tiktoken, tokenizers, character-based fallback.
 
     Args:
         text: The text to estimate tokens for
@@ -208,8 +253,22 @@ def estimate_tokens(text: str) -> int:
         text = str(text)
 
     tokenizer = get_tokenizer()
-    encoding = tokenizer.encode(text)
-    return len(encoding.ids)
+
+    if tokenizer is None:
+        # Fallback: estimate 4 characters per token (conservative for GPT-2/3)
+        return len(text) // 4
+
+    # Handle tiktoken backend
+    if TOKENIZER_BACKEND == "tiktoken":
+        return len(tokenizer.encode(text))
+
+    # Handle tokenizers backend
+    if TOKENIZER_BACKEND == "tokenizers":
+        encoding = tokenizer.encode(text)
+        return len(encoding.ids)
+
+    # Should never reach here, but fallback just in case
+    return len(text) // 4
 
 
 def sanitize_error_message(error: Exception) -> str:
