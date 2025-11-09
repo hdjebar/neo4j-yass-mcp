@@ -10,6 +10,15 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+from fastmcp import Context
+
+
+def create_mock_context(session_id: str = "test_session_123") -> Mock:
+    """Create a mock FastMCP Context for testing."""
+    mock_ctx = Mock(spec=Context)
+    mock_ctx.session_id = session_id
+    mock_ctx.client_id = None
+    return mock_ctx
 
 
 class TestServerInitialization:
@@ -151,7 +160,7 @@ class TestEndToEndQueryFlow:
                     with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
                         from neo4j_yass_mcp.server import query_graph
 
-                        result = await query_graph.fn("How old is John Doe?")
+                        result = await query_graph.fn("How old is John Doe?", ctx=create_mock_context())
 
                         # Verify result structure
                         assert result["success"] is True
@@ -191,7 +200,7 @@ class TestEndToEndQueryFlow:
                     with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
                         from neo4j_yass_mcp.server import query_graph
 
-                        result = await query_graph.fn("Show me the apoc count function")
+                        result = await query_graph.fn("Show me the apoc count function", ctx=create_mock_context())
 
                         # Should succeed but with warnings logged
                         assert result["success"] is True
@@ -217,7 +226,7 @@ class TestEndToEndQueryFlow:
                     from neo4j_yass_mcp.server import execute_cypher
 
                     query = "MATCH (p:Person) RETURN p.name AS name, p.age AS age"
-                    result = await execute_cypher(query)
+                    result = await execute_cypher(query, ctx=create_mock_context())
 
                     # Verify successful execution
                     assert result["success"] is True
@@ -248,7 +257,7 @@ class TestEndToEndQueryFlow:
 
                     # Attempt unsafe query
                     unsafe_query = "LOAD CSV FROM 'file:///etc/passwd' AS line RETURN line"
-                    result = await execute_cypher(unsafe_query)
+                    result = await execute_cypher(unsafe_query, ctx=create_mock_context())
 
                     # Verify query was blocked
                     assert result["success"] is False
@@ -289,7 +298,7 @@ class TestReadOnlyModeIntegration:
                     ]
 
                     for query in write_queries:
-                        result = await execute_cypher(query)
+                        result = await execute_cypher(query, ctx=create_mock_context())
 
                         # Check for error (read-only mode returns {"error": msg})
                         assert "error" in result
@@ -314,7 +323,7 @@ class TestReadOnlyModeIntegration:
                     ]
 
                     for query in read_queries:
-                        result = await execute_cypher(query)
+                        result = await execute_cypher(query, ctx=create_mock_context())
 
                         assert result["success"] is True
                         mock_graph.query.assert_called()
@@ -337,7 +346,7 @@ class TestResponseTruncationIntegration:
                 with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
                     from neo4j_yass_mcp.server import execute_cypher
 
-                    result = await execute_cypher("MATCH (n) RETURN n")
+                    result = await execute_cypher("MATCH (n) RETURN n", ctx=create_mock_context())
 
                     # Verify truncation
                     assert result["success"] is True
@@ -425,7 +434,7 @@ class TestAuditLoggerIntegration:
 
                     # Execute query
                     query = "MATCH (n:Test) RETURN n"
-                    result = await execute_cypher(query)
+                    result = await execute_cypher(query, ctx=create_mock_context())
 
                     assert result["success"] is True
 

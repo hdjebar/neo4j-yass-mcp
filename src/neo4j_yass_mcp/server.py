@@ -13,17 +13,17 @@ Features:
 """
 
 import asyncio
-import contextvars
 import json
 import logging
 import os
 import re
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from dotenv import load_dotenv
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from langchain_neo4j import GraphCypherQAChain
 
 # Tokenizer imports - try tiktoken first (no download), fallback to tokenizers
@@ -129,35 +129,46 @@ _debug_mode: bool = False
 # Tokenizer for accurate token counting (can be tiktoken, tokenizers, or None)
 _tokenizer: Any = None
 
-# Context variable for per-request client ID tracking
-_current_client_id: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "current_client_id"  # NO default - force LookupError
-)
-
-def get_client_id() -> str:
+def get_client_id_from_context(ctx: Context | None = None) -> str:
     """
-    Get stable client ID for the current MCP session.
+    Extract client identifier from FastMCP Context for rate limiting.
 
-    Uses the async task ID as a stable session identifier so that all requests
-    from the same MCP client/session share the same rate limit bucket. This
-    enables per-session rate limiting where the rate limit is enforced across
-    multiple requests from the same client.
+    Uses FastMCP's session_id when available for stable per-session rate limiting.
+    Each MCP client connection gets a unique session_id that persists across
+    multiple tool calls, enabling proper rate limit enforcement per client.
 
-    Each MCP client connection runs in its own async task, so the task ID
-    provides a stable, unique identifier for the session lifetime.
+    Args:
+        ctx: FastMCP Context object (auto-injected into tool functions)
 
     Returns:
-        Stable client ID string for the current session
+        Client identifier string for rate limiting bucket selection.
+        Format: "session_{session_id}" or "unknown" if no context available.
+
+    Note:
+        When session_id is None (can happen in some FastMCP versions/transports),
+        returns "unknown" which means all requests share one bucket - a known
+        limitation that requires FastMCP session tracking improvements.
     """
-    try:
-        # Return existing client ID if already set for this session
-        return _current_client_id.get()
-    except LookupError:
-        # First request in this session - generate stable ID from task
-        # This ID will be reused for all subsequent requests in same session
-        client_id = f"session_{id(asyncio.current_task())}"
-        _current_client_id.set(client_id)
-        return client_id
+    if ctx is None:
+        # Should not happen in production (Context auto-injected), but handle gracefully
+        logger.warning("No Context provided to get_client_id_from_context - rate limiting degraded")
+        return "unknown"
+
+    # Use FastMCP session_id if available (persistent across requests from same client)
+    if ctx.session_id:
+        return f"session_{ctx.session_id}"
+
+    # Fallback: Use client_id if available
+    if ctx.client_id:
+        return f"client_{ctx.client_id}"
+
+    # Last resort: No session identification available
+    # This means all clients share one rate limit bucket (known limitation)
+    logger.warning(
+        "FastMCP Context has no session_id or client_id - "
+        "rate limiting will be shared across all clients"
+    )
+    return "unknown"
 
 
 def get_executor() -> ThreadPoolExecutor:
@@ -564,7 +575,7 @@ Status: Connected
 
 
 @mcp.tool()
-async def query_graph(query: str) -> dict[str, Any]:
+async def query_graph(query: str, ctx: Context) -> dict[str, Any]:
     """
     Query the Neo4j graph database using natural language.
 
@@ -595,9 +606,9 @@ async def query_graph(query: str) -> dict[str, Any]:
     if chain is None or graph is None:
         return {"error": "Neo4j or LangChain not initialized", "success": False}
 
-    # Check rate limit (use per-request client ID)
+    # Check rate limit (extract client ID from FastMCP Context)
     if rate_limit_enabled:
-        client_id = get_client_id()
+        client_id = get_client_id_from_context(ctx)
         is_allowed, rate_info = check_rate_limit(client_id=client_id)
         if not is_allowed and rate_info is not None:
             error_msg = f"Rate limit exceeded. Retry after {rate_info.retry_after_seconds:.1f}s"
@@ -750,7 +761,7 @@ async def query_graph(query: str) -> dict[str, Any]:
 
 
 async def _execute_cypher_impl(
-    cypher_query: str, parameters: dict[str, Any | None] | None = None
+    cypher_query: str, ctx: Context, parameters: dict[str, Any | None] | None = None
 ) -> dict[str, Any]:
     """
     Internal implementation of execute_cypher.
@@ -770,6 +781,7 @@ async def _execute_cypher_impl(
 
     Args:
         cypher_query: The Cypher query to execute
+        ctx: FastMCP Context for session identification
         parameters: Optional dictionary of parameters for the query
 
     Returns:
@@ -786,9 +798,9 @@ async def _execute_cypher_impl(
     if graph is None:
         return {"error": "Neo4j graph not initialized", "success": False}
 
-    # Check rate limit (use per-request client ID)
+    # Check rate limit (extract client ID from FastMCP Context)
     if rate_limit_enabled:
-        client_id = get_client_id()
+        client_id = get_client_id_from_context(ctx)
         is_allowed, rate_info = check_rate_limit(client_id=client_id)
         if not is_allowed and rate_info is not None:
             error_msg = f"Rate limit exceeded. Retry after {rate_info.retry_after_seconds:.1f}s"
@@ -970,7 +982,7 @@ async def _execute_cypher_impl(
 # ensures `_read_only_mode` is set correctly before deciding whether to
 # expose the tool to MCP clients.
 async def execute_cypher(
-    cypher_query: str, parameters: dict[str, Any | None] | None = None
+    cypher_query: str, ctx: Context, parameters: dict[str, Any | None] | None = None
 ) -> dict[str, Any]:
     """
     Execute a raw Cypher query against the Neo4j database.
@@ -980,7 +992,7 @@ async def execute_cypher(
 
     This function runs asynchronously, allowing parallel query execution.
     """
-    return await _execute_cypher_impl(cypher_query, parameters)
+    return await _execute_cypher_impl(cypher_query, ctx, parameters)
 
 
 @mcp.tool()

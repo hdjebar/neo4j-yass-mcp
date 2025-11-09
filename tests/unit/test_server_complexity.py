@@ -8,8 +8,17 @@ Tests lines 562-587, 760-785 in server.py
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+from fastmcp import Context
 
 from neo4j_yass_mcp.security.complexity_limiter import ComplexityScore
+
+
+def create_mock_context(session_id: str = "test_session_123") -> Mock:
+    """Create a mock FastMCP Context for testing."""
+    mock_ctx = Mock(spec=Context)
+    mock_ctx.session_id = session_id
+    mock_ctx.client_id = None
+    return mock_ctx
 
 
 class TestComplexityLimitEnforcement:
@@ -55,7 +64,7 @@ class TestComplexityLimitEnforcement:
 
         try:
             # Call query_graph
-            result = await server.query_graph.fn(query="Show me everything connected")
+            result = await server.query_graph.fn(query="Show me everything connected", ctx=create_mock_context())
 
             # Verify complexity block response
             assert result["success"] is False
@@ -107,7 +116,7 @@ class TestComplexityLimitEnforcement:
         try:
             # Call execute_cypher with complex query
             complex_query = "MATCH (n)-[r*1..20]->(m) RETURN n, r, m"
-            result = await server.execute_cypher(cypher_query=complex_query)
+            result = await server.execute_cypher(cypher_query=complex_query, ctx=create_mock_context())
 
             # Verify complexity block response
             assert result["success"] is False
@@ -158,7 +167,7 @@ class TestComplexityLimitEnforcement:
 
         try:
             # Call query_graph
-            result = await server.query_graph.fn(query="Show me 10 people")
+            result = await server.query_graph.fn(query="Show me 10 people", ctx=create_mock_context())
 
             # Verify it proceeded past complexity check
             assert result["success"] is True
@@ -185,7 +194,7 @@ class TestComplexityLimitEnforcement:
 
         try:
             # Call execute_cypher
-            result = await server.execute_cypher(cypher_query="MATCH (n) RETURN n LIMIT 1")
+            result = await server.execute_cypher(cypher_query="MATCH (n) RETURN n LIMIT 1", ctx=create_mock_context())
 
             # Verify complexity check was NOT called
             mock_check_complexity.assert_not_called()
@@ -213,7 +222,7 @@ class TestComplexityLimitEnforcement:
 
         try:
             # Call execute_cypher
-            result = await server.execute_cypher(cypher_query="MATCH (n) RETURN n")
+            result = await server.execute_cypher(cypher_query="MATCH (n) RETURN n", ctx=create_mock_context())
 
             # Verify error response handles None score
             assert result["success"] is False

@@ -8,6 +8,15 @@ Tests lines 653, 868 in server.py
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+from fastmcp import Context
+
+
+def create_mock_context(session_id: str = "test_session_123") -> Mock:
+    """Create a mock FastMCP Context for testing."""
+    mock_ctx = Mock(spec=Context)
+    mock_ctx.session_id = session_id
+    mock_ctx.client_id = None
+    return mock_ctx
 
 
 class TestErrorAuditLogging:
@@ -31,7 +40,7 @@ class TestErrorAuditLogging:
         server.graph = MagicMock()
 
         # Call query_graph (should catch exception)
-        result = await server.query_graph.fn(query="MATCH (n) RETURN n")
+        result = await server.query_graph.fn(query="MATCH (n) RETURN n", ctx=create_mock_context())
 
         # Verify error response
         # ValueError now triggers security_blocked response (SecureNeo4jGraph)
@@ -70,7 +79,7 @@ class TestErrorAuditLogging:
 
         # Call execute_cypher (should catch exception)
         cypher_query = "INVALID CYPHER QUERY"
-        result = await server.execute_cypher(cypher_query=cypher_query)
+        result = await server.execute_cypher(cypher_query=cypher_query, ctx=create_mock_context())
 
         # Verify error response
         assert result["success"] is False
@@ -104,7 +113,7 @@ class TestErrorAuditLogging:
         server.graph = MagicMock()
 
         # Call query_graph (should not crash without audit logger)
-        result = await server.query_graph.fn(query="test query")
+        result = await server.query_graph.fn(query="test query", ctx=create_mock_context())
 
         # Verify error response (should still work)
         assert result["success"] is False
@@ -131,7 +140,7 @@ class TestErrorAuditLogging:
         server.graph = mock_graph
 
         # Call execute_cypher (should not crash without audit logger)
-        result = await server.execute_cypher(cypher_query="test query")
+        result = await server.execute_cypher(cypher_query="test query", ctx=create_mock_context())
 
         # Verify error response (should still work)
         assert result["success"] is False
@@ -161,7 +170,7 @@ class TestErrorAuditLogging:
         server.graph = MagicMock()
 
         # Call query_graph
-        result = await server.query_graph.fn(query="complex query")
+        result = await server.query_graph.fn(query="complex query", ctx=create_mock_context())
 
         # Verify error response
         assert result["success"] is False

@@ -73,17 +73,12 @@ class QuerySanitizer:
         r";\s+(?i:DELETE)",  # Query chaining with any whitespace
         r";\s+(?i:DROP)",  # Query chaining with any whitespace
         r";\s+(?i:CALL)",  # Query chaining with CALL
-        # Comment-based injection (fixed for multi-line)
-        r"/\*[\s\S]*?\*/",  # Block comments (multi-line aware)
-        r"//[^\n]*",  # Line comments (safer pattern)
         # Excessive operations
         r"(?i)FOREACH\s*\([^)]*\s+IN\s+range\s*\(\s*\d+\s*,\s*\d{6,}",  # Large range iterations
-        # String concatenation
-        r"'.*?'\s*\+\s*'.*?'",
-        r'".*?"\s*\+\s*".*?"',
         # Additional dangerous patterns
         r"(?i)apoc\.periodic\.iterate",  # Batch operations that can cause DoS
         r"(?i)apoc\.cypher\.parallel",  # Parallel execution abuse
+        r"\[\*\.\.\d{3,}\]",  # Variable-length relationships with high upper bound
     ]
 
     # Suspicious but not always dangerous (warnings)
@@ -144,7 +139,7 @@ class QuerySanitizer:
         """
         warnings: list[str] = []
 
-        # Check 1: Query length
+        # Check 1: Query length (on original query)
         if len(query) > self.max_query_length:
             return (
                 False,
@@ -152,7 +147,10 @@ class QuerySanitizer:
                 warnings,
             )
 
-        # Check 2: Null or empty
+        # Strip comments before further validation
+        query = self._strip_comments(query)
+
+        # Check 2: Null or empty after stripping comments
         if not query or not query.strip():
             return False, "Empty query not allowed", warnings
 
@@ -198,6 +196,14 @@ class QuerySanitizer:
 
         # All checks passed
         return True, None, warnings
+
+    def _strip_comments(self, query: str) -> str:
+        """Remove block and line comments from a query"""
+        # Remove block comments /* ... */
+        query = re.sub(r"/\*[\s\S]*?\*/", "", query)
+        # Remove line comments // ...
+        query = re.sub(r"//[^\n]*", "", query)
+        return query
 
     def sanitize_parameters(self, parameters: dict[str, Any | None]) -> tuple[bool, str | None]:
         """

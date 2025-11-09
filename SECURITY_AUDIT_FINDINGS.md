@@ -144,11 +144,11 @@ def check_read_only_access(cypher_query: str) -> str | None:
 
 ## 🟠 MEDIUM SEVERITY
 
-### 3. ✅ **Global Rate Limiting Breaks Per-Session Enforcement (MEDIUM - FIXED)**
+### 3. ⚠️ **Global Rate Limiting Breaks Per-Client Enforcement (MEDIUM - PARTIAL FIX)**
 
-**Location:** [server.py:137-160](src/neo4j_yass_mcp/server.py#L137-L160)
+**Location:** [server.py:137-167](src/neo4j_yass_mcp/server.py#L137-L167)
 
-**Status:** ✅ **FIXED** - Stable per-session client ID tracking implemented
+**Status:** ⚠️ **PARTIAL FIX** - Per-request identifiers prevent global bucket sharing, but proper per-client rate limiting requires FastMCP session metadata
 
 **Vulnerability (ORIGINAL):**
 ```python
@@ -173,60 +173,54 @@ The initial fix generated a NEW client_id for EVERY request, which completely di
 
 **Severity:** 🟠 **MEDIUM** - DoS and forensics impact
 
-**Fix Implemented (CORRECT):**
+**Fix Implemented (PARTIAL - IN PROGRESS):**
 ```python
-# Lines 133-135: Context-based client ID tracking
-_current_client_id: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "current_client_id"  # NO default - force LookupError on first access
-)
+# Lines 132-134: Request counter for unique per-request IDs
+_request_counter: int = 0
+_counter_lock = threading.Lock()
 
-# Lines 137-160: Stable session-based client ID
-def get_client_id() -> str:
+# Lines 137-167: Multi-tier client ID generation
+def get_client_id(session_id: str | None = None, client_id: str | None = None) -> str:
     """
-    Get stable client ID for the current MCP session.
+    Get client identifier for rate limiting.
 
-    Uses the async task ID as a stable session identifier so that all requests
-    from the same MCP client/session share the same rate limit bucket. This
-    enables per-session rate limiting where the rate limit is enforced across
-    multiple requests from the same client.
-
-    Each MCP client connection runs in its own async task, so the task ID
-    provides a stable, unique identifier for the session lifetime.
+    Prioritizes FastMCP session metadata when available, falls back to
+    unique per-request identifier.
     """
-    try:
-        # Return existing client ID if already set for this session
-        return _current_client_id.get()
-    except LookupError:
-        # First request in this session - generate stable ID from task
-        # This ID will be reused for all subsequent requests in same session
-        client_id = f"session_{id(asyncio.current_task())}"
-        _current_client_id.set(client_id)
-        return client_id
+    # Priority 1: Use FastMCP session_id if available (most reliable)
+    if session_id:
+        return f"session_{session_id}"
+
+    # Priority 2: Use FastMCP client_id if available
+    if client_id:
+        return f"client_{client_id}"
+
+    # Priority 3: Generate unique per-request ID (prevents bucket sharing)
+    global _request_counter
+    with _counter_lock:
+        _request_counter += 1
+        return f"request_{_request_counter}_{id(asyncio.current_task())}"
 ```
 
-**Verification:**
-- Each MCP session gets ONE stable client_id
-- All requests from same session share the same rate limit bucket
-- Rate limiting is properly enforced across multiple requests
-- Different sessions get different client_ids
-- Tests added:
-  - `test_sequential_requests_share_same_client_id`: Verifies 3 sequential requests in same session share same ID
-  - `test_rate_limiting_actually_blocks_after_limit`: Verifies rate limiting actually blocks after 5 requests (REAL functionality test)
+**Current Limitation:**
+- FastMCP Context.session_id and Context.client_id are passed to get_client_id()
+- However, these may be None in current FastMCP versions
+- Fallback generates per-request IDs, which means each request gets fresh rate limit bucket
+- This prevents rate limiting from working effectively (requests never hit limits)
+- **Proper fix requires:** Reliable session identification from FastMCP or external auth layer
+
+**Verification (Current State):**
+- When FastMCP Context provides session_id: Proper per-session rate limiting works
+- When FastMCP Context.session_id is None (current reality): Each request gets unique ID
+- Tests demonstrate the mechanism works when session info is available
+- **Known issue:** Without reliable session identification, rate limiting is effectively disabled
 - Test suite: 415 tests passing
 
-**Empirical Test Results (FINAL FIX):**
-```python
-# Sequential requests in same session:
-Request 1: session_4436984240  # Generated on first request
-Request 2: session_4436984240  # REUSED (same session!)
-Request 3: session_4436984240  # REUSED (same session!)
-All same? True ✅
-
-# Rate limiting actually works:
-Requests 1-5: SUCCESS (within burst limit)
-Request 6: BLOCKED (rate_limited=True, retry_after_seconds=60)
-Request 7: BLOCKED (rate_limited=True) ✅
-```
+**Next Steps for Complete Fix:**
+1. Wait for FastMCP session_id reliability improvements
+2. OR implement external session tracking (e.g., via client certificates, API keys)
+3. OR use transport-level identifiers (IP + connection ID)
+4. Add integration tests that verify cross-session isolation when session_id available
 
 ---
 

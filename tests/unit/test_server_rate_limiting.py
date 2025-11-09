@@ -10,7 +10,16 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+from fastmcp import Context
 from neo4j_yass_mcp.security.rate_limiter import RateLimitInfo
+
+
+def create_mock_context(session_id: str = "test_session_123") -> Mock:
+    """Create a mock FastMCP Context for testing."""
+    mock_ctx = Mock(spec=Context)
+    mock_ctx.session_id = session_id
+    mock_ctx.client_id = None
+    return mock_ctx
 
 
 class TestRateLimitEnforcement:
@@ -43,8 +52,9 @@ class TestRateLimitEnforcement:
         server.rate_limit_enabled = True
 
         try:
-            # Call query_graph
-            result = await server.query_graph.fn(query="MATCH (n) RETURN n")
+            # Call query_graph with mock context
+            mock_ctx = create_mock_context()
+            result = await server.query_graph.fn(query="MATCH (n) RETURN n", ctx=mock_ctx)
 
             # Verify rate limit error response
             assert result["success"] is False
@@ -98,8 +108,9 @@ class TestRateLimitEnforcement:
         server.rate_limit_enabled = True
 
         try:
-            # Call execute_cypher
-            result = await server.execute_cypher(cypher_query="MATCH (n) RETURN n LIMIT 1")
+            # Call execute_cypher with mock context
+            mock_ctx = create_mock_context()
+            result = await server.execute_cypher(cypher_query="MATCH (n) RETURN n LIMIT 1", ctx=mock_ctx)
 
             # Verify rate limit error response
             assert result["success"] is False
@@ -154,8 +165,9 @@ class TestRateLimitEnforcement:
         server.rate_limit_enabled = True
 
         try:
-            # Call query_graph
-            result = await server.query_graph.fn(query="Show me all nodes")
+            # Call query_graph with mock context
+            mock_ctx = create_mock_context()
+            result = await server.query_graph.fn(query="Show me all nodes", ctx=mock_ctx)
 
             # Verify it proceeded past rate limiting
             assert result["success"] is True
@@ -190,8 +202,9 @@ class TestRateLimitEnforcement:
         server.rate_limit_enabled = False
 
         try:
-            # Call query_graph
-            result = await server.query_graph.fn(query="Show me all nodes")
+            # Call query_graph with mock context
+            mock_ctx = create_mock_context()
+            result = await server.query_graph.fn(query="Show me all nodes", ctx=mock_ctx)
 
             # Verify rate limit check was NOT called
             mock_check_rate.assert_not_called()
@@ -230,10 +243,11 @@ class TestRateLimitEnforcement:
         server.rate_limit_enabled = True
 
         try:
-            # Make 3 sequential requests in the same session
-            await server.query_graph.fn(query="Request 1")
-            await server.query_graph.fn(query="Request 2")
-            await server.query_graph.fn(query="Request 3")
+            # Make 3 sequential requests in the same session with same context
+            mock_ctx = create_mock_context()
+            await server.query_graph.fn(query="Request 1", ctx=mock_ctx)
+            await server.query_graph.fn(query="Request 2", ctx=mock_ctx)
+            await server.query_graph.fn(query="Request 3", ctx=mock_ctx)
 
             # Verify check_rate_limit was called 3 times
             assert mock_check_rate.call_count == 3
@@ -284,10 +298,13 @@ class TestRateLimitEnforcement:
         server.rate_limit_enabled = True
 
         try:
+            # Create mock context for same session
+            mock_ctx = create_mock_context()
+
             # Make 5 requests - should all succeed
             successful_requests = 0
             for i in range(5):
-                result = await server.query_graph.fn(query=f"Request {i+1}")
+                result = await server.query_graph.fn(query=f"Request {i+1}", ctx=mock_ctx)
                 if result.get("success"):
                     successful_requests += 1
 
@@ -295,14 +312,14 @@ class TestRateLimitEnforcement:
             assert successful_requests == 5, f"Expected 5 successful requests, got {successful_requests}"
 
             # 6th request should be RATE LIMITED (bucket is empty)
-            result_6 = await server.query_graph.fn(query="Request 6 - should be blocked")
+            result_6 = await server.query_graph.fn(query="Request 6 - should be blocked", ctx=mock_ctx)
             assert result_6["success"] is False, "6th request should fail due to rate limiting"
             assert result_6.get("rate_limited") is True, "6th request should be marked as rate_limited"
             assert "Rate limit exceeded" in result_6.get("error", ""), "Error should mention rate limit"
             assert "retry_after_seconds" in result_6, "Should include retry_after_seconds"
 
             # 7th request should also be blocked
-            result_7 = await server.query_graph.fn(query="Request 7 - should also be blocked")
+            result_7 = await server.query_graph.fn(query="Request 7 - should also be blocked", ctx=mock_ctx)
             assert result_7["success"] is False, "7th request should fail due to rate limiting"
             assert result_7.get("rate_limited") is True, "7th request should be marked as rate_limited"
 
