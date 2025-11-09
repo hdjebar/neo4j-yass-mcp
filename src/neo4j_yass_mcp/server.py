@@ -1154,19 +1154,24 @@ def register_mcp_components():
         )
     )
 
-    mcp.tool()(
-        log_tool_invocation("execute_cypher")(
-            rate_limit_tool(
-                limiter=lambda: tool_rate_limiter,
-                client_id_extractor=get_client_id_from_context,
-                limit=EXECUTE_CYPHER_RATE_LIMIT,
-                window=EXECUTE_CYPHER_RATE_WINDOW,
-                enabled=lambda: tool_rate_limit_enabled,
-                tool_name="execute_cypher",
-                build_error_response=_build_execute_rate_limit_error,
-            )(execute_cypher)
+    # Register execute_cypher tool only if not in read-only mode
+    if not _read_only_mode:
+        mcp.tool()(
+            log_tool_invocation("execute_cypher")(
+                rate_limit_tool(
+                    limiter=lambda: tool_rate_limiter,
+                    client_id_extractor=get_client_id_from_context,
+                    limit=EXECUTE_CYPHER_RATE_LIMIT,
+                    window=EXECUTE_CYPHER_RATE_WINDOW,
+                    enabled=lambda: tool_rate_limit_enabled,
+                    tool_name="execute_cypher",
+                    build_error_response=_build_execute_rate_limit_error,
+                )(execute_cypher)
+            )
         )
-    )
+        logger.info("Tool 'execute_cypher' registered (write operations enabled)")
+    else:
+        logger.info("Tool 'execute_cypher' registration skipped (read-only mode active)")
 
     mcp.tool()(
         log_tool_invocation("refresh_schema")(
@@ -1183,11 +1188,6 @@ def register_mcp_components():
     )
 
     # The tools and resources are now registered with FastMCP
-    # In read-only mode, execute_cypher is not hidden by omitting registration
-    if not _read_only_mode:
-        logger.info("Tool 'execute_cypher' registered (write operations enabled)")
-    else:
-        logger.info("Tool 'execute_cypher' registration skipped (read-only mode active)")
 
 
 def main():
