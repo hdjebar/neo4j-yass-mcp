@@ -330,9 +330,7 @@ class QuerySanitizer:
                 # If ftfy had to fix things, it might indicate an attack
                 if normalized != query:
                     # Check what ftfy fixed
-                    if (
-                        len(normalized) < len(query) * 0.9
-                    ):  # >10% shrinkage suggests removed characters
+                    if len(normalized) < len(query) * 0.9:  # >10% shrinkage suggests removed characters
                         return (
                             False,
                             "Blocked: Query contained problematic Unicode sequences removed by normalization",
