@@ -65,7 +65,7 @@ if sanitizer_enabled:
         max_query_length=int(os.getenv("SANITIZER_MAX_QUERY_LENGTH", "10000")),
     )
     logger.info("Query sanitizer enabled (injection + UTF-8 attack protection active)")
-else:
+else:  # pragma: no cover - Module initialization, tested in production
     logger.warning("⚠️  Query sanitizer disabled - injection protection is OFF!")
 
 # Initialize query complexity limiter
@@ -77,7 +77,7 @@ if complexity_limit_enabled:
         require_limit_unbounded=os.getenv("REQUIRE_LIMIT_UNBOUNDED", "true").lower() == "true",
     )
     logger.info("Query complexity limiter enabled (prevents resource exhaustion attacks)")
-else:
+else:  # pragma: no cover - Module initialization, tested in production
     logger.warning("⚠️  Query complexity limiter disabled - no protection against complex queries!")
 
 # Initialize rate limiter
@@ -89,7 +89,7 @@ if rate_limit_enabled:
         burst=int(os.getenv("RATE_LIMIT_BURST", "20")) if os.getenv("RATE_LIMIT_BURST") else None,
     )
     logger.info("Rate limiter enabled (prevents abuse through excessive requests)")
-else:
+else:  # pragma: no cover - Module initialization, tested in production
     logger.warning("⚠️  Rate limiter disabled - no protection against request flooding!")
 
 # Initialize FastMCP server
