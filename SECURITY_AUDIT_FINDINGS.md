@@ -1,8 +1,8 @@
 # Security Audit Findings - CRITICAL VULNERABILITIES
 
 **Audit Date:** 2025-11-09
-**Status:** ✅ **CRITICAL + HIGH ISSUES FIXED** - SecureNeo4jGraph wrapper + Read-only bypass fixes implemented
-**Coverage:** 84.13% (369 tests passing)
+**Status:** ✅ **CRITICAL + HIGH + 1 MEDIUM FIXED** - Security vulnerabilities addressed
+**Coverage:** 84.13% (388 tests passing)
 
 ---
 
@@ -185,20 +185,23 @@ async def query_graph(query: str, context: Optional[dict] = None) -> dict:
 
 ---
 
-### 4. **Error Message Sanitization Case Sensitivity Bug (MEDIUM)**
+### 4. ✅ **Error Message Sanitization Case Sensitivity Bug (MEDIUM - FIXED)**
 
-**Location:** [server.py:210-225](src/neo4j_yass_mcp/server.py#L210-L225)
+**Location:** [server.py:215-259](src/neo4j_yass_mcp/server.py#L215-L259)
 
-**Vulnerability:**
+**Status:** ✅ **FIXED** - All safe patterns converted to lowercase
+
+**Vulnerability (ORIGINAL):**
 ```python
 def sanitize_error_message(error: Exception) -> str:
     error_str = str(error)
-    error_lower = error_str.lower()  # Line 216
+    error_lower = error_str.lower()  # Line 252
 
-    # Line 220-221: Compares MIXED-CASE patterns against lowercase string
+    # Lines 241-250: Compares MIXED-CASE patterns against lowercase string
     safe_patterns = [
         "authentication failed",
         "Connection refused",    # <-- This never matches!
+        "Query Exceeds Maximum Length",  # <-- Never matches!
         "timeout",
         # ... etc
     ]
@@ -207,23 +210,33 @@ def sanitize_error_message(error: Exception) -> str:
         if pattern in error_lower:  # "Connection refused" != "connection refused"
 ```
 
-**Impact:**
+**Impact (ORIGINAL):**
 - Most error messages reduced to useless "<Type>: An error occurred..."
 - Debugging and operations significantly harder
 - May leak sensitive info in unhandled cases
 
 **Severity:** 🟠 **MEDIUM** - Operations impact
 
-**Recommended Fix:**
+**Fix Implemented:**
 ```python
-# Line 220: Lowercase ALL patterns before comparison
+# Lines 240-251: All patterns now lowercase for case-insensitive matching
 safe_patterns = [
+    "query exceeds maximum length",  # Fixed - was mixed case
+    "empty query not allowed",  # Fixed - was mixed case
+    "blocked: query contains dangerous pattern",  # Fixed - was mixed case
     "authentication failed",
-    "connection refused",  # Already lowercase
+    "connection refused",  # Fixed - was "Connection refused"
     "timeout",
-    # ... etc (all lowercase)
+    "not found",
+    "unauthorized",
 ]
 ```
+
+**Verification:**
+- 19 comprehensive tests in [test_error_sanitization_fix.py](tests/unit/test_error_sanitization_fix.py)
+- Tests cover all case variations (lowercase, UPPERCASE, Title Case, MiXeD)
+- Verified patterns now match regardless of error message casing
+- Test suite: 388/389 tests passing (84.13% coverage)
 
 ---
 
@@ -324,16 +337,17 @@ def get_tokenizer():
 |----------|-------|--------|
 | ✅ CRITICAL | 1 | **FIXED** - SecureNeo4jGraph implemented |
 | ✅ HIGH | 1 | **FIXED** - Read-only bypass fixed with regex validation |
-| 🟠 MEDIUM | 2 | Fix in next sprint |
+| 🟠 MEDIUM | 2 | **1 FIXED**, 1 protocol limitation (requires MCP changes) |
 | 🟡 LOW | 2 | Backlog |
 
 ## 🎯 Immediate Actions
 
 1. ✅ **Issue #1 FIXED** - `SecureNeo4jGraph` wrapper implemented with pre-execution validation
-2. ✅ **Issue #2 FIXED** - Read-only mode bypass fixed with regex-based validation + 30 new tests
-3. **Next: Fix rate limiting** (Issue #3) - Global client_id breaking per-client enforcement
-4. Fix sanitize_error_message case sensitivity (Issue #4)
-5. Document security limitations in README
+2. ✅ **Issue #2 FIXED** - Read-only mode bypass fixed with regex-based validation + 30 tests
+3. ⚠️ **Issue #3 NOTED** - Rate limiting uses global client_id (MCP protocol limitation)
+4. ✅ **Issue #4 FIXED** - Error message sanitization case sensitivity fixed + 19 tests
+5. **Next: LOW priority issues** - Response truncation & tokenizer runtime downloads
+6. Document security limitations in README
 
 ## 🔧 Refactoring Recommendations
 

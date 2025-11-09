@@ -238,10 +238,11 @@ def sanitize_error_message(error: Exception) -> str:
     # Remove potential sensitive information (paths, credentials, IPs)
 
     # Known safe error patterns that can be shown as-is
+    # All patterns must be lowercase for case-insensitive matching
     safe_patterns = [
-        "Query exceeds maximum length",
-        "Empty query not allowed",
-        "Blocked: Query contains dangerous pattern",
+        "query exceeds maximum length",
+        "empty query not allowed",
+        "blocked: query contains dangerous pattern",
         "authentication failed",
         "connection refused",
         "timeout",
