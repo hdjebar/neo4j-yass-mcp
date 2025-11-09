@@ -134,28 +134,30 @@ _current_client_id: contextvars.ContextVar[str] = contextvars.ContextVar(
     "current_client_id"  # NO default - force LookupError
 )
 
-# Counter for generating unique client IDs
-_client_id_counter: int = 0
-
-
 def get_client_id() -> str:
     """
-    Get unique client ID for the current request.
+    Get stable client ID for the current MCP session.
 
-    Generates a NEW unique identifier for EACH MCP tool invocation to enable
-    true per-request rate limiting (not per-session or per-task).
+    Uses the async task ID as a stable session identifier so that all requests
+    from the same MCP client/session share the same rate limit bucket. This
+    enables per-session rate limiting where the rate limit is enforced across
+    multiple requests from the same client.
+
+    Each MCP client connection runs in its own async task, so the task ID
+    provides a stable, unique identifier for the session lifetime.
 
     Returns:
-        Unique client ID string
+        Stable client ID string for the current session
     """
-    global _client_id_counter
-
-    # ALWAYS generate a new client ID for each request
-    # This ensures per-request rate limiting instead of per-session
-    _client_id_counter += 1
-    client_id = f"client_{_client_id_counter}_{id(asyncio.current_task())}"
-    _current_client_id.set(client_id)
-    return client_id
+    try:
+        # Return existing client ID if already set for this session
+        return _current_client_id.get()
+    except LookupError:
+        # First request in this session - generate stable ID from task
+        # This ID will be reused for all subsequent requests in same session
+        client_id = f"session_{id(asyncio.current_task())}"
+        _current_client_id.set(client_id)
+        return client_id
 
 
 def get_executor() -> ThreadPoolExecutor:

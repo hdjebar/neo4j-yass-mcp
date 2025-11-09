@@ -65,8 +65,8 @@ class TestRateLimitEnforcement:
             mock_check_rate.assert_called_once()
             call_kwargs = mock_check_rate.call_args[1]
             assert "client_id" in call_kwargs
-            # Client ID should be unique (client_{counter}_{task_id})
-            assert call_kwargs["client_id"].startswith("client_")
+            # Client ID should be stable session ID (session_{task_id})
+            assert call_kwargs["client_id"].startswith("session_")
 
         finally:
             # Restore original state
@@ -120,8 +120,8 @@ class TestRateLimitEnforcement:
             mock_check_rate.assert_called_once()
             call_kwargs = mock_check_rate.call_args[1]
             assert "client_id" in call_kwargs
-            # Client ID should be unique (client_{counter}_{task_id})
-            assert call_kwargs["client_id"].startswith("client_")
+            # Client ID should be stable session ID (session_{task_id})
+            assert call_kwargs["client_id"].startswith("session_")
 
         finally:
             # Restore original state
@@ -165,8 +165,8 @@ class TestRateLimitEnforcement:
             mock_check_rate.assert_called_once()
             call_kwargs = mock_check_rate.call_args[1]
             assert "client_id" in call_kwargs
-            # Client ID should be unique (client_{counter}_{task_id})
-            assert call_kwargs["client_id"].startswith("client_")
+            # Client ID should be stable session ID (session_{task_id})
+            assert call_kwargs["client_id"].startswith("session_")
 
         finally:
             # Restore original state
@@ -205,8 +205,8 @@ class TestRateLimitEnforcement:
 
     @pytest.mark.asyncio
     @patch("neo4j_yass_mcp.server.check_rate_limit")
-    async def test_sequential_requests_get_different_client_ids(self, mock_check_rate):
-        """Test that sequential requests in same task get DIFFERENT client IDs (per-request rate limiting)"""
+    async def test_sequential_requests_share_same_client_id(self, mock_check_rate):
+        """Test that sequential requests in same session share SAME client ID (per-session rate limiting)"""
         from neo4j_yass_mcp import server
 
         # Setup: Always allow requests
@@ -230,7 +230,7 @@ class TestRateLimitEnforcement:
         server.rate_limit_enabled = True
 
         try:
-            # Make 3 sequential requests
+            # Make 3 sequential requests in the same session
             await server.query_graph.fn(query="Request 1")
             await server.query_graph.fn(query="Request 2")
             await server.query_graph.fn(query="Request 3")
@@ -244,20 +244,73 @@ class TestRateLimitEnforcement:
                 for call_args, call_kwargs in mock_check_rate.call_args_list
             ]
 
-            # CRITICAL ASSERTION: All client IDs must be different (per-request limiting)
-            assert len(set(client_ids)) == 3, (
-                f"Expected 3 different client IDs for 3 requests, "
-                f"but got: {client_ids}. "
-                "This means rate limiting is still per-session, not per-request!"
+            # CRITICAL ASSERTION: All client IDs must be SAME (per-session limiting)
+            # This ensures rate limiting is enforced across multiple requests from same session
+            assert len(set(client_ids)) == 1, (
+                f"Expected same client ID for all 3 requests in same session, "
+                f"but got different IDs: {client_ids}. "
+                "This means rate limiting would not work - each request gets fresh bucket!"
             )
 
-            # Verify all IDs follow the expected format
-            for client_id in client_ids:
-                assert client_id.startswith("client_")
+            # Verify ID follows the expected format (session_<task_id>)
+            client_id = client_ids[0]
+            assert client_id.startswith("session_"), f"Expected 'session_' prefix, got: {client_id}"
 
         finally:
             # Restore original state
             server.rate_limit_enabled = original_rate_limit_enabled
+
+
+    @pytest.mark.asyncio
+    @patch("neo4j_yass_mcp.security.rate_limiter._rate_limiter", None)
+    async def test_rate_limiting_actually_blocks_after_limit(self):
+        """Test that rate limiting ACTUALLY blocks requests after exceeding the limit (REAL functionality test)"""
+        from neo4j_yass_mcp import server
+        from neo4j_yass_mcp.security import initialize_rate_limiter
+
+        # Initialize a real rate limiter with very restrictive limits for testing
+        # Allow 5 requests per 60 seconds, burst of 5
+        initialize_rate_limiter(rate=5, per_seconds=60, burst=5)
+
+        # Setup server state
+        mock_chain = Mock()
+        mock_chain.invoke.return_value = {
+            "result": "Query executed",
+            "intermediate_steps": [{"query": "MATCH (n) RETURN n"}],
+        }
+        server.chain = mock_chain
+        server.graph = MagicMock()
+        original_rate_limit_enabled = server.rate_limit_enabled
+        server.rate_limit_enabled = True
+
+        try:
+            # Make 5 requests - should all succeed
+            successful_requests = 0
+            for i in range(5):
+                result = await server.query_graph.fn(query=f"Request {i+1}")
+                if result.get("success"):
+                    successful_requests += 1
+
+            # All 5 should succeed (within burst limit)
+            assert successful_requests == 5, f"Expected 5 successful requests, got {successful_requests}"
+
+            # 6th request should be RATE LIMITED (bucket is empty)
+            result_6 = await server.query_graph.fn(query="Request 6 - should be blocked")
+            assert result_6["success"] is False, "6th request should fail due to rate limiting"
+            assert result_6.get("rate_limited") is True, "6th request should be marked as rate_limited"
+            assert "Rate limit exceeded" in result_6.get("error", ""), "Error should mention rate limit"
+            assert "retry_after_seconds" in result_6, "Should include retry_after_seconds"
+
+            # 7th request should also be blocked
+            result_7 = await server.query_graph.fn(query="Request 7 - should also be blocked")
+            assert result_7["success"] is False, "7th request should fail due to rate limiting"
+            assert result_7.get("rate_limited") is True, "7th request should be marked as rate_limited"
+
+        finally:
+            # Restore original state
+            server.rate_limit_enabled = original_rate_limit_enabled
+            # Reinitialize with default settings for other tests
+            initialize_rate_limiter()
 
 
 if __name__ == "__main__":
