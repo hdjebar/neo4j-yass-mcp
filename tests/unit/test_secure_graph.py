@@ -9,7 +9,7 @@ intercepts and validates queries BEFORE they reach the Neo4j driver. We test
 that the wrapper correctly calls security functions and blocks unsafe queries.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 

@@ -73,8 +73,14 @@ class QuerySanitizer:
         r";\s+(?i:DELETE)",  # Query chaining with any whitespace
         r";\s+(?i:DROP)",  # Query chaining with any whitespace
         r";\s+(?i:CALL)",  # Query chaining with CALL
+        # Comment-based injection (multi-line aware)
+        r"/\*[\s\S]*?\*/",  # Block comments
+        r"//[^\n]*",  # Line comments
         # Excessive operations
         r"(?i)FOREACH\s*\([^)]*\s+IN\s+range\s*\(\s*\d+\s*,\s*\d{6,}",  # Large range iterations
+        # String concatenation (LLM injection vector)
+        r"'.*?'\s*\+\s*'.*?'",
+        r'".*?"\s*\+\s*".*?"',
         # Additional dangerous patterns
         r"(?i)apoc\.periodic\.iterate",  # Batch operations that can cause DoS
         r"(?i)apoc\.cypher\.parallel",  # Parallel execution abuse
@@ -147,17 +153,19 @@ class QuerySanitizer:
                 warnings,
             )
 
-        # Strip comments before further validation
-        query = self._strip_comments(query)
+        original_query = query
 
-        # Check 2: Null or empty after stripping comments
+        # Check 2: Check for dangerous patterns (operate on original query so comments are detected)
+        for pattern in self.DANGEROUS_PATTERNS:
+            if re.search(pattern, original_query, re.IGNORECASE | re.MULTILINE):
+                return False, f"Blocked: Query contains dangerous pattern: {pattern}", warnings
+
+        # Strip comments before further validation
+        query = self._strip_comments(original_query)
+
+        # Check 3: Null or empty after stripping comments
         if not query or not query.strip():
             return False, "Empty query not allowed", warnings
-
-        # Check 3: Check for dangerous patterns
-        for pattern in self.DANGEROUS_PATTERNS:
-            if re.search(pattern, query, re.IGNORECASE | re.MULTILINE):
-                return False, f"Blocked: Query contains dangerous pattern: {pattern}", warnings
 
         # Check 4: Check for suspicious patterns
         for pattern in self.SUSPICIOUS_PATTERNS:

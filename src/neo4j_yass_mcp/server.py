@@ -17,7 +17,6 @@ import json
 import logging
 import os
 import re
-import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
@@ -129,6 +128,7 @@ _debug_mode: bool = False
 # Tokenizer for accurate token counting (can be tiktoken, tokenizers, or None)
 _tokenizer: Any = None
 
+
 def get_client_id_from_context(ctx: Context | None = None) -> str:
     """
     Extract client identifier from FastMCP Context for rate limiting.
@@ -150,23 +150,30 @@ def get_client_id_from_context(ctx: Context | None = None) -> str:
         limitation that requires FastMCP session tracking improvements.
     """
     if ctx is None:
-        # Should not happen in production (Context auto-injected), but handle gracefully
-        logger.warning("No Context provided to get_client_id_from_context - rate limiting degraded")
+        logger.warning("No Context provided to get_client_id_from_context - using 'unknown'")
         return "unknown"
 
     # Use FastMCP session_id if available (persistent across requests from same client)
-    if ctx.session_id:
-        return f"session_{ctx.session_id}"
+    session_id = getattr(ctx, "session_id", None)
+    if session_id:
+        return f"session_{session_id}"
 
     # Fallback: Use client_id if available
-    if ctx.client_id:
-        return f"client_{ctx.client_id}"
+    client_id = getattr(ctx, "client_id", None)
+    if client_id:
+        return f"client_{client_id}"
 
-    # Last resort: No session identification available
-    # This means all clients share one rate limit bucket (known limitation)
+    # Last resort: fall back to request_id (unique per invocation)
+    request_id = getattr(ctx, "request_id", None)
+    if request_id:
+        logger.warning(
+            "FastMCP Context missing session_id/client_id - using request_id '%s' as fallback",
+            request_id,
+        )
+        return f"request_{request_id}"
+
     logger.warning(
-        "FastMCP Context has no session_id or client_id - "
-        "rate limiting will be shared across all clients"
+        "FastMCP Context missing session_id, client_id, and request_id - using 'unknown' bucket"
     )
     return "unknown"
 

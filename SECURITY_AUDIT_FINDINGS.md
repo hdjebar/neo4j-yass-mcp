@@ -175,52 +175,49 @@ The initial fix generated a NEW client_id for EVERY request, which completely di
 
 **Fix Implemented (PARTIAL - IN PROGRESS):**
 ```python
-# Lines 132-134: Request counter for unique per-request IDs
-_request_counter: int = 0
-_counter_lock = threading.Lock()
+# Lines 143-182: Multi-tier client ID generation
+def get_client_id_from_context(ctx: Context | None = None) -> str:
+    if ctx is None:
+        logger.warning("No FastMCP Context provided - using 'unknown'")
+        return "unknown"
 
-# Lines 137-167: Multi-tier client ID generation
-def get_client_id(session_id: str | None = None, client_id: str | None = None) -> str:
-    """
-    Get client identifier for rate limiting.
-
-    Prioritizes FastMCP session metadata when available, falls back to
-    unique per-request identifier.
-    """
-    # Priority 1: Use FastMCP session_id if available (most reliable)
+    session_id = getattr(ctx, "session_id", None)
     if session_id:
         return f"session_{session_id}"
 
-    # Priority 2: Use FastMCP client_id if available
+    client_id = getattr(ctx, "client_id", None)
     if client_id:
         return f"client_{client_id}"
 
-    # Priority 3: Generate unique per-request ID (prevents bucket sharing)
-    global _request_counter
-    with _counter_lock:
-        _request_counter += 1
-        return f"request_{_request_counter}_{id(asyncio.current_task())}"
+    request_id = getattr(ctx, "request_id", None)
+    if request_id:
+        logger.warning(
+            "FastMCP Context missing session_id/client_id - using request_id '%s' as fallback",
+            request_id,
+        )
+        return f"request_{request_id}"
+
+    logger.warning(
+        "FastMCP Context missing session_id, client_id, and request_id - "
+        "rate limiting falls back to 'unknown' (shared bucket)"
+    )
+    return "unknown"
 ```
 
 **Current Limitation:**
-- FastMCP Context.session_id and Context.client_id are passed to get_client_id()
-- However, these may be None in current FastMCP versions
-- Fallback generates per-request IDs, which means each request gets fresh rate limit bucket
-- This prevents rate limiting from working effectively (requests never hit limits)
-- **Proper fix requires:** Reliable session identification from FastMCP or external auth layer
+- FastMCP Context.session_id and Context.client_id are not always populated (transport-dependent)
+- When both are missing we fall back to request_id (per-request). This prevents outright crashes but means rate limiting reverts to per-request buckets on transports that omit session metadata.
+- **Proper fix requires:** Reliable session identification from FastMCP or an explicit session-tracking layer above FastMCP
 
 **Verification (Current State):**
-- When FastMCP Context provides session_id: Proper per-session rate limiting works
-- When FastMCP Context.session_id is None (current reality): Each request gets unique ID
-- Tests demonstrate the mechanism works when session info is available
-- **Known issue:** Without reliable session identification, rate limiting is effectively disabled
+- When FastMCP Context provides session_id/client_id: Proper per-session rate limiting works (tests cover reuse and blocking)
+- When Context lacks identifiers: rate limiting is effectively per-request (shared quota), matching the documented trade-off and covered by tests to avoid silent regressions.
 - Test suite: 415 tests passing
 
 **Next Steps for Complete Fix:**
-1. Wait for FastMCP session_id reliability improvements
-2. OR implement external session tracking (e.g., via client certificates, API keys)
-3. OR use transport-level identifiers (IP + connection ID)
-4. Add integration tests that verify cross-session isolation when session_id available
+1. Ensure FastMCP Context always exposes stable session identifiers
+2. Consider persisting session IDs derived from authenticated principals/API keys
+3. Add transport-specific integration tests to guarantee session identifiers remain stable
 
 ---
 
