@@ -57,14 +57,16 @@ except Exception as e:
         try:
             # Get coverage config path
             cwd = "/Users/hdjebar/Projects/neo4j-yass-mcp"
-            coverage_rc = os.path.join(cwd, "pyproject.toml")
+            coverage_rc = os.path.join(cwd, ".coveragerc")
 
             # Start server process with coverage
             env = os.environ.copy()
             env['COVERAGE_PROCESS_START'] = coverage_rc
+            # Add project root to PYTHONPATH so sitecustomize.py is found
+            env['PYTHONPATH'] = cwd + os.pathsep + env.get('PYTHONPATH', '')
 
             proc = subprocess.Popen(
-                [sys.executable, "-m", "coverage", "run", "--parallel-mode", script_path],
+                [sys.executable, script_path],  # sitecustomize.py auto-starts coverage
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 cwd=cwd,
@@ -122,14 +124,15 @@ except Exception as e:
 
         try:
             cwd = "/Users/hdjebar/Projects/neo4j-yass-mcp"
-            coverage_rc = os.path.join(cwd, "pyproject.toml")
+            coverage_rc = os.path.join(cwd, ".coveragerc")
 
             env = os.environ.copy()
             env['COVERAGE_PROCESS_START'] = coverage_rc
+            env['PYTHONPATH'] = cwd + os.pathsep + env.get('PYTHONPATH', '')
 
             # Run and expect failure
             result = subprocess.run(
-                [sys.executable, "-m", "coverage", "run", "--parallel-mode", script_path],
+                [sys.executable, script_path],  # sitecustomize.py auto-starts coverage
                 capture_output=True,
                 timeout=10,
                 cwd=cwd,
@@ -183,13 +186,14 @@ except KeyboardInterrupt:
 
         try:
             cwd = "/Users/hdjebar/Projects/neo4j-yass-mcp"
-            coverage_rc = os.path.join(cwd, "pyproject.toml")
+            coverage_rc = os.path.join(cwd, ".coveragerc")
 
             env = os.environ.copy()
             env['COVERAGE_PROCESS_START'] = coverage_rc
+            env['PYTHONPATH'] = cwd + os.pathsep + env.get('PYTHONPATH', '')
 
             proc = subprocess.Popen(
-                [sys.executable, "-m", "coverage", "run", "--parallel-mode", script_path],
+                [sys.executable, script_path],  # sitecustomize.py auto-starts coverage
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 cwd=cwd,
