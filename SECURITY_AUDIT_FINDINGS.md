@@ -171,7 +171,7 @@ is_allowed, rate_info = check_rate_limit(client_id="default")
 ```python
 # Lines 133-163: Context-based client ID tracking
 _current_client_id: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "current_client_id", default="default"
+    "current_client_id"  # NO default - force LookupError
 )
 
 _client_id_counter: int = 0
