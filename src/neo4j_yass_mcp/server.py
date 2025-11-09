@@ -330,18 +330,18 @@ def get_tokenizer() -> Any:
         # Try Hugging Face tokenizers first (handles most models including GPT-2, GPT-3, Llama, etc.)
         if Tokenizer is not None:
             try:
-                logger.info("Initializing Hugging Face tokenizer (gpt2, local files only)")
-                _tokenizer = Tokenizer.from_pretrained("gpt2", local_files_only=True)
+                logger.info("Initializing Hugging Face tokenizer (gpt2)")
+                _tokenizer = Tokenizer.from_pretrained("gpt2")
                 return _tokenizer
             except Exception as e:
                 logger.warning(
-                    f"Hugging Face tokenizer initialization failed (local_files_only): {e}, trying next backend. "
+                    f"Hugging Face tokenizer initialization failed: {e}, trying next backend. "
                     "Consider running 'python -c \"from tokenizers import Tokenizer; Tokenizer.from_pretrained('gpt2')\"' "
                     "to download tokenizer data."
                 )
 
         # Fall back to tiktoken (fast, no download needed)
-        if tiktoken is not None and _tokenizer is None:
+        if "tiktoken" in globals() and tiktoken is not None and _tokenizer is None:
             try:
                 logger.info("Initializing tiktoken tokenizer (gpt2)")
                 _tokenizer = tiktoken.get_encoding("gpt2")
@@ -1172,7 +1172,7 @@ def register_mcp_components():
         )
     )
 
-    decorated_execute_cypher = mcp.tool()(
+    mcp.tool()(
         log_tool_invocation("execute_cypher")(
             rate_limit_tool(
                 limiter=lambda: tool_rate_limiter,
