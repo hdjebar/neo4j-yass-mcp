@@ -30,8 +30,10 @@ import signal
 # Set environment for test
 os.environ['MCP_TRANSPORT'] = 'stdio'
 os.environ['NEO4J_URI'] = 'bolt://localhost:7687'
-os.environ['NEO4J_USER'] = 'neo4j'
+os.environ['NEO4J_USERNAME'] = 'neo4j'
 os.environ['NEO4J_PASSWORD'] = 'test-password'
+os.environ['ALLOW_WEAK_PASSWORDS'] = 'true'
+os.environ['ENVIRONMENT'] = 'development'
 
 # Handle SIGTERM gracefully
 def handle_sigterm(signum, frame):
@@ -107,7 +109,7 @@ import os
 
 # Set invalid Neo4j credentials to force initialization error
 os.environ['NEO4J_URI'] = 'bolt://invalid-host:9999'
-os.environ['NEO4J_USER'] = 'invalid'
+os.environ['NEO4J_USERNAME'] = 'invalid'
 os.environ['NEO4J_PASSWORD'] = 'invalid'
 os.environ['MCP_TRANSPORT'] = 'stdio'
 
@@ -163,8 +165,10 @@ import signal
 
 os.environ['MCP_TRANSPORT'] = 'stdio'
 os.environ['NEO4J_URI'] = 'bolt://localhost:7687'
-os.environ['NEO4J_USER'] = 'neo4j'
+os.environ['NEO4J_USERNAME'] = 'neo4j'
 os.environ['NEO4J_PASSWORD'] = 'test-password'
+os.environ['ALLOW_WEAK_PASSWORDS'] = 'true'
+os.environ['ENVIRONMENT'] = 'development'
 os.environ['READ_ONLY_MODE'] = 'true'  # Enable read-only mode
 
 def handle_sigterm(signum, frame):
