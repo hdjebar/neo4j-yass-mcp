@@ -169,7 +169,7 @@ os.environ['NEO4J_USERNAME'] = 'neo4j'
 os.environ['NEO4J_PASSWORD'] = 'test-password'
 os.environ['ALLOW_WEAK_PASSWORDS'] = 'true'
 os.environ['ENVIRONMENT'] = 'development'
-os.environ['READ_ONLY_MODE'] = 'true'
+os.environ['READ_ONLY_MODE'] = 'true'  # Enable read-only mode
 
 def handle_sigterm(signum, frame):
     sys.exit(0)
