@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neo4j YASS MCP Test Page</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2c3e50;
+            --success-color: #2ecc71;
+            --error-color: #e74c3c;
+            --warning-color: #f39c12;
+            --light-bg: #f8f9fa;
+            --dark-bg: #2c3e50;
+            --text-color: #2c3e50;
+            --border-color: #dee2e6;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--light-bg);
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        header h1 {
+            color: var(--secondary-color);
+            margin-bottom: 10px;
+        }
+
+        header p {
+            color: #666;
+        }
+
+        section {
+            margin-bottom: 30px;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h2 {
+            color: var(--secondary-color);
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        h3 {
+            color: var(--secondary-color);
+            margin-top: 15px;
+            margin-bottom: 10px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: var(--secondary-color);
+        }
+
+        input[type="text"],
+        input[type="password"],
+        input[type="number"],
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+
+        textarea {
+            min-height: 120px;
+            font-family: 'Courier New', monospace;
+            resize: vertical;
+        }
+
+        .config-row {
+            margin-bottom: 15px;
+        }
+
+        .toggle-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .toggle-btn {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid var(--primary-color);
+            background-color: white;
+            color: var(--primary-color);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-btn:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .toggle-btn.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .query-section {
+            margin-bottom: 15px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 15px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        .sample-btn {
+            background-color: #9b59b6;
+        }
+
+        .sample-btn:hover {
+            background-color: #8e44ad;
+        }
+
+        #submit-btn {
+            background-color: var(--success-color);
+            padding: 12px 25px;
+            font-size: 16px;
+        }
+
+        #submit-btn:hover {
+            background-color: #27ae60;
+        }
+
+        #clear-btn {
+            background-color: var(--warning-color);
+        }
+
+        #clear-btn:hover {
+            background-color: #d35400;
+        }
+
+        .results-info {
+            background-color: #e8f4fd;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            text-align: center;
+            color: #2980b9;
+        }
+
+        .result-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 4px;
+        }
+
+        #response-data, #generated-cypher, #error-message {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .error {
+            background-color: #fadbd8;
+            border-left: 4px solid var(--error-color);
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .status.loading {
+            background-color: #f39c12;
+            color: white;
+        }
+
+        .status.success {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        .status.error {
+            background-color: var(--error-color);
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .toggle-group {
+                flex-direction: column;
+            }
+            
+            .button-row {
+                flex-direction: column;
+            }
+            
+            button, .sample-btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Neo4j YASS MCP Test Page</h1>
+        <p>Test your Neo4j MCP server endpoints</p>
+    </header>
+
+    <section id="configuration">
+        <h2>Configuration</h2>
+        <div class="config-row">
+            <label for="endpoint">MCP Endpoint:</label>
+            <input type="text" id="endpoint" placeholder="http://localhost:8000" value="http://localhost:8000">
+        </div>
+        <div class="config-row">
+            <label for="token">Authentication Token:</label>
+            <input type="password" id="token" placeholder="Enter your token">
+        </div>
+        <div class="config-row">
+            <label for="timeout">Timeout (ms):</label>
+            <input type="number" id="timeout" value="30000" min="1000" max="60000">
+        </div>
+    </section>
+
+    <section id="query-type">
+        <h2>Query Type</h2>
+        <div class="toggle-group">
+            <button id="nl-toggle" class="toggle-btn active">Natural Language</button>
+            <button id="cypher-toggle" class="toggle-btn">Raw Cypher</button>
+        </div>
+    </section>
+
+    <section id="query-input">
+        <h2>Query Input</h2>
+        <div id="nl-query" class="query-section">
+            <label for="nl-text">Natural Language Query:</label>
+            <textarea id="nl-text" placeholder="Ask a question about your graph (e.g., 'Who starred in Top Gun?')"></textarea>
+        </div>
+        <div id="cypher-query" class="query-section hidden">
+            <label for="cypher-text">Raw Cypher Query:</label>
+            <textarea id="cypher-text" placeholder="Enter a Cypher query (e.g., 'MATCH (n:Person) RETURN n LIMIT 10')"></textarea>
+        </div>
+    </section>
+
+    <section id="test-buttons">
+        <h2>Quick Test Queries</h2>
+        <div class="button-row">
+            <button class="sample-btn" data-type="nl" data-query="Who starred in Top Gun?">Top Gun Query</button>
+            <button class="sample-btn" data-type="nl" data-query="Show all movies released in 1986">Movies from 1986</button>
+        </div>
+        <div class="button-row">
+            <button class="sample-btn" data-type="cypher" data-query="MATCH (n:Movie) RETURN n.title LIMIT 5">Get 5 Movies</button>
+            <button class="sample-btn" data-type="cypher" data-query="MATCH (n) RETURN count(n) AS nodeCount">Count All Nodes</button>
+        </div>
+    </section>
+
+    <section id="actions">
+        <button id="submit-btn">Submit Query</button>
+        <button id="clear-btn">Clear Results</button>
+    </section>
+
+    <section id="results">
+        <h2>Results</h2>
+        <div id="results-display">
+            <div id="results-info" class="results-info">No results yet. Submit a query to see results.</div>
+            <div id="cypher-output" class="result-section hidden">
+                <h3>Generated Cypher Query:</h3>
+                <pre id="generated-cypher"></pre>
+            </div>
+            <div id="execution-info" class="result-section hidden">
+                <h3>Execution Info:</h3>
+                <div id="exec-time"></div>
+            </div>
+            <div id="response-output" class="result-section hidden">
+                <h3>Response:</h3>
+                <pre id="response-data"></pre>
+            </div>
+            <div id="error-output" class="result-section hidden error">
+                <h3>Error:</h3>
+                <pre id="error-message"></pre>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // DOM Elements
+        const nlToggle = document.getElementById('nl-toggle');
+        const cypherToggle = document.getElementById('cypher-toggle');
+        const nlQuerySection = document.getElementById('nl-query');
+        const cypherQuerySection = document.getElementById('cypher-query');
+        const nlText = document.getElementById('nl-text');
+        const cypherText = document.getElementById('cypher-text');
+        const submitBtn = document.getElementById('submit-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const sampleBtns = document.querySelectorAll('.sample-btn');
+        
+        // Results Elements
+        const resultsInfo = document.getElementById('results-info');
+        const cypherOutput = document.getElementById('cypher-output');
+        const execTime = document.getElementById('exec-time');
+        const responseOutput = document.getElementById('response-output');
+        const errorOutput = document.getElementById('error-output');
+        const generatedCypher = document.getElementById('generated-cypher');
+        const responseData = document.getElementById('response-data');
+        const errorMessage = document.getElementById('error-message');
+        
+        // Current query type ('nl' or 'cypher')
+        let currentQueryType = 'nl';
+
+        // Toggle query type
+        nlToggle.addEventListener('click', () => {
+            currentQueryType = 'nl';
+            nlToggle.classList.add('active');
+            cypherToggle.classList.remove('active');
+            nlQuerySection.classList.remove('hidden');
+            cypherQuerySection.classList.add('hidden');
+        });
+
+        cypherToggle.addEventListener('click', () => {
+            currentQueryType = 'cypher';
+            cypherToggle.classList.add('active');
+            nlToggle.classList.remove('active');
+            cypherQuerySection.classList.remove('hidden');
+            nlQuerySection.classList.add('hidden');
+        });
+
+        // Sample query buttons
+        sampleBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const queryType = btn.getAttribute('data-type');
+                const query = btn.getAttribute('data-query');
+                
+                if (queryType === 'nl') {
+                    // Switch to NL mode if not already
+                    if (currentQueryType !== 'nl') {
+                        currentQueryType = 'nl';
+                        nlToggle.classList.add('active');
+                        cypherToggle.classList.remove('active');
+                        nlQuerySection.classList.remove('hidden');
+                        cypherQuerySection.classList.add('hidden');
+                    }
+                    nlText.value = query;
+                } else {
+                    // Switch to Cypher mode if not already
+                    if (currentQueryType !== 'cypher') {
+                        currentQueryType = 'cypher';
+                        cypherToggle.classList.add('active');
+                        nlToggle.classList.remove('active');
+                        cypherQuerySection.classList.remove('hidden');
+                        nlQuerySection.classList.add('hidden');
+                    }
+                    cypherText.value = query;
+                }
+            });
+        });
+
+        // Clear results
+        clearBtn.addEventListener('click', () => {
+            clearResults();
+        });
+
+        // Submit query
+        submitBtn.addEventListener('click', async () => {
+            const query = currentQueryType === 'nl' ? nlText.value.trim() : cypherText.value.trim();
+            const endpoint = document.getElementById('endpoint').value.trim();
+            const token = document.getElementById('token').value.trim();
+            const timeout = parseInt(document.getElementById('timeout').value);
+
+            if (!query) {
+                alert('Please enter a query');
+                return;
+            }
+
+            if (!endpoint) {
+                alert('Please enter an endpoint URL');
+                return;
+            }
+
+            // Show loading state
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+            
+            // Clear previous results
+            clearResults();
+            
+            try {
+                // Record start time
+                const startTime = Date.now();
+                
+                // Prepare request based on query type
+                let toolName, params;
+                if (currentQueryType === 'nl') {
+                    toolName = 'query_graph';
+                    params = { query: query };
+                } else {
+                    toolName = 'execute_cypher';
+                    params = { cypher_query: query };
+                }
+
+                // Make request to MCP server
+                const response = await makeMcpRequest(endpoint, toolName, params, token, timeout);
+                const endTime = Date.now();
+                const executionTime = endTime - startTime;
+
+                // Display results
+                displaySuccess(response, executionTime, currentQueryType === 'nl' ? response.generated_cypher : query);
+            } catch (error) {
+                displayError(error.message);
+            } finally {
+                // Reset button
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Query';
+            }
+        });
+
+        // Function to make MCP request
+        async function makeMcpRequest(endpoint, toolName, params, token, timeout) {
+            // Construct the URL for the MCP tool
+            // For a proper MCP server, this would use the MCP protocol
+            // For testing purposes, we'll simulate the call
+            
+            // In a real implementation, this would make a proper MCP request
+            // For now, we'll create a simple HTTP API call structure
+            const requestUrl = endpoint;
+            
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+            
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            
+            const body = JSON.stringify({
+                tool_name: toolName,
+                parameters: params
+            });
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+            try {
+                const response = await fetch(requestUrl, {
+                    method: 'POST',
+                    headers,
+                    body,
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                clearTimeout(timeoutId);
+                if (error.name === 'AbortError') {
+                    throw new Error('Request timeout');
+                }
+                throw error;
+            }
+        }
+
+        // Display success results
+        function displaySuccess(response, executionTime, generatedCypherQuery) {
+            // Show results section
+            resultsInfo.classList.add('hidden');
+            
+            // Display generated Cypher if available
+            if (generatedCypherQuery) {
+                generatedCypher.textContent = generatedCypherQuery;
+                cypherOutput.classList.remove('hidden');
+            } else {
+                cypherOutput.classList.add('hidden');
+            }
+            
+            // Display execution time
+            execTime.textContent = `Execution Time: ${executionTime}ms`;
+            execTime.classList.remove('hidden');
+            executionInfo.classList.remove('hidden');
+            
+            // Display response data
+            responseData.textContent = JSON.stringify(response, null, 2);
+            responseOutput.classList.remove('hidden');
+            
+            // Hide error section
+            errorOutput.classList.add('hidden');
+        }
+
+        // Display error
+        function displayError(message) {
+            // Show results section
+            resultsInfo.classList.add('hidden');
+            
+            // Hide other sections
+            cypherOutput.classList.add('hidden');
+            executionInfo.classList.add('hidden');
+            responseOutput.classList.add('hidden');
+            
+            // Show error
+            errorMessage.textContent = message;
+            errorOutput.classList.remove('hidden');
+        }
+
+        // Clear all results
+        function clearResults() {
+            resultsInfo.textContent = 'No results yet. Submit a query to see results.';
+            resultsInfo.classList.remove('hidden');
+            
+            // Hide all result sections
+            cypherOutput.classList.add('hidden');
+            executionInfo.classList.add('hidden');
+            responseOutput.classList.add('hidden');
+            errorOutput.classList.add('hidden');
+            
+            // Clear content
+            generatedCypher.textContent = '';
+            execTime.textContent = '';
+            responseData.textContent = '';
+            errorMessage.textContent = '';
+        }
+
+        // Add a function to simulate MCP protocol calls if needed
+        // This would connect to a running MCP server via HTTP transport
+        function setupMcpConnection(endpoint) {
+            // In a real implementation, this would establish a connection
+            // to the MCP server using the appropriate transport mechanism
+            console.log('Setting up MCP connection to:', endpoint);
+        }
+    </script>
+</body>
+</html>
