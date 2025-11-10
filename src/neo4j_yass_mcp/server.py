@@ -499,14 +499,24 @@ def initialize_neo4j():
         logger.error(f"   Reason: {weakness_reason}")
         logger.error("   Set a strong password in NEO4J_PASSWORD environment variable")
 
-        # Allow in development, but warn heavily
-        if os.getenv("ALLOW_WEAK_PASSWORDS", "false").lower() != "true":
+        # Only allow weak passwords in development environment
+        allow_weak_passwords = os.getenv("ALLOW_WEAK_PASSWORDS", "false").lower() == "true"
+        environment = os.getenv("ENVIRONMENT", "development").lower()
+
+        if allow_weak_passwords:
+            if environment in ("production", "prod"):
+                logger.error("❌ ALLOW_WEAK_PASSWORDS cannot be enabled in production environment")
+                raise ValueError(
+                    "ALLOW_WEAK_PASSWORDS=true is not allowed in production. "
+                    "Set ENVIRONMENT=development to allow weak passwords during development."
+                )
+            else:
+                logger.warning(
+                    f"⚠️  ALLOW_WEAK_PASSWORDS=true - Weak password allowed (DEVELOPMENT ONLY!): {weakness_reason}"
+                )
+        else:
             raise ValueError(
                 f"Weak password detected: {weakness_reason}. Set ALLOW_WEAK_PASSWORDS=true to override (NOT recommended for production)"
-            )
-        else:
-            logger.warning(
-                f"⚠️  ALLOW_WEAK_PASSWORDS=true - Weak password allowed (DEVELOPMENT ONLY!): {weakness_reason}"
             )
 
     # Debug mode with production environment check

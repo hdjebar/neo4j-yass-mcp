@@ -120,17 +120,20 @@ class TokenBucketRateLimiter:
             # Refill tokens
             tokens = self._refill_tokens(client_id)
 
+            # Get current time for consistent calculations
+            now_timestamp = time.time()
+            now_datetime = datetime.now()
+
             # Check if enough tokens available
             if tokens >= cost:
                 # Consume tokens
                 tokens -= cost
-                now = time.time()
-                self._buckets[client_id] = (tokens, now)
+                self._buckets[client_id] = (tokens, now_timestamp)
 
                 # Calculate reset time (when bucket will be full again)
                 tokens_to_fill = self.burst - tokens
                 seconds_to_fill = tokens_to_fill / self.refill_rate
-                reset_time = datetime.now() + timedelta(seconds=seconds_to_fill)
+                reset_time = now_datetime + timedelta(seconds=seconds_to_fill)
 
                 return RateLimitInfo(
                     allowed=True,
@@ -141,7 +144,7 @@ class TokenBucketRateLimiter:
                 # Not enough tokens - calculate retry time
                 tokens_needed = cost - tokens
                 retry_after = tokens_needed / self.refill_rate
-                reset_time = datetime.now() + timedelta(seconds=retry_after)
+                reset_time = now_datetime + timedelta(seconds=retry_after)
 
                 logger.warning(
                     f"Rate limit exceeded for client '{client_id}': "

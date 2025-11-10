@@ -107,7 +107,7 @@ class QueryComplexityAnalyzer:
             for pattern in variable_patterns:
                 if isinstance(pattern, tuple):
                     # Pattern like [*1..5] or [*..10]
-                    int(pattern[0]) if pattern[0] else 1
+                    # min_val = int(pattern[0]) if pattern[0] else 1  # Not currently used in algorithm
                     max_val = int(pattern[1]) if pattern[1] else self.max_variable_path_length
                     max_length = max(max_length, max_val)
                 else:
