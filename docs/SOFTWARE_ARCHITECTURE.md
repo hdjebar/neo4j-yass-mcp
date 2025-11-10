@@ -12,14 +12,36 @@
 
 1. [Executive Summary](#executive-summary)
 2. [Architectural Overview](#architectural-overview)
+   - [2.1 High-Level Architecture](#21-high-level-architecture)
+   - [2.2 Component Architecture](#22-component-architecture)
+   - [2.3 Layered Architecture](#23-layered-architecture)
 3. [System Context](#system-context)
 4. [Component Architecture](#component-architecture)
 5. [Data Flow](#data-flow)
+   - [5.1 Natural Language Query Flow](#51-natural-language-query-flow)
+   - [5.2 Raw Cypher Query Flow](#52-raw-cypher-query-flow)
+   - [5.3 Query Execution Flow](#53-query-execution-flow)
 6. [Security Architecture](#security-architecture)
+   - [6.1 Defense-in-Depth Model](#61-defense-in-depth-model)
+   - [6.2 Defense in Depth Strategy](#62-defense-in-depth-strategy)
+   - [6.3 Security Controls](#63-security-controls)
+     - [6.3.1 Query Sanitization](#631-query-sanitization)
+     - [6.3.2 Access Control](#632-access-control)
 7. [Deployment Architecture](#deployment-architecture)
+   - [7.1 Container Architecture (Docker)](#71-container-architecture-docker)
+   - [7.2 Kubernetes Deployment Architecture](#72-kubernetes-deployment-architecture)
+   - [7.3 Multi-Stage Docker Build](#73-multi-stage-docker-build)
+   - [7.4 Deployment Topologies](#74-deployment-topologies)
+     - [7.4.1 Single-Instance (Development)](#741-single-instance-development)
+     - [7.4.2 Load-Balanced (Production)](#742-load-balanced-production)
+     - [7.4.3 Multi-Tenant SaaS](#743-multi-tenant-saas)
+   - [7.5 Network Architecture](#75-network-architecture)
 8. [Technology Stack](#technology-stack)
 9. [Design Patterns](#design-patterns)
 10. [Scalability & Performance](#scalability--performance)
+    - [10.1 Performance Architecture](#101-performance-architecture)
+    - [10.2 Performance Characteristics](#102-performance-characteristics)
+    - [10.3 Monitoring & Observability Architecture](#103-monitoring--observability-architecture)
 11. [Future Architecture Evolution](#future-architecture-evolution)
 12. [Appendices](#appendices)
 
@@ -59,59 +81,105 @@ Neo4j YASS (Yet Another Semantic Search) MCP Server provides **server-side natur
 
 ```mermaid
 graph TB
-    subgraph ClientLayer["Client Layer"]
-        Claude["Claude Desktop"]
-        HTTP["HTTP Client"]
-        Custom["Custom MCP Client"]
+    subgraph "MCP Client Layer"
+        A["MCP Client (Claude Desktop, Web Apps, etc.)"]
     end
 
-    subgraph MCPServer["Neo4j YASS MCP Server"]
-        subgraph MCPLayer["MCP Server Layer"]
-            Tools["Tools API"]
-            Resources["Resources"]
-            Prompts["Prompts"]
+    subgraph "Neo4j YASS MCP Server"
+        B["FastMCP Framework<br/>(stdio/HTTP/SSE transport)"]
+
+        subgraph "Security Layer"
+            C["Query Sanitizer<br/>(injection, UTF-8)"]
+            D["Read-Only Validation"]
+            E["Rate Limiter Service"]
         end
 
-        subgraph BusinessLayer["Business Logic Layer"]
-            Pipeline["Query Processing Pipeline<br/>1. NL → 2. LLM → 3. Cypher → 4. Results"]
-        end
-
-        subgraph SecurityLayer["Security & Compliance Layer"]
-            Sanitizer["Sanitizer<br/>(UTF-8, Injection)"]
-            AuditLogger["Audit Logger<br/>(PII Redaction)"]
-            ReadOnly["Read-Only<br/>Enforcement"]
-        end
-
-        subgraph IntegrationLayer["Integration Layer"]
-            subgraph LLMProviders["LLM Providers"]
-                GPT["GPT"]
-                Claude2["Claude"]
-                Gemini["Gemini"]
-            end
-
-            subgraph Neo4jDriver["Neo4j Driver"]
-                Bolt["Bolt Protocol"]
-            end
-        end
+        F["Audit Logger<br/>(Compliance & Forensics)"]
+        G["LangChain Layer<br/>(GraphCypherQAChain)"]
+        H["Neo4j Driver<br/>(Database Connection)"]
     end
 
-    subgraph DataLayer["Neo4j Database"]
-        GraphStore["Graph Store"]
-        APOC["APOC Plugin"]
-        GDS["GDS Plugin"]
+    subgraph "Neo4j Database Layer"
+        I["Neo4j Graph Database<br/>(Graph Database Engine)"]
     end
 
-    ClientLayer -->|MCP Protocol<br/>(stdio/HTTP/SSE)| MCPLayer
-    MCPLayer --> BusinessLayer
-    BusinessLayer --> SecurityLayer
-    SecurityLayer --> IntegrationLayer
-    LLMProviders -.->|HTTPS| ExternalLLM[("External LLM APIs<br/>OpenAI/Anthropic/Google")]
-    Neo4jDriver -->|Bolt (7687)| DataLayer
+    A --> B
+    B --> C
+    B --> D
+    B --> E
+    C --> F
+    D --> F
+    E --> F
+    F --> G
+    G --> H
+    H --> I
+```
 
-    style MCPServer fill:#e1f5ff
-    style ClientLayer fill:#fff4e1
-    style DataLayer fill:#e8f5e9
-    style ExternalLLM fill:#fce4ec
+### 2.2 Component Architecture
+
+```mermaid
+graph TB
+    subgraph "Server Components"
+        SA["server.py<br/>Main MCP server entry point"]
+        SB["secure_graph.py<br/>Security wrapper for Neo4jGraph"]
+        SC["tool_wrappers.py<br/>Rate limiting and logging decorators"]
+    end
+
+    subgraph "Configuration Module"
+        CA["config/llm_config.py<br/>LLM provider configuration"]
+        CB["config/utils.py<br/>General utilities"]
+    end
+
+    subgraph "Security Module"
+        SAA["security/sanitizer.py<br/>Query sanitization logic"]
+        SAB["security/audit_logger.py<br/>Audit logging implementation"]
+        SAC["security/complexity_limiter.py<br/>Query complexity analysis"]
+        SAD["security/rate_limiter.py<br/>Rate limiting implementation"]
+    end
+
+    SA --> SB
+    SA --> SC
+    SA --> CA
+    SA --> SAA
+    SA --> SAB
+    SA --> SAC
+    SA --> SAD
+```
+
+### 2.3 Layered Architecture
+
+```mermaid
+graph TB
+    subgraph "Presentation Layer"
+        A["MCP Protocol Layer<br/>- FastMCP Framework<br/>- Transport: stdio/HTTP/SSE"]
+    end
+
+    subgraph "Security Layer"
+        B1["Query Sanitizer<br/>- Injection Prevention<br/>- UTF-8 Attack Prevention"]
+        B2["Access Control<br/>- Read-Only Mode<br/>- Rate Limiting"]
+        B3["Audit Layer<br/>- Query Logging<br/>- Compliance"]
+    end
+
+    subgraph "Business Logic Layer"
+        C["LangChain Integration<br/>- Natural Language Processing<br/>- Cypher Query Generation"]
+    end
+
+    subgraph "Data Access Layer"
+        D["Neo4j Driver<br/>- Bolt Protocol<br/>- Connection Pooling"]
+    end
+
+    subgraph "Data Layer"
+        E["Neo4j Graph Database<br/>- Graph Storage Engine<br/>- APOC & GDS Plugins"]
+    end
+
+    A --> B1
+    A --> B2
+    A --> B3
+    B1 --> C
+    B2 --> C
+    B3 --> C
+    C --> D
+    D --> E
 ```
 
 ### 2.2 Architectural Layers
@@ -431,7 +499,44 @@ All limits are enforced per-session (via `ctx.session_id`, falling back to clien
 
 ## 5. Data Flow
 
-### 5.1 Query Execution Flow
+### 5.1 Natural Language Query Flow
+
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client
+    participant Server as Server Components
+    participant Neo4j as Neo4j Database
+
+    Client->>Server: query_graph("Who starred in Top Gun?")
+    Note over Server: 1. Security Validation<br/>- Sanitization<br/>- Complexity<br/>- Read-only check
+    Server->>Neo4j: Audit Log Query
+    Note over Server: 2. LLM Translation<br/>- NLP to Cypher
+    Server->>Neo4j: Generated Query Validation
+    Note over Server: 3. Execute in Neo4j<br/>- Cypher Execution
+    Server->>Neo4j: Process Results
+    Note over Server: 4. Process Results<br/>- Truncate if needed<br/>- Format response
+    Server->>Client: Response with answer and generated Cypher
+```
+
+### 5.2 Raw Cypher Query Flow
+
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client
+    participant Server as Server Components
+    participant Neo4j as Neo4j Database
+
+    Client->>Server: execute_cypher("MATCH (n:Movie) RETURN n")
+    Note over Server: 1. Query Sanitization<br/>- Pattern validation<br/>- Parameter check
+    Server->>Neo4j: 2. Complexity Check<br/>- Resource analysis
+    Server->>Neo4j: 3. Read-Only Check<br/>- Write op validation
+    Server->>Neo4j: 4. Audit Logging
+    Note over Server: 5. Execute in Neo4j<br/>- Direct Cypher exec
+    Server->>Neo4j: 6. Process Results<br/>- Apply limits<br/>- Format response
+    Server->>Client: Response with results and metadata
+```
+
+### 5.3 Query Execution Flow
 
 ```mermaid
 sequenceDiagram
@@ -551,7 +656,20 @@ sequenceDiagram
 
 ## 6. Security Architecture
 
-### 6.1 Defense in Depth Strategy
+### 6.1 Defense-in-Depth Model
+
+```mermaid
+graph TB
+    A["MCP Client"] --> B["Transport Layer<br/>- HTTP/SSE/stdio<br/>- TLS (if HTTPS)"]
+    B --> C["Input Validation<br/>- Query length<br/>- Parameter names<br/>- Format checks"]
+    C --> D["Query Sanitization<br/>- Pattern blocking<br/>- UTF-8 attacks<br/>- Injection"]
+    D --> E["Complexity Check<br/>- Resource limits<br/>- Pattern limits<br/>- Depth analysis"]
+    E --> F["Read-Only Check<br/>- Write operation<br/>- Procedure check<br/>- Schema changes"]
+    F --> G["Audit Logging<br/>- Query logging<br/>- Response logging<br/>- Error logging"]
+    G --> H["Neo4j Execution<br/>- Cypher execution<br/>- Transaction<br/>- Result return"]
+```
+
+### 6.2 Defense in Depth Strategy
 
 ```mermaid
 graph TD
@@ -576,6 +694,42 @@ graph TD
     style L4 fill:#fff3e0
     style L5 fill:#e8f5e9
     style L6 fill:#fce4ec
+```
+
+### 6.3 Security Controls
+
+#### 6.3.1 Query Sanitization
+```mermaid
+graph TB
+    A["Input Query"] --> B["Length Validation"]
+    B --> C{"Pattern Check?"}
+    C -->|Yes| D["Block Dangerous Patterns"]
+    C -->|No| E["UTF-8 Attack Prevention"]
+    E --> F["Parameter Validation"]
+    F --> G["Allow Query"]
+    D --> H["Log Security Event"]
+    
+    style A fill:#e8f5e9
+    style D fill:#ff5252
+    style H fill:#ff5252
+    style G fill:#e8f5e9
+```
+
+#### 6.3.2 Access Control
+```mermaid
+graph TB
+    A["MCP Request"] --> B{"Read-Only Mode?"}
+    B -->|Yes| C["Block Write Operations"]
+    B -->|No| D["Allow Write Operations"]
+    C --> E["Return Read-Only Response"]
+    D --> F["Execute Request"]
+    E --> G["Log Access Event"]
+    F --> G
+    
+    style B fill:#fff3e0
+    style C fill:#ff5252
+    style E fill:#fff3e0
+    style D fill:#e8f5e9
 ```
 
 ### 6.2 Threat Model
@@ -667,24 +821,104 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph DockerHost["Docker Host Machine"]
-        subgraph MCPContainer["neo4j-yass-mcp Container"]
-            Runtime["Runtime Layer<br/>(python:3.11-slim)<br/>- Python 3.11<br/>- Virtual env (/opt/venv)<br/>- App code (/app)<br/><br/>User: mcp (UID 999)<br/>Ports: 8000"]
+    subgraph "Docker Host"
+        subgraph "Neo4j YASS MCP Container"
+            SA["Application Layer"]
+            subgraph "App Services"
+                SAA["FastMCP Server"]
+                SAB["LangChain Client"]
+                SAC["Neo4j Driver"]
+            end
 
-            Volumes["Volumes:<br/>- ./data/logs:/app/logs<br/>- ./.env:/app/.env:ro"]
+            SB["Security Layer"]
+            subgraph "Security Services"
+                SBA["Sanitization Engine"]
+                SBB["Rate Limit Engine"]
+                SBC["Audit Log Service"]
+            end
 
-            Networks["Networks:<br/>- neo4j-stack"]
+            SC["Runtime Dependencies"]
+            subgraph "Runtime"
+                SCC["UV Package Manager"]
+                SCB["Python 3.13+"]
+                SCD["Security Libraries"]
+            end
         end
 
-        subgraph Neo4jContainer["Neo4j Container (Optional)"]
-            Neo4jImage["Image: neo4j:5.x<br/>Ports: 7687, 7474<br/>Volumes: data, logs, plugins<br/>Networks: neo4j-stack"]
+        subgraph "Neo4j Database Container"
+            DA["Neo4j Graph Database Engine"]
+            subgraph "Database Services"
+                DAA["Storage Engine"]
+                DAB["Query Engine"]
+                DAC["Security Module"]
+                DAD["APOC Plugin"]
+                DAE["GDS Plugin"]
+                DAF["Backup Service"]
+            end
         end
     end
 
-    MCPContainer <-->|neo4j-stack network| Neo4jContainer
+    SAA -.-> DAA
+    SAB -.-> DA
+    SAC -.-> DA
+    SBA -.-> DA
+    SBB -.-> DA
+    SBC -.-> DA
+```
 
-    style MCPContainer fill:#e1f5ff
-    style Neo4jContainer fill:#e8f5e9
+### 7.2 Kubernetes Deployment Architecture
+
+```mermaid
+graph TB
+    subgraph "Kubernetes Cluster"
+        subgraph "MCP Namespace"
+            subgraph "Neo4j YASS MCP Deployment"
+                subgraph "MCP Pod (replicas: 2-5)"
+                    MA["Container: MCP Server<br/>- Port: 8000<br/>- Resources: 512Mi/1 CPU<br/>- Health checks"]
+                end
+
+                MB["Service: MCP Load Balancer<br/>- Type: ClusterIP/LoadBalancer<br/>- Port: 8000"]
+            end
+        end
+
+        subgraph "Neo4j StatefulSet"
+            subgraph "Neo4j Database Cluster"
+                subgraph "Pod (StatefulSet: neo4j-0,1,2)"
+                    NA["Container: Neo4j Server<br/>- Port: 7687 (Bolt)<br/>- Storage: Persistent Volumes<br/>- Plugins: APOC, GDS"]
+                end
+            end
+        end
+    end
+```
+
+### 7.3 Multi-Stage Docker Build
+
+```mermaid
+graph LR
+    subgraph Stage1["Stage 1: Builder"]
+        Base1["python:3.11-slim"]
+        BuildTools["Install:<br/>- gcc<br/>- build tools"]
+        Deps["Install Dependencies<br/>pyproject.toml"]
+    end
+
+    subgraph Stage2["Stage 2: Runtime"]
+        Base2["python:3.11-slim"]
+        Copy["Copy venv only<br/>(no build tools)"]
+        NonRoot["Non-root user<br/>(mcp:mcp)"]
+        AppCode["Application code"]
+    end
+
+    Base1 --> BuildTools --> Deps
+    Base2 --> Copy --> NonRoot --> AppCode
+    Deps -.->|Copy /opt/venv| Copy
+
+    Stage1 -.->|500MB| Discard[Discarded]
+    Stage2 -->|150MB| FinalImage["Final Image<br/><b>70% smaller</b>"]
+
+    style Stage1 fill:#ffebee
+    style Stage2 fill:#e8f5e9
+    style FinalImage fill:#a5d6a7
+    style Discard fill:#ffcdd2
 ```
 
 ### 7.2 Multi-Stage Docker Build
@@ -1090,7 +1324,28 @@ classDiagram
 
 ## 10. Scalability & Performance
 
-### 10.1 Performance Characteristics
+### 10.1 Performance Architecture
+
+```mermaid
+graph TB
+    subgraph "Performance Optimizations"
+        A["Async Workers<br/>- Thread Pool<br/>- 10 threads<br/>- Concurrency"]
+        B["Caching<br/>- Schema<br/>- Query<br/>- LLM results"]
+        C["Connection<br/>- Pooling<br/>- Bolt driver<br/>- Reuse"]
+        D["Rate Limits<br/>- Per-session<br/>- Sliding<br/>- Window"]
+        E["Response<br/>- Truncation<br/>- Size limits<br/>- Sampling"]
+        F["Token<br/>- Budgeting<br/>- Estimation<br/>- Optimization"]
+    end
+
+    A --> B
+    A --> C
+    B --> D
+    C --> D
+    D --> E
+    E --> F
+```
+
+### 10.2 Performance Characteristics
 
 ```mermaid
 graph LR
@@ -1108,6 +1363,45 @@ graph LR
     style QueryGen fill:#fff3e0
     style QueryExec fill:#e1f5ff
     style E2E fill:#f3e5f5
+```
+
+### 10.3 Monitoring & Observability Architecture
+
+```mermaid
+graph TB
+    subgraph "Application Metrics"
+        MA["Query Counters"]
+        MB["Performance Timings"]
+        MC["Error Rate Tracking"]
+    end
+
+    subgraph "Logs"
+        LA["Audit Logging"]
+        LB["Application Logs"]
+        LC["Security Events"]
+    end
+
+    subgraph "Tracing"
+        TA["Request Flow Tracking"]
+        TB["Security Checks Timing"]
+        TC["LLM Interaction Metrics"]
+    end
+
+    subgraph "External Systems"
+        EA["Prometheus<br/>Metrics Collection"]
+        EB["Grafana<br/>Dashboard & Alert"]
+        EC["ELK Stack<br/>Logging & Search"]
+    end
+
+    MA --> EA
+    MB --> EA
+    MC --> EA
+    LA --> EB
+    LB --> EB
+    LC --> EB
+    TA --> EC
+    TB --> EC
+    TC --> EC
 ```
 
 ### 10.2 Horizontal Scaling
