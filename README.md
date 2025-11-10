@@ -6,6 +6,12 @@
 [![FastMCP](https://img.shields.io/badge/framework-FastMCP-orange.svg)](https://github.com/jlowin/fastmcp)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
+[![CI/CD Pipeline](https://github.com/hdjebar/neo4j-yass-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/hdjebar/neo4j-yass-mcp/actions/workflows/ci.yml)
+[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://hub.docker.com/)
+[![MCP Protocol](https://img.shields.io/badge/MCP-1.21.0-purple.svg)](https://modelcontextprotocol.io/)
+[![Security: Bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
+[![LangChain 1.0](https://img.shields.io/badge/langchain-1.0-green.svg)](https://python.langchain.com/)
+
 **Yet Another Secure Server (YASS)** - A production-ready, security-enhanced Model Context Protocol (MCP) server that provides Neo4j graph database querying capabilities using LangChain's GraphCypherQAChain for natural language to Cypher query translation.
 
 > Transform natural language into graph insights with enterprise-grade security and compliance.

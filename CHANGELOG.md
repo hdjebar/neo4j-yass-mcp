@@ -25,6 +25,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - Security improvements and fixes
 
+## [1.2.0] - 2025-11-10
+
+### Added
+- 🎉 **Public Release**: Neo4j YASS MCP is now open source!
+- Enhanced README badges for better visibility:
+  - CI/CD pipeline status badge
+  - Docker ready badge
+  - MCP Protocol version badge
+  - Security scanning (Bandit) badge
+  - LangChain 1.0 compatibility badge
+- Updated documentation metadata for public release
+- Public repository links in all documentation
+
+### Changed
+- README badges reorganized for improved visual hierarchy
+- Documentation index updated with public release status
+- Version information updated across documentation (1.1.0 → 1.2.0)
+
+### Documentation
+- All documentation reviewed and verified for public release
+- No sensitive information or credentials found in repository
+- MIT License confirmed for open source distribution
+- Security policy and vulnerability reporting guidelines in place
+- Comprehensive documentation for users, developers, and security auditors
+
+### Repository
+- Repository visibility changed from private to public
+- GitHub Actions CI/CD pipeline configured and running
+- Security scanning with Trivy and Bandit enabled
+- 287 tests passing with 81.89% code coverage
+- Docker images ready for public deployment
+
 ## [1.1.0] - 2025-11-08
 
 ### Changed
