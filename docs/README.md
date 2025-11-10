@@ -226,8 +226,8 @@ Neo4j YASS MCP is licensed under the MIT License. See [LICENSE](../LICENSE) for 
 
 ---
 
-**Built with**: FastMCP, LangChain, Neo4j, Python 3.11+
+**Built with**: FastMCP, LangChain, Neo4j, Python 3.13+
 
-**Version**: 1.0.0
+**Version**: 1.1.0
 
-**Last Updated**: 2025-11-07
+**Last Updated**: 2025-11-10
