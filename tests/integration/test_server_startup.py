@@ -30,8 +30,10 @@ import signal
 # Set environment for test
 os.environ['MCP_TRANSPORT'] = 'stdio'
 os.environ['NEO4J_URI'] = 'bolt://localhost:7687'
-os.environ['NEO4J_USER'] = 'neo4j'
+os.environ['NEO4J_USERNAME'] = 'neo4j'
 os.environ['NEO4J_PASSWORD'] = 'test-password'
+os.environ['ALLOW_WEAK_PASSWORDS'] = 'true'
+os.environ['ENVIRONMENT'] = 'development'
 
 # Handle SIGTERM gracefully
 def handle_sigterm(signum, frame):
@@ -57,8 +59,8 @@ except Exception as e:
         script_path.write_text(test_script)
 
         try:
-            # Get coverage config path
-            cwd = "/Users/hdjebar/Projects/neo4j-yass-mcp"
+            # Get coverage config path - use project root dynamically
+            cwd = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
             coverage_rc = os.path.join(cwd, ".coveragerc")
 
             # Start server process with coverage
@@ -107,7 +109,7 @@ import os
 
 # Set invalid Neo4j credentials to force initialization error
 os.environ['NEO4J_URI'] = 'bolt://invalid-host:9999'
-os.environ['NEO4J_USER'] = 'invalid'
+os.environ['NEO4J_USERNAME'] = 'invalid'
 os.environ['NEO4J_PASSWORD'] = 'invalid'
 os.environ['MCP_TRANSPORT'] = 'stdio'
 
@@ -124,7 +126,7 @@ except Exception as e:
         script_path.write_text(test_script)
 
         try:
-            cwd = "/Users/hdjebar/Projects/neo4j-yass-mcp"
+            cwd = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
             coverage_rc = os.path.join(cwd, ".coveragerc")
 
             env = os.environ.copy()
@@ -163,9 +165,11 @@ import signal
 
 os.environ['MCP_TRANSPORT'] = 'stdio'
 os.environ['NEO4J_URI'] = 'bolt://localhost:7687'
-os.environ['NEO4J_USER'] = 'neo4j'
+os.environ['NEO4J_USERNAME'] = 'neo4j'
 os.environ['NEO4J_PASSWORD'] = 'test-password'
-os.environ['READ_ONLY_MODE'] = 'true'  # Enable read-only mode
+os.environ['ALLOW_WEAK_PASSWORDS'] = 'true'
+os.environ['ENVIRONMENT'] = 'development'
+os.environ['READ_ONLY_MODE'] = 'true'
 
 def handle_sigterm(signum, frame):
     sys.exit(0)
@@ -185,7 +189,7 @@ except KeyboardInterrupt:
         script_path.write_text(test_script)
 
         try:
-            cwd = "/Users/hdjebar/Projects/neo4j-yass-mcp"
+            cwd = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
             coverage_rc = os.path.join(cwd, ".coveragerc")
 
             env = os.environ.copy()
