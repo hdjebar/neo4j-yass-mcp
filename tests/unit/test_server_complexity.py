@@ -65,7 +65,7 @@ class TestComplexityLimitEnforcement:
 
         try:
             # Call query_graph
-            result = await server.query_graph.fn(
+            result = await server.query_graph(
                 query="Show me everything connected", ctx=create_mock_context()
             )
 
@@ -118,7 +118,7 @@ class TestComplexityLimitEnforcement:
         try:
             # Call execute_cypher with complex query
             complex_query = "MATCH (n)-[r*1..20]->(m) RETURN n, r, m"
-            result = await server.execute_cypher.fn(
+            result = await server.execute_cypher(
                 cypher_query=complex_query, ctx=create_mock_context()
             )
 
@@ -171,9 +171,7 @@ class TestComplexityLimitEnforcement:
 
         try:
             # Call query_graph
-            result = await server.query_graph.fn(
-                query="Show me 10 people", ctx=create_mock_context()
-            )
+            result = await server.query_graph(query="Show me 10 people", ctx=create_mock_context())
 
             # Verify it proceeded past complexity check
             assert result["success"] is True
@@ -200,7 +198,7 @@ class TestComplexityLimitEnforcement:
 
         try:
             # Call execute_cypher
-            result = await server.execute_cypher.fn(
+            result = await server.execute_cypher(
                 cypher_query="MATCH (n) RETURN n LIMIT 1", ctx=create_mock_context()
             )
 
@@ -230,7 +228,7 @@ class TestComplexityLimitEnforcement:
 
         try:
             # Call execute_cypher
-            result = await server.execute_cypher.fn(
+            result = await server.execute_cypher(
                 cypher_query="MATCH (n) RETURN n", ctx=create_mock_context()
             )
 

@@ -169,6 +169,7 @@ jobs:
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
         if: always()
+        continue-on-error: true  # Don't fail if upload has permission issues
         with:
           sarif_file: 'trivy-results.sarif'
 
@@ -189,6 +190,10 @@ jobs:
         uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
+
+      - name: Create Docker network
+        run: |
+          docker network create neo4j-stack || true
 
       - name: Start services with docker compose
         run: |

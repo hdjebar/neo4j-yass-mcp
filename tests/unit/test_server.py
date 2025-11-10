@@ -37,7 +37,7 @@ class TestQueryGraph:
             with patch("neo4j_yass_mcp.server.chain", None):
                 from neo4j_yass_mcp.server import query_graph
 
-                result = await query_graph.fn("test query", ctx=create_mock_context())
+                result = await query_graph("test query", ctx=create_mock_context())
 
                 assert result["success"] is False
                 assert "not initialized" in result["error"].lower()
@@ -50,9 +50,7 @@ class TestQueryGraph:
                 with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
                     from neo4j_yass_mcp.server import query_graph
 
-                    result = await query_graph.fn(
-                        "Who starred in Top Gun?", ctx=create_mock_context()
-                    )
+                    result = await query_graph("Who starred in Top Gun?", ctx=create_mock_context())
 
                     assert result["success"] is True
                     assert "Tom Cruise" in result["answer"]
@@ -84,9 +82,7 @@ class TestQueryGraph:
                     with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
                         from neo4j_yass_mcp.server import query_graph
 
-                        result = await query_graph.fn(
-                            "Load system files", ctx=create_mock_context()
-                        )
+                        result = await query_graph("Load system files", ctx=create_mock_context())
 
                         # Should fail due to sanitizer
                         assert result["success"] is False
@@ -102,7 +98,7 @@ class TestQueryGraph:
             with patch("neo4j_yass_mcp.server.chain", Mock()):
                 from neo4j_yass_mcp.server import query_graph
 
-                result = await query_graph.fn("", ctx=create_mock_context())
+                result = await query_graph("", ctx=create_mock_context())
 
                 # Should handle empty query gracefully
                 assert isinstance(result, dict)
@@ -119,7 +115,7 @@ class TestQueryGraph:
                 with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
                     from neo4j_yass_mcp.server import query_graph
 
-                    result = await query_graph.fn("test query", ctx=create_mock_context())
+                    result = await query_graph("test query", ctx=create_mock_context())
 
                     assert result["success"] is False
                     assert "error" in result
@@ -135,9 +131,7 @@ class TestExecuteCypher:
         with patch("neo4j_yass_mcp.server.graph", None):
             from neo4j_yass_mcp.server import execute_cypher
 
-            result = await execute_cypher.fn(
-                "MATCH (n) RETURN n LIMIT 1", ctx=create_mock_context()
-            )
+            result = await execute_cypher("MATCH (n) RETURN n LIMIT 1", ctx=create_mock_context())
 
             assert result["success"] is False
             assert "not initialized" in result["error"].lower()
@@ -149,7 +143,7 @@ class TestExecuteCypher:
             with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
                 from neo4j_yass_mcp.server import execute_cypher
 
-                result = await execute_cypher.fn(
+                result = await execute_cypher(
                     "MATCH (n:Movie) RETURN n.title LIMIT 1", ctx=create_mock_context()
                 )
 
@@ -165,7 +159,7 @@ class TestExecuteCypher:
                 from neo4j_yass_mcp.server import execute_cypher
 
                 params = {"title": "Top Gun", "year": 1986}
-                result = await execute_cypher.fn(
+                result = await execute_cypher(
                     "MATCH (m:Movie {title: $title}) RETURN m",
                     parameters=params,
                     ctx=create_mock_context(),
@@ -183,7 +177,7 @@ class TestExecuteCypher:
                     from neo4j_yass_mcp.server import execute_cypher
 
                     # Try to execute a write query
-                    result = await execute_cypher.fn(
+                    result = await execute_cypher(
                         "CREATE (n:Test) RETURN n", ctx=create_mock_context()
                     )
 
@@ -199,7 +193,7 @@ class TestExecuteCypher:
                     from neo4j_yass_mcp.server import execute_cypher
 
                     # Unsafe query - use a clearly dangerous pattern
-                    result = await execute_cypher.fn(
+                    result = await execute_cypher(
                         "LOAD CSV FROM 'file.csv' AS line RETURN line", ctx=create_mock_context()
                     )
 
@@ -218,7 +212,7 @@ class TestExecuteCypher:
             with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
                 from neo4j_yass_mcp.server import execute_cypher
 
-                result = await execute_cypher.fn("MATCH (n) RETURN n", ctx=create_mock_context())
+                result = await execute_cypher("MATCH (n) RETURN n", ctx=create_mock_context())
 
                 assert result["success"] is False
                 assert "error" in result
@@ -233,7 +227,7 @@ class TestRefreshSchema:
         with patch("neo4j_yass_mcp.server.graph", None):
             from neo4j_yass_mcp.server import refresh_schema
 
-            result = await refresh_schema.fn(ctx=create_mock_context())
+            result = await refresh_schema(ctx=create_mock_context())
 
             assert result["success"] is False
             assert "not initialized" in result["error"].lower()
@@ -244,7 +238,7 @@ class TestRefreshSchema:
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
             from neo4j_yass_mcp.server import refresh_schema
 
-            result = await refresh_schema.fn(ctx=create_mock_context())
+            result = await refresh_schema(ctx=create_mock_context())
 
             assert result["success"] is True
             assert "schema" in result
@@ -259,7 +253,7 @@ class TestRefreshSchema:
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
             from neo4j_yass_mcp.server import refresh_schema
 
-            result = await refresh_schema.fn(ctx=create_mock_context())
+            result = await refresh_schema(ctx=create_mock_context())
 
             assert result["success"] is False
             assert "error" in result
@@ -274,7 +268,7 @@ class TestGetSchema:
         with patch("neo4j_yass_mcp.server.graph", None):
             from neo4j_yass_mcp.server import get_schema
 
-            result = await get_schema.fn()
+            result = await get_schema()
 
             assert "error" in result.lower()
             assert "not initialized" in result.lower()
@@ -285,7 +279,7 @@ class TestGetSchema:
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
             from neo4j_yass_mcp.server import get_schema
 
-            result = await get_schema.fn()
+            result = await get_schema()
 
             assert "Node: Movie" in result
             assert "Relationship: ACTED_IN" in result
@@ -299,7 +293,7 @@ class TestGetSchema:
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
             from neo4j_yass_mcp.server import get_schema
 
-            result = await get_schema.fn()
+            result = await get_schema()
 
             assert "Error retrieving schema" in result
             assert "Schema error" in result
@@ -314,9 +308,9 @@ class TestGetDatabaseInfo:
         with patch("neo4j_yass_mcp.server.graph", None):
             from neo4j_yass_mcp.server import get_database_info
 
-            result = await get_database_info.fn()
+            result = await get_database_info()
 
-            # get_database_info.fn() doesn't check if graph is initialized
+            # get_database_info() doesn't check if graph is initialized
             # It just returns environment configuration
             assert isinstance(result, str)
             assert "neo4j" in result.lower()
@@ -329,7 +323,7 @@ class TestGetDatabaseInfo:
                 with patch("neo4j_yass_mcp.server._read_only_mode", False):
                     from neo4j_yass_mcp.server import get_database_info
 
-                    result = await get_database_info.fn()
+                    result = await get_database_info()
 
                     assert isinstance(result, str)
                     # Should contain configuration info
@@ -663,7 +657,7 @@ class TestAuditLoggerIntegration:
                 ):
                     from neo4j_yass_mcp.server import query_graph
 
-                    await query_graph.fn("Test query", ctx=create_mock_context())
+                    await query_graph("Test query", ctx=create_mock_context())
 
                     # Verify audit logging was called
                     mock_audit_logger.log_query.assert_called_once()
@@ -692,7 +686,7 @@ class TestAuditLoggerIntegration:
                     ):
                         from neo4j_yass_mcp.server import query_graph
 
-                        await query_graph.fn("Load files", ctx=create_mock_context())
+                        await query_graph("Load files", ctx=create_mock_context())
 
                         # Verify error was logged
                         mock_audit_logger.log_error.assert_called_once()
@@ -722,7 +716,7 @@ class TestAuditLoggerIntegration:
                     ):
                         from neo4j_yass_mcp.server import query_graph
 
-                        await query_graph.fn("Create node", ctx=create_mock_context())
+                        await query_graph("Create node", ctx=create_mock_context())
 
                         # Verify error was logged
                         mock_audit_logger.log_error.assert_called_once()
@@ -738,7 +732,7 @@ class TestAuditLoggerIntegration:
             with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=mock_audit_logger):
                 from neo4j_yass_mcp.server import execute_cypher
 
-                await execute_cypher.fn("MATCH (n) RETURN n", ctx=create_mock_context())
+                await execute_cypher("MATCH (n) RETURN n", ctx=create_mock_context())
 
                 # Verify audit logging
                 mock_audit_logger.log_query.assert_called_once()
@@ -757,7 +751,7 @@ class TestAuditLoggerIntegration:
                 ):
                     from neo4j_yass_mcp.server import execute_cypher
 
-                    await execute_cypher.fn(
+                    await execute_cypher(
                         "LOAD CSV FROM 'file.csv' AS line RETURN line", ctx=create_mock_context()
                     )
 
@@ -777,7 +771,7 @@ class TestAuditLoggerIntegration:
                 ):
                     from neo4j_yass_mcp.server import execute_cypher
 
-                    await execute_cypher.fn("CREATE (n:Test) RETURN n", ctx=create_mock_context())
+                    await execute_cypher("CREATE (n:Test) RETURN n", ctx=create_mock_context())
 
                     # Verify error was logged
                     mock_audit_logger.log_error.assert_called_once()
@@ -803,9 +797,7 @@ class TestResponseTruncation:
                 ):
                     from neo4j_yass_mcp.server import execute_cypher
 
-                    result = await execute_cypher.fn(
-                        "MATCH (n) RETURN n", ctx=create_mock_context()
-                    )
+                    result = await execute_cypher("MATCH (n) RETURN n", ctx=create_mock_context())
 
                     # Should include truncation metadata
                     assert result.get("truncated") is True
@@ -830,7 +822,7 @@ class TestResponseTruncation:
                     with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
                         from neo4j_yass_mcp.server import query_graph
 
-                        result = await query_graph.fn("Test query", ctx=create_mock_context())
+                        result = await query_graph("Test query", ctx=create_mock_context())
 
                         # Should include truncation warning
                         assert result.get("truncated") is True
@@ -856,7 +848,7 @@ class TestSanitizerWarnings:
 
                         from neo4j_yass_mcp.server import execute_cypher
 
-                        result = await execute_cypher.fn(
+                        result = await execute_cypher(
                             "MATCH (n)-->(m) RETURN n, m", ctx=create_mock_context()
                         )
 

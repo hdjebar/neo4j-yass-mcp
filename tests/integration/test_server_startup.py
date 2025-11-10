@@ -59,8 +59,8 @@ except Exception as e:
         script_path.write_text(test_script)
 
         try:
-            # Get coverage config path
-            cwd = "/Users/hdjebar/Projects/neo4j-yass-mcp"
+            # Get coverage config path - use project root dynamically
+            cwd = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
             coverage_rc = os.path.join(cwd, ".coveragerc")
 
             # Start server process with coverage
@@ -126,7 +126,7 @@ except Exception as e:
         script_path.write_text(test_script)
 
         try:
-            cwd = "/Users/hdjebar/Projects/neo4j-yass-mcp"
+            cwd = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
             coverage_rc = os.path.join(cwd, ".coveragerc")
 
             env = os.environ.copy()
@@ -189,7 +189,7 @@ except KeyboardInterrupt:
         script_path.write_text(test_script)
 
         try:
-            cwd = "/Users/hdjebar/Projects/neo4j-yass-mcp"
+            cwd = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
             coverage_rc = os.path.join(cwd, ".coveragerc")
 
             env = os.environ.copy()
