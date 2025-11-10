@@ -2,7 +2,7 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, claude/code-review-audit-011CUzW4cr9U9noUbcezEN3K ]
   pull_request:
     branches: [ main, develop ]
 
