@@ -42,7 +42,7 @@ class TestRateLimitDecorators:
         server.chain = Mock()
         server.graph = Mock()
 
-        result = await server.query_graph.fn(query="MATCH (n) RETURN n", ctx=create_mock_context())
+        result = await server.query_graph(query="MATCH (n) RETURN n", ctx=create_mock_context())
 
         assert result["success"] is False
         assert result["rate_limited"] is True
@@ -59,7 +59,7 @@ class TestRateLimitDecorators:
 
         server.graph = Mock()
 
-        result = await server.execute_cypher.fn(
+        result = await server.execute_cypher(
             cypher_query="MATCH (n) RETURN n",
             ctx=create_mock_context(),
         )
@@ -95,7 +95,7 @@ class TestRateLimitDecorators:
         server.chain = mock_chain
         server.graph = Mock()
 
-        result = await server.query_graph.fn(query="Show me nodes", ctx=create_mock_context())
+        result = await server.query_graph(query="Show me nodes", ctx=create_mock_context())
 
         assert result["success"] is True
         mock_limiter.check_and_record.assert_called_once()
@@ -120,7 +120,7 @@ class TestRateLimitDecorators:
                 "check_and_record",
                 AsyncMock(return_value=(True, {})),
             ) as mock_check:
-                result = await server.query_graph.fn(
+                result = await server.query_graph(
                     query="Show me nodes", ctx=create_mock_context()
                 )
 
@@ -154,7 +154,7 @@ class TestRateLimitDecorators:
 
         server.graph = Mock()
 
-        result = await server.refresh_schema.fn(ctx=create_mock_context())
+        result = await server.refresh_schema(ctx=create_mock_context())
 
         assert result["success"] is False
         assert result["rate_limited"] is True
@@ -171,7 +171,7 @@ class TestRateLimitDecorators:
         server.graph = Mock()
         type(server.graph).get_schema = PropertyMock(return_value="schema")
 
-        result = await server.get_schema.fn()
+        result = await server.get_schema()
 
         assert "rate limit exceeded" in result.lower()
         mock_limiter.check_and_record.assert_called_once()
@@ -192,7 +192,7 @@ class TestRateLimitDecorators:
                 "check_and_record",
                 AsyncMock(return_value=(True, {})),
             ) as mock_check:
-                result = await server.get_schema.fn()
+                result = await server.get_schema()
 
             assert "schema" in result.lower()
             mock_check.assert_not_called()
