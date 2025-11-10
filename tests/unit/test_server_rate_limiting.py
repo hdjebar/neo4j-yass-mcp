@@ -120,9 +120,7 @@ class TestRateLimitDecorators:
                 "check_and_record",
                 AsyncMock(return_value=(True, {})),
             ) as mock_check:
-                result = await server.query_graph(
-                    query="Show me nodes", ctx=create_mock_context()
-                )
+                result = await server.query_graph(query="Show me nodes", ctx=create_mock_context())
 
             assert result["success"] is True
             mock_check.assert_not_called()

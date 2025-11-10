@@ -350,9 +350,7 @@ class TestResponseTruncationIntegration:
                 with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
                     from neo4j_yass_mcp.server import execute_cypher
 
-                    result = await execute_cypher(
-                        "MATCH (n) RETURN n", ctx=create_mock_context()
-                    )
+                    result = await execute_cypher("MATCH (n) RETURN n", ctx=create_mock_context())
 
                     # Verify truncation
                     assert result["success"] is True

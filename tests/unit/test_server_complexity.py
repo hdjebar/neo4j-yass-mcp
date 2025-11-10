@@ -171,9 +171,7 @@ class TestComplexityLimitEnforcement:
 
         try:
             # Call query_graph
-            result = await server.query_graph(
-                query="Show me 10 people", ctx=create_mock_context()
-            )
+            result = await server.query_graph(query="Show me 10 people", ctx=create_mock_context())
 
             # Verify it proceeded past complexity check
             assert result["success"] is True

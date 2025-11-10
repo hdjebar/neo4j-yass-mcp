@@ -50,9 +50,7 @@ class TestQueryGraph:
                 with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
                     from neo4j_yass_mcp.server import query_graph
 
-                    result = await query_graph(
-                        "Who starred in Top Gun?", ctx=create_mock_context()
-                    )
+                    result = await query_graph("Who starred in Top Gun?", ctx=create_mock_context())
 
                     assert result["success"] is True
                     assert "Tom Cruise" in result["answer"]
@@ -84,9 +82,7 @@ class TestQueryGraph:
                     with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
                         from neo4j_yass_mcp.server import query_graph
 
-                        result = await query_graph(
-                            "Load system files", ctx=create_mock_context()
-                        )
+                        result = await query_graph("Load system files", ctx=create_mock_context())
 
                         # Should fail due to sanitizer
                         assert result["success"] is False
@@ -135,9 +131,7 @@ class TestExecuteCypher:
         with patch("neo4j_yass_mcp.server.graph", None):
             from neo4j_yass_mcp.server import execute_cypher
 
-            result = await execute_cypher(
-                "MATCH (n) RETURN n LIMIT 1", ctx=create_mock_context()
-            )
+            result = await execute_cypher("MATCH (n) RETURN n LIMIT 1", ctx=create_mock_context())
 
             assert result["success"] is False
             assert "not initialized" in result["error"].lower()
@@ -803,9 +797,7 @@ class TestResponseTruncation:
                 ):
                     from neo4j_yass_mcp.server import execute_cypher
 
-                    result = await execute_cypher(
-                        "MATCH (n) RETURN n", ctx=create_mock_context()
-                    )
+                    result = await execute_cypher("MATCH (n) RETURN n", ctx=create_mock_context())
 
                     # Should include truncation metadata
                     assert result.get("truncated") is True
