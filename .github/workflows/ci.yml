@@ -190,6 +190,10 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Create Docker network
+        run: |
+          docker network create neo4j-stack || true
+
       - name: Start services with docker compose
         run: |
           docker compose up -d
