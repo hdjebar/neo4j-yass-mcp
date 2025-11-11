@@ -580,8 +580,7 @@ class TestQueryAnalysisRealWorldScenarios:
             # Empty query
             "",
             # Very long query
-            "MATCH " + "(n" + str(i) + ")" + ("-[:REL]->(n" + str(i+1) + ")" if i < 50 else "") for i in range(50)
-        ][0],
+            "MATCH " + "(n" + str(i) + ")" + ("-[:REL]->(n" + str(i+1) + ")" if i < 50 else "") for i in range(50),
             # Query with special characters
             "MATCH (n:Person {name: 'O\'Brien'}) RETURN n",
             # Unicode characters
