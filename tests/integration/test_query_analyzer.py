@@ -148,7 +148,7 @@ class TestQueryAnalysisIntegration:
 
                 assert result["success"] is False
                 assert "error" in result
-                assert "analysis_error" in result.get("type", "")
+                assert result.get("error_type") == "ValueError"
 
     @pytest.mark.asyncio
     async def test_analyze_query_performance_graph_not_initialized(self, mock_context):
@@ -182,8 +182,8 @@ class TestQueryAnalysisIntegration:
 
                 assert result["success"] is False
                 assert "error" in result
-                # Should be caught as analysis error, not server error
-                assert result.get("type") == "analysis_error"
+                # Should be caught as analysis error (ValueError for invalid mode)
+                assert result.get("error_type") == "ValueError"
 
     @pytest.mark.asyncio
     async def test_analyze_query_performance_with_audit_logging(
@@ -345,7 +345,7 @@ class TestQueryAnalysisIntegration:
 
                     assert result["success"] is False
                     assert "error" in result
-                    assert result.get("type") == scenario["expected_error_type"]
+                    assert result.get("error_type") == scenario["expected_error_type"]
 
     @pytest.mark.asyncio
     async def test_complex_query_analysis(self, mock_context):
