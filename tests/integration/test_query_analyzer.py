@@ -367,20 +367,16 @@ class TestQueryAnalysisIntegration:
         LIMIT 50
         """
 
-        # Mock complex execution plan
+        # Mock complex execution plan (flat list format matching Neo4j EXPLAIN output)
         mock_graph = Mock()
         mock_graph.query = Mock(
             return_value=[
-                {
-                    "operators": [
-                        {"name": "NodeByLabelScan", "estimated_rows": 50000},
-                        {"name": "ExpandAll", "estimated_rows": 200000},
-                        {"name": "Filter", "estimated_rows": 15000},
-                        {"name": "Aggregation", "estimated_rows": 1000},
-                        {"name": "Sort", "estimated_rows": 1000},
-                        {"name": "Limit", "estimated_rows": 50},
-                    ]
-                }
+                {"name": "NodeByLabelScan", "estimated_rows": 50000},
+                {"name": "ExpandAll", "estimated_rows": 200000},
+                {"name": "Filter", "estimated_rows": 15000},
+                {"name": "Aggregation", "estimated_rows": 1000},
+                {"name": "Sort", "estimated_rows": 1000},
+                {"name": "Limit", "estimated_rows": 50},
             ]
         )
 
