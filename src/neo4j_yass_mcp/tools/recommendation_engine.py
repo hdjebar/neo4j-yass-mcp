@@ -34,7 +34,7 @@ class RecommendationEngine:
                 "category": "query_structure",
                 "templates": [
                     {
-                        "condition": lambda b: "many patterns" in b.get("description", ""),
+                        "condition": lambda b: "patterns in single MATCH" in b.get("description", "") or "many patterns" in b.get("description", ""),
                         "recommendation": {
                             "title": "Break complex MATCH into smaller parts",
                             "description": "Split the MATCH clause into multiple queries or use pattern comprehension",
@@ -96,7 +96,7 @@ class RecommendationEngine:
                 "category": "pattern_optimization",
                 "templates": [
                     {
-                        "condition": lambda b: "completely unbounded" in b.get("description", ""),
+                        "condition": lambda b: "completely unbounded" in b.get("description", "").lower(),
                         "recommendation": {
                             "title": "Add reasonable bounds to variable-length pattern",
                             "description": "Unbounded patterns can explore the entire graph and cause memory issues",
@@ -410,14 +410,13 @@ class RecommendationEngine:
         """Adjust recommendation priority based on bottleneck severity."""
         # priority_scores = {"low": 1, "medium": 2, "high": 3}  # Not currently used
 
-        # Increase priority for high-severity issues
+        # Increase priority for high-severity issues (but never decrease)
         if severity >= 8:
             return "high"
         elif severity >= 6 and base_priority == "low":
             return "medium"
-        elif severity <= 3 and base_priority == "high":
-            return "medium"
 
+        # Keep original priority for all other cases
         return base_priority
 
     def _priority_to_score(self, priority: str) -> int:

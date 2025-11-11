@@ -217,41 +217,29 @@ class TestQueryAnalysisIntegration:
         # Create analyzer with mock graph
         mock_graph = Mock()
 
-        # Simulate different execution plans
+        # Simulate different execution plans (matching Neo4j EXPLAIN output structure)
         scenarios = [
             {
                 "name": "Expensive Scan",
                 "plan": [
-                    {
-                        "operators": [
-                            {"name": "NodeByLabelScan", "estimated_rows": 10000},
-                            {"name": "Filter", "estimated_rows": 5000},
-                        ]
-                    }
+                    {"name": "NodeByLabelScan", "estimated_rows": 10000},
+                    {"name": "Filter", "estimated_rows": 5000},
                 ],
                 "expected_bottlenecks": ["missing_index"],
             },
             {
                 "name": "Cartesian Product",
                 "plan": [
-                    {
-                        "operators": [
-                            {"name": "CartesianProduct", "estimated_rows": 1000000},
-                            {"name": "NodeByLabelScan", "estimated_rows": 1000},
-                        ]
-                    }
+                    {"name": "CartesianProduct", "estimated_rows": 1000000},
+                    {"name": "NodeByLabelScan", "estimated_rows": 1000},
                 ],
                 "expected_bottlenecks": ["cartesian_product"],
             },
             {
                 "name": "Efficient Index Usage",
                 "plan": [
-                    {
-                        "operators": [
-                            {"name": "NodeIndexSeek", "estimated_rows": 10},
-                            {"name": "ExpandInto", "estimated_rows": 50},
-                        ]
-                    }
+                    {"name": "NodeIndexSeek", "estimated_rows": 10},
+                    {"name": "ExpandInto", "estimated_rows": 50},
                 ],
                 "expected_bottlenecks": [],  # Should be efficient
             },

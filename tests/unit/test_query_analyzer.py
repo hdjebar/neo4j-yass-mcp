@@ -214,7 +214,7 @@ class TestBottleneckDetector:
 
         assert len(bottlenecks) > 0
         assert any(b["type"] == "unbounded_varlength" for b in bottlenecks)
-        assert any("completely unbounded" in b["description"] for b in bottlenecks)
+        assert any("Completely unbounded" in b["description"] for b in bottlenecks)
 
     @pytest.mark.asyncio
     async def test_detect_missing_limit_clauses(self, detector):
@@ -302,7 +302,7 @@ class TestBottleneckDetector:
         RETURN a, b, c, d
         """
 
-        execution_plan = {"operators": [{"name": "NodeByLabelScan", "estimated_rows": 1000}]}
+        execution_plan = {"operators": [{"name": "NodeByLabelScan", "estimated_rows": 5000}]}
 
         bottlenecks = await detector.detect_bottlenecks(execution_plan, query)
 
@@ -327,7 +327,7 @@ class TestRecommendationEngine:
         bottlenecks = [
             {
                 "type": "cartesian_product",
-                "description": "3 patterns in single MATCH",
+                "description": "Potential Cartesian product: 3 patterns in single MATCH",
                 "severity": 9,
                 "location": "MATCH (a), (b), (c)",
             }

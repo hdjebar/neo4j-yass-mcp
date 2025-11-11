@@ -307,6 +307,20 @@ class BottleneckDetector:
         for operator in operators:
             operator_name = operator.get("name", "").lower()
 
+            # Check for Cartesian product operators
+            if "cartesianproduct" in operator_name:
+                estimated_rows = operator.get("estimated_rows", 0)
+                bottlenecks.append(
+                    {
+                        "type": "cartesian_product",
+                        "description": f"Cartesian product detected in execution plan",
+                        "severity": self.severity_scores.get("cartesian_product", 9),
+                        "impact": f"Very High - estimated {estimated_rows} row combinations",
+                        "location": operator.get("name", "Unknown operator"),
+                        "suggestion": "Add relationship constraints or filter conditions to reduce cross-product",
+                    }
+                )
+
             # Check for expensive operators
             if "scan" in operator_name and "index" not in operator_name:
                 # NodeByLabelScan or similar without index

@@ -9,12 +9,15 @@ the new analyze_query_performance functionality.
 import asyncio
 import sys
 
+import pytest
+
 # Add the src directory to Python path
 sys.path.insert(0, "/Users/hdjebar/Projects/kimi/neo4j-yass-mcp/src")
 
 from neo4j_yass_mcp.server import analyze_query_performance
 
 
+@pytest.mark.asyncio
 async def test_query_analysis_integration():
     """Test the query analysis tool with various scenarios."""
 
@@ -168,6 +171,7 @@ async def test_query_analysis_integration():
     return True
 
 
+@pytest.mark.asyncio
 async def test_html_page_compatibility():
     """Test that the results are compatible with the HTML test page format."""
 

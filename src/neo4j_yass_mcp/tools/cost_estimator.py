@@ -342,13 +342,13 @@ class QueryCostEstimator:
         """Convert total cost to a 1-10 score."""
         if total_cost < 100:
             return 1
-        elif total_cost < 500:
+        elif total_cost <= 500:
             return 2
         elif total_cost < 1000:
             return 3
         elif total_cost < 2000:
             return 4
-        elif total_cost < 5000:
+        elif total_cost <= 5000:
             return 5
         elif total_cost < 8000:
             return 6

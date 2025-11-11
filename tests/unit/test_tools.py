@@ -21,9 +21,11 @@ class TestToolsModule:
         """Test __all__ exports from tools module."""
         from neo4j_yass_mcp.tools import __all__
 
-        # Currently empty, reserved for future expansion
+        # Should export query analysis tools
         assert isinstance(__all__, list)
-        assert len(__all__) == 0
+        expected_exports = ["QueryPlanAnalyzer", "BottleneckDetector", "RecommendationEngine", "QueryCostEstimator"]
+        assert len(__all__) == len(expected_exports)
+        assert set(__all__) == set(expected_exports)
 
 
 if __name__ == "__main__":
