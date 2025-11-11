@@ -261,7 +261,7 @@ class TestBottleneckDetector:
 
         assert len(bottlenecks) > 0
         assert any(b["type"] == "missing_index" for b in bottlenecks)
-        assert any("5000 rows" in b["impact"] for b in bottlenecks)
+        assert any("5000 nodes" in b["impact"] for b in bottlenecks)
 
     @pytest.mark.asyncio
     async def test_detect_schema_bottlenecks(self, detector):

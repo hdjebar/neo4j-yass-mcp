@@ -246,7 +246,7 @@ class TestQueryAnalysisIntegration:
         ]
 
         for scenario in scenarios:
-            mock_graph.query = AsyncMock(return_value=scenario["plan"])
+            mock_graph.query = Mock(return_value=scenario["plan"])
             analyzer = QueryPlanAnalyzer(mock_graph)
 
             result = await analyzer.analyze_query(
