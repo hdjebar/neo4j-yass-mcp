@@ -8,7 +8,7 @@ potential resource requirements before executing expensive queries.
 
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -81,9 +81,9 @@ class QueryCostEstimator:
     def estimate_cost(
         self,
         query: str,
-        execution_plan: Optional[Dict[str, Any]] = None,
-        estimated_rows: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        execution_plan: dict[str, Any] | None = None,
+        estimated_rows: int | None = None,
+    ) -> dict[str, Any]:
         """
         Estimate the cost of executing a query.
 
@@ -220,7 +220,7 @@ class QueryCostEstimator:
 
         return multiplier
 
-    def _calculate_plan_cost(self, execution_plan: Dict[str, Any]) -> float:
+    def _calculate_plan_cost(self, execution_plan: dict[str, Any]) -> float:
         """Calculate cost from execution plan operators."""
         plan_cost = 0
         operators = execution_plan.get("operators", [])
@@ -238,7 +238,7 @@ class QueryCostEstimator:
 
         return plan_cost
 
-    def _extract_plan_multipliers(self, execution_plan: Dict[str, Any]) -> Dict[str, float]:
+    def _extract_plan_multipliers(self, execution_plan: dict[str, Any]) -> dict[str, float]:
         """Extract additional multipliers from execution plan."""
         multipliers = {}
         operators = execution_plan.get("operators", [])
@@ -258,7 +258,7 @@ class QueryCostEstimator:
 
         return multipliers
 
-    def _estimate_row_count(self, query: str, execution_plan: Optional[Dict[str, Any]]) -> int:
+    def _estimate_row_count(self, query: str, execution_plan: dict[str, Any] | None) -> int:
         """Estimate the number of rows the query will process."""
         # Default estimate
         estimated_rows = 100
@@ -286,8 +286,8 @@ class QueryCostEstimator:
         return estimated_rows
 
     def _calculate_resource_costs(
-        self, total_cost: float, multipliers: Dict[str, float]
-    ) -> Dict[str, float]:
+        self, total_cost: float, multipliers: dict[str, float]
+    ) -> dict[str, float]:
         """Calculate cost breakdown by resource type."""
         # Apply multipliers
         cpu_multiplier = multipliers.get("expensive_operations", 1.0) * multipliers.get(
@@ -303,8 +303,8 @@ class QueryCostEstimator:
         }
 
     def _assess_risk(
-        self, query: str, total_cost: float, resource_costs: Dict[str, float]
-    ) -> Dict[str, Any]:
+        self, query: str, total_cost: float, resource_costs: dict[str, float]
+    ) -> dict[str, Any]:
         """Assess the risk level of the query."""
         risk_factors = []
         risk_level = "low"
@@ -361,7 +361,7 @@ class QueryCostEstimator:
         else:
             return 10
 
-    def _calculate_confidence(self, execution_plan: Optional[Dict[str, Any]]) -> str:
+    def _calculate_confidence(self, execution_plan: dict[str, Any] | None) -> str:
         """Calculate confidence level of the cost estimate."""
         if not execution_plan:
             return "low"

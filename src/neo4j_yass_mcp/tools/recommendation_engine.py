@@ -7,7 +7,7 @@ potential impact.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -214,8 +214,8 @@ class RecommendationEngine:
         }
 
     def generate_recommendations(
-        self, query: str, execution_plan: Dict[str, Any], bottlenecks: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+        self, query: str, execution_plan: dict[str, Any], bottlenecks: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """
         Generate optimization recommendations based on detected bottlenecks.
 
@@ -269,8 +269,8 @@ class RecommendationEngine:
         return unique_recommendations
 
     def _find_matching_template(
-        self, bottleneck: Dict[str, Any], templates: List[Dict[str, Any]]
-    ) -> Optional[Dict[str, Any]]:
+        self, bottleneck: dict[str, Any], templates: list[dict[str, Any]]
+    ) -> dict[str, Any] | None:
         """Find the first template that matches the bottleneck."""
         for template in templates:
             condition_func = template.get("condition")
@@ -279,8 +279,8 @@ class RecommendationEngine:
         return None
 
     def _build_recommendation(
-        self, bottleneck: Dict[str, Any], template: Dict[str, Any], priority: str, category: str
-    ) -> Dict[str, Any]:
+        self, bottleneck: dict[str, Any], template: dict[str, Any], priority: str, category: str
+    ) -> dict[str, Any]:
         """Build a complete recommendation from template and bottleneck context."""
 
         # Calculate severity-based priority adjustment
@@ -311,8 +311,8 @@ class RecommendationEngine:
         return recommendation
 
     def _generate_generic_recommendation(
-        self, bottleneck: Dict[str, Any], rule: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, bottleneck: dict[str, Any], rule: dict[str, Any]
+    ) -> dict[str, Any]:
         """Generate a generic recommendation when no specific template matches."""
         return {
             "id": f"generic_{bottleneck.get('type', 'unknown')}_{hash(str(bottleneck))}",
@@ -330,7 +330,7 @@ class RecommendationEngine:
             "implementation": "Review query patterns and consider optimization techniques",
         }
 
-    def _generate_basic_recommendation(self, bottleneck: Dict[str, Any]) -> Dict[str, Any]:
+    def _generate_basic_recommendation(self, bottleneck: dict[str, Any]) -> dict[str, Any]:
         """Generate a basic recommendation for unknown bottleneck types."""
         return {
             "id": f"basic_{bottleneck.get('type', 'unknown')}_{hash(str(bottleneck))}",
@@ -348,7 +348,7 @@ class RecommendationEngine:
             "implementation": "Analyze query patterns and consider optimization strategies",
         }
 
-    def _generate_implementation_guidance(self, recommendation: Dict[str, Any]) -> str:
+    def _generate_implementation_guidance(self, recommendation: dict[str, Any]) -> str:
         """Generate step-by-step implementation guidance."""
         category = recommendation.get("category", "")
         effort = recommendation.get("effort", "medium")
@@ -407,7 +407,7 @@ class RecommendationEngine:
 
     def _adjust_priority_by_severity(self, base_priority: str, severity: int) -> str:
         """Adjust recommendation priority based on bottleneck severity."""
-        priority_scores = {"low": 1, "medium": 2, "high": 3}
+        # priority_scores = {"low": 1, "medium": 2, "high": 3}  # Not currently used
 
         # Increase priority for high-severity issues
         if severity >= 8:
@@ -430,8 +430,8 @@ class RecommendationEngine:
         return scores.get(impact.lower(), 2)
 
     def _deduplicate_recommendations(
-        self, recommendations: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+        self, recommendations: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """Remove duplicate recommendations based on type and location."""
         seen = set()
         unique_recommendations = []
@@ -445,7 +445,7 @@ class RecommendationEngine:
         return unique_recommendations
 
     def score_recommendation_severity(
-        self, recommendation: Dict[str, Any], query_complexity: int
+        self, recommendation: dict[str, Any], query_complexity: int
     ) -> int:
         """
         Score recommendation severity (1-10 scale) considering query complexity.

@@ -1,33 +1,59 @@
 # Neo4j YASS MCP Documentation
 
-Welcome to the Neo4j YASS MCP documentation! This directory contains comprehensive guides, architecture documentation, and implementation details.
+Welcome to the Neo4j YASS MCP documentation! This directory contains comprehensive guides, architecture documentation, and implementation details for the most secure, production-ready MCP server for Neo4j.
+
+## 🚀 New: Query Plan Analysis Tool
+
+**[Query Plan Analysis Tool](./features/query-analysis/)** - Our flagship feature for Neo4j query performance optimization!
+- Real-time query execution plan analysis
+- Automated bottleneck detection and recommendations
+- Cost estimation with risk assessment
+- Support for both EXPLAIN and PROFILE modes
 
 ## 📚 Quick Navigation
 
-### Getting Started
+### 🎯 Getting Started
 - [Quick Start Guide](../QUICK_START.md) - Get up and running in 5 minutes
 - [Docker Deployment](../DOCKER.md) - Deploy with Docker Compose
-- [Contributing Guidelines](../CONTRIBUTING.md) - How to contribute to the project
+- [Query Analysis Quick Start](./features/query-analysis/) - Start optimizing queries immediately
 
-### Core Documentation
+### 🔧 User Guides
+- [User Guide Overview](./user-guides/) - End-user documentation
+- [Security Best Practices](./user-guides/SECURITY.md) - Security guidelines for users
+- [Troubleshooting Guide](./user-guides/TROUBLESHOOTING.md) - Common issues and solutions
 
-#### Architecture & Design
+### 🏗️ Architecture & Technical Documentation
 - [Software Architecture](./SOFTWARE_ARCHITECTURE.md) - System architecture and design patterns
 - [Software Architecture (ASCII)](./SOFTWARE_ARCHITECTURE_ASCII.md) - Text-based architecture diagrams
-- [Business Case](./BUSINESS_CASE.md) - Value proposition, ROI, and use cases
+- [Security Architecture](./SECURITY.md) - Comprehensive security design
+- [API Reference](./architecture/API_REFERENCE.md) - Complete API documentation
 
-#### Security
+### 🛡️ Security Documentation
 - [Security Overview](./SECURITY.md) - Security policies and practices
 - [Sanitization Architecture](./SANITIZATION_ARCHITECTURE.md) - Query sanitization design (DRY approach)
 - [DRY Sanitization Summary](./DRY_SANITIZATION_SUMMARY.md) - Implementation summary of DRY sanitization
 - [Prompt Injection Prevention](./PROMPT_INJECTION_PREVENTION.md) - Comprehensive prompt injection defense
 - [Chained Security Implementation Plan](./CHAINED_SECURITY_IMPLEMENTATION_PLAN.md) - Roadmap for 5-layer security
 
-#### LLM Integration
+### 🤖 LLM Integration
 - [LLM Providers](./LLM_PROVIDERS.md) - Supported LLM providers and configuration
 - [Adding LLM Providers](./ADDING_LLM_PROVIDERS.md) - Guide to adding new LLM providers
 
-#### Project Status
+### 📊 Features
+- [Query Plan Analysis](./features/query-analysis/) - Query performance optimization tool
+- [Rate Limiting](./features/rate-limiting/) - Request throttling and abuse prevention
+
+### 🚀 Deployment
+- [Docker Deployment](../DOCKER.md) - Container deployment guide
+- [Production Deployment](./deployment/PRODUCTION.md) - Production environment setup
+- [Configuration Reference](./deployment/CONFIGURATION.md) - Complete configuration options
+
+### 💻 Development
+- [Contributing Guidelines](../CONTRIBUTING.md) - How to contribute to the project
+- [Development Setup](./development/) - Developer environment setup
+- [Testing Guide](./development/TESTING.md) - Testing procedures and best practices
+
+### 📈 Project Status
 - [Improvements Summary](./IMPROVEMENTS_SUMMARY.md) - Recent enhancements and changes
 - [Changelog](../CHANGELOG.md) - Version history and release notes
 

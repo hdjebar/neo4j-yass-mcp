@@ -14,8 +14,7 @@ Features:
 
 import json
 import logging
-import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from neo4j_yass_mcp.tools.bottleneck_detector import BottleneckDetector
 from neo4j_yass_mcp.tools.cost_estimator import QueryCostEstimator
@@ -52,7 +51,7 @@ class QueryPlanAnalyzer:
         mode: str = "profile",
         include_recommendations: bool = True,
         include_cost_estimate: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Analyze a Cypher query and provide performance insights.
 
@@ -120,12 +119,12 @@ class QueryPlanAnalyzer:
 
         except Exception as e:
             logger.error(f"Query analysis failed: {str(e)}", exc_info=True)
-            raise ValueError(f"Query analysis failed: {str(e)}")
+            raise ValueError(f"Query analysis failed: {str(e)}") from e
 
-    async def _execute_explain(self, query: str) -> Dict[str, Any]:
+    async def _execute_explain(self, query: str) -> dict[str, Any]:
         """Execute EXPLAIN to get execution plan without running the query."""
         explain_query = f"EXPLAIN {query}"
-        logger.debug(f"Executing EXPLAIN for query analysis")
+        logger.debug("Executing EXPLAIN for query analysis")
 
         try:
             # Use the secure graph to execute the explain query
@@ -137,12 +136,12 @@ class QueryPlanAnalyzer:
             }
         except Exception as e:
             logger.error(f"EXPLAIN execution failed: {str(e)}")
-            raise ValueError(f"Failed to execute EXPLAIN: {str(e)}")
+            raise ValueError(f"Failed to execute EXPLAIN: {str(e)}") from e
 
-    async def _execute_profile(self, query: str) -> Dict[str, Any]:
+    async def _execute_profile(self, query: str) -> dict[str, Any]:
         """Execute PROFILE to get execution plan with runtime statistics."""
         profile_query = f"PROFILE {query}"
-        logger.debug(f"Executing PROFILE for query analysis")
+        logger.debug("Executing PROFILE for query analysis")
 
         try:
             # Use the secure graph to execute the profile query
@@ -154,11 +153,11 @@ class QueryPlanAnalyzer:
             return {"type": "profile", "plan": result, "statistics": statistics}
         except Exception as e:
             logger.error(f"PROFILE execution failed: {str(e)}")
-            raise ValueError(f"Failed to execute PROFILE: {str(e)}")
+            raise ValueError(f"Failed to execute PROFILE: {str(e)}") from e
 
     async def _execute_cypher_safe(
-        self, query: str, parameters: Optional[Dict] = None
-    ) -> List[Dict[str, Any]]:
+        self, query: str, parameters: dict | None = None
+    ) -> list[dict[str, Any]]:
         """
         Safely execute a Cypher query using the secure graph.
 
@@ -172,7 +171,7 @@ class QueryPlanAnalyzer:
         # Use the graph's query method which includes security checks
         return self.graph.query(query, params=parameters or {})
 
-    def _parse_execution_plan(self, plan_result: Dict[str, Any]) -> Dict[str, Any]:
+    def _parse_execution_plan(self, plan_result: dict[str, Any]) -> dict[str, Any]:
         """
         Parse and normalize the execution plan from Neo4j.
 
@@ -189,6 +188,7 @@ class QueryPlanAnalyzer:
             plan_data = plan_result.get("plan", [])
 
             parsed_plan = {
+                "type": plan_result.get("type", "unknown"),  # Preserve type from original result
                 "operators": [],
                 "estimated_rows": 0,
                 "estimated_cost": 0,
@@ -210,6 +210,9 @@ class QueryPlanAnalyzer:
             # Extract statistics if available (PROFILE mode)
             if plan_result.get("statistics"):
                 stats = plan_result["statistics"]
+                # Preserve original statistics structure
+                parsed_plan["statistics"] = stats
+                # Also add individual fields for easy access
                 parsed_plan.update(
                     {
                         "actual_rows": stats.get("rows", 0),
@@ -225,7 +228,7 @@ class QueryPlanAnalyzer:
             logger.error(f"Failed to parse execution plan: {str(e)}")
             return {"error": f"Plan parsing failed: {str(e)}", "operators": []}
 
-    def _parse_operator(self, operator_data: Any) -> Optional[Dict[str, Any]]:
+    def _parse_operator(self, operator_data: Any) -> dict[str, Any] | None:
         """
         Parse a single operator from the execution plan.
 
@@ -260,7 +263,7 @@ class QueryPlanAnalyzer:
 
         return None
 
-    def _extract_profile_statistics(self, result: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _extract_profile_statistics(self, result: list[dict[str, Any]]) -> dict[str, Any]:
         """
         Extract runtime statistics from PROFILE results.
 
@@ -294,8 +297,8 @@ class QueryPlanAnalyzer:
             return statistics
 
     def _generate_summary(
-        self, bottlenecks: List[Dict], recommendations: List[Dict], cost_estimate: Optional[Dict]
-    ) -> Dict[str, Any]:
+        self, bottlenecks: list[dict], recommendations: list[dict], cost_estimate: dict | None
+    ) -> dict[str, Any]:
         """
         Generate a human-readable summary of the analysis.
 
@@ -330,7 +333,7 @@ class QueryPlanAnalyzer:
         return summary
 
     def format_analysis_report(
-        self, analysis_result: Dict[str, Any], format_type: str = "text"
+        self, analysis_result: dict[str, Any], format_type: str = "text"
     ) -> str:
         """
         Format the analysis results for display.

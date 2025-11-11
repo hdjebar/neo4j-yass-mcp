@@ -11,7 +11,7 @@ This module analyzes query execution plans to identify common performance issues
 
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +62,10 @@ class BottleneckDetector:
 
     async def detect_bottlenecks(
         self,
-        execution_plan: Dict[str, Any],
+        execution_plan: dict[str, Any],
         query: str,
-        schema_info: Optional[Dict[str, Any]] = None,
-    ) -> List[Dict[str, Any]]:
+        schema_info: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Detect performance bottlenecks in query execution plan and query text.
 
@@ -102,7 +102,7 @@ class BottleneckDetector:
         logger.info(f"Detected {len(unique_bottlenecks)} bottlenecks")
         return unique_bottlenecks
 
-    def _detect_pattern_bottlenecks(self, query: str) -> List[Dict[str, Any]]:
+    def _detect_pattern_bottlenecks(self, query: str) -> list[dict[str, Any]]:
         """Detect bottlenecks by analyzing query patterns."""
         bottlenecks = []
         query_upper = query.upper()
@@ -129,7 +129,7 @@ class BottleneckDetector:
 
         return bottlenecks
 
-    def _detect_cartesian_products(self, query: str) -> List[Dict[str, Any]]:
+    def _detect_cartesian_products(self, query: str) -> list[dict[str, Any]]:
         """Detect potential Cartesian products in the query."""
         bottlenecks = []
 
@@ -168,7 +168,7 @@ class BottleneckDetector:
 
         return bottlenecks
 
-    def _detect_unbounded_varlength_patterns(self, query: str) -> List[Dict[str, Any]]:
+    def _detect_unbounded_varlength_patterns(self, query: str) -> list[dict[str, Any]]:
         """Detect unbounded or large variable-length patterns."""
         bottlenecks = []
 
@@ -207,7 +207,7 @@ class BottleneckDetector:
 
         return bottlenecks
 
-    def _detect_missing_limit_clauses(self, query: str) -> List[Dict[str, Any]]:
+    def _detect_missing_limit_clauses(self, query: str) -> list[dict[str, Any]]:
         """Detect queries that might benefit from LIMIT clauses."""
         bottlenecks = []
 
@@ -237,7 +237,7 @@ class BottleneckDetector:
 
         return bottlenecks
 
-    def _detect_expensive_procedures(self, query: str) -> List[Dict[str, Any]]:
+    def _detect_expensive_procedures(self, query: str) -> list[dict[str, Any]]:
         """Detect usage of expensive procedures."""
         bottlenecks = []
 
@@ -263,7 +263,7 @@ class BottleneckDetector:
 
         return bottlenecks
 
-    def _detect_inefficient_patterns(self, query: str) -> List[Dict[str, Any]]:
+    def _detect_inefficient_patterns(self, query: str) -> list[dict[str, Any]]:
         """Detect inefficient query patterns."""
         bottlenecks = []
 
@@ -298,8 +298,8 @@ class BottleneckDetector:
         return bottlenecks
 
     def _detect_plan_bottlenecks(
-        self, execution_plan: Dict[str, Any], schema_info: Optional[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+        self, execution_plan: dict[str, Any], schema_info: dict[str, Any] | None
+    ) -> list[dict[str, Any]]:
         """Detect bottlenecks by analyzing execution plan operators."""
         bottlenecks = []
         operators = execution_plan.get("operators", [])
@@ -341,14 +341,14 @@ class BottleneckDetector:
         return bottlenecks
 
     def _detect_schema_bottlenecks(
-        self, query: str, schema_info: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+        self, query: str, schema_info: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         """Detect bottlenecks based on schema information."""
         bottlenecks = []
 
         # Extract node labels and relationship types from query
         node_labels = re.findall(r":(\w+)", query)
-        rel_types = re.findall(r"\[:?(\w+)\]", query)
+        # rel_types = re.findall(r"\[:?(\w+)\]", query)  # Not currently used
 
         # Check if queried labels exist in schema
         schema_labels = set(schema_info.get("node_labels", []))
@@ -367,7 +367,7 @@ class BottleneckDetector:
 
         return bottlenecks
 
-    def _deduplicate_bottlenecks(self, bottlenecks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _deduplicate_bottlenecks(self, bottlenecks: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Remove duplicate bottlenecks based on type and location."""
         seen = set()
         unique_bottlenecks = []

@@ -322,6 +322,28 @@
         </div>
     </section>
 
+    <section id="query-analysis">
+        <h2>🔍 Query Analysis Tool (NEW!)</h2>
+        <p>Analyze query performance and get optimization recommendations</p>
+        
+        <div class="button-row">
+            <button class="sample-btn" onclick="testQueryAnalysis('explain')">Test EXPLAIN Mode</button>
+            <button class="sample-btn" onclick="testQueryAnalysis('profile')">Test PROFILE Mode</button>
+        </div>
+        <div class="button-row">
+            <button class="sample-btn" onclick="testProblematicQuery()">Test Problematic Query</button>
+            <button class="sample-btn" onclick="testOptimizedQuery()">Test Optimized Query</button>
+        </div>
+        
+        <div id="analysis-results" class="result-section hidden">
+            <h3>Analysis Results:</h3>
+            <div id="analysis-summary"></div>
+            <div id="analysis-bottlenecks"></div>
+            <div id="analysis-recommendations"></div>
+            <div id="analysis-report"></div>
+        </div>
+    </section>
+
     <section id="actions">
         <button id="submit-btn">Submit Query</button>
         <button id="clear-btn">Clear Results</button>
@@ -597,6 +619,231 @@
             // In a real implementation, this would establish a connection
             // to the MCP server using the appropriate transport mechanism
             console.log('Setting up MCP connection to:', endpoint);
+        }
+
+        // 🔍 Query Analysis Tool Testing Functions
+        async function testQueryAnalysis(mode) {
+            const endpoint = document.getElementById('endpoint').value.trim();
+            const token = document.getElementById('token').value.trim();
+            const timeout = parseInt(document.getElementById('timeout').value);
+
+            if (!endpoint) {
+                alert('Please enter an endpoint URL');
+                return;
+            }
+
+            const query = "MATCH (n:Person) WHERE n.age > 25 RETURN n.name, n.age";
+            
+            try {
+                showAnalysisLoading(`Testing ${mode} mode analysis...`);
+                
+                const startTime = Date.now();
+                const response = await makeMcpRequest(endpoint, 'analyze_query_performance', {
+                    query: query,
+                    mode: mode,
+                    include_recommendations: true
+                }, token, timeout);
+                const endTime = Date.now();
+                const executionTime = endTime - startTime;
+
+                displayAnalysisResults(response, executionTime, mode);
+                
+            } catch (error) {
+                displayAnalysisError(error.message);
+            }
+        }
+
+        async function testProblematicQuery() {
+            const endpoint = document.getElementById('endpoint').value.trim();
+            const token = document.getElementById('token').value.trim();
+            const timeout = parseInt(document.getElementById('timeout').value);
+
+            if (!endpoint) {
+                alert('Please enter an endpoint URL');
+                return;
+            }
+
+            // This query should trigger several bottlenecks
+            const problematicQuery = `
+                MATCH (a), (b), (c)
+                WHERE a.name = 'test' AND b.age > 25
+                OPTIONAL MATCH (a)-[*]->(d)
+                WITH *
+                RETURN a.name, b.name, c.name, d.name
+            `;
+            
+            try {
+                showAnalysisLoading('Analyzing problematic query...');
+                
+                const startTime = Date.now();
+                const response = await makeMcpRequest(endpoint, 'analyze_query_performance', {
+                    query: problematicQuery,
+                    mode: 'explain',
+                    include_recommendations: true
+                }, token, timeout);
+                const endTime = Date.now();
+                const executionTime = endTime - startTime;
+
+                displayAnalysisResults(response, executionTime, 'explain');
+                
+            } catch (error) {
+                displayAnalysisError(error.message);
+            }
+        }
+
+        async function testOptimizedQuery() {
+            const endpoint = document.getElementById('endpoint').value.trim();
+            const token = document.getElementById('token').value.trim();
+            const timeout = parseInt(document.getElementById('timeout').value);
+
+            if (!endpoint) {
+                alert('Please enter an endpoint URL');
+                return;
+            }
+
+            // This query should be well-optimized
+            const optimizedQuery = `
+                MATCH (person:Person {name: 'Alice'})
+                MATCH (person)-[:KNOWS]->(friend:Person)
+                WHERE friend.age > 25
+                RETURN friend.name, friend.age
+                LIMIT 10
+            `;
+            
+            try {
+                showAnalysisLoading('Analyzing optimized query...');
+                
+                const startTime = Date.now();
+                const response = await makeMcpRequest(endpoint, 'analyze_query_performance', {
+                    query: optimizedQuery,
+                    mode: 'explain',
+                    include_recommendations: true
+                }, token, timeout);
+                const endTime = Date.now();
+                const executionTime = endTime - startTime;
+
+                displayAnalysisResults(response, executionTime, 'explain');
+                
+            } catch (error) {
+                displayAnalysisError(error.message);
+            }
+        }
+
+        function showAnalysisLoading(message) {
+            const analysisResults = document.getElementById('analysis-results');
+            const analysisSummary = document.getElementById('analysis-summary');
+            
+            analysisResults.classList.remove('hidden');
+            analysisSummary.innerHTML = `
+                <div class="status loading">
+                    <span class="loading"></span>
+                    ${message}
+                </div>
+            `;
+            
+            // Hide other analysis sections
+            document.getElementById('analysis-bottlenecks').innerHTML = '';
+            document.getElementById('analysis-recommendations').innerHTML = '';
+            document.getElementById('analysis-report').innerHTML = '';
+        }
+
+        function displayAnalysisResults(response, executionTime, mode) {
+            const analysisSummary = document.getElementById('analysis-summary');
+            const analysisBottlenecks = document.getElementById('analysis-bottlenecks');
+            const analysisRecommendations = document.getElementById('analysis-recommendations');
+            const analysisReport = document.getElementById('analysis-report');
+
+            if (response.success) {
+                // Display summary
+                const summary = response.analysis_summary || {};
+                analysisSummary.innerHTML = `
+                    <div class="status success">
+                        <h4>Analysis Summary (${mode} mode)</h4>
+                        <p><strong>Overall Severity:</strong> ${summary.overall_severity || 0}/10</p>
+                        <p><strong>Bottlenecks Found:</strong> ${response.bottlenecks_found || 0}</p>
+                        <p><strong>Recommendations:</strong> ${response.recommendations_count || 0}</p>
+                        <p><strong>Risk Level:</strong> ${response.risk_level || 'unknown'}</p>
+                        <p><strong>Cost Score:</strong> ${response.cost_score || 0}/10</p>
+                        <p><strong>Analysis Time:</strong> ${executionTime}ms</p>
+                    </div>
+                `;
+
+                // Display bottlenecks
+                if (response.detailed_analysis && response.detailed_analysis.bottlenecks && response.detailed_analysis.bottlenecks.length > 0) {
+                    let bottlenecksHtml = '<h4>Performance Bottlenecks:</h4><ul>';
+                    response.detailed_analysis.bottlenecks.forEach((bottleneck, index) => {
+                        bottlenecksHtml += `
+                            <li>
+                                <strong>${bottleneck.type || 'Unknown'}:</strong> ${bottleneck.description}<br>
+                                <small>Severity: ${bottleneck.severity || 0}/10 | ${bottleneck.impact || ''}</small><br>
+                                <small>Location: ${bottleneck.location || 'Unknown'}</small>
+                            </li>
+                        `;
+                    });
+                    bottlenecksHtml += '</ul>';
+                    analysisBottlenecks.innerHTML = bottlenecksHtml;
+                } else {
+                    analysisBottlenecks.innerHTML = '<p>No significant bottlenecks detected.</p>';
+                }
+
+                // Display recommendations
+                if (response.detailed_analysis && response.detailed_analysis.recommendations && response.detailed_analysis.recommendations.length > 0) {
+                    let recommendationsHtml = '<h4>Optimization Recommendations:</h4><ol>';
+                    response.detailed_analysis.recommendations.forEach((rec, index) => {
+                        recommendationsHtml += `
+                            <li>
+                                <strong>${rec.title}</strong><br>
+                                ${rec.description}<br>
+                                <small>Priority: ${rec.priority} | Effort: ${rec.effort} | Impact: ${rec.impact}</small><br>
+                                <code>${rec.example || 'No example provided'}</code>
+                            </li>
+                        `;
+                    });
+                    recommendationsHtml += '</ol>';
+                    analysisRecommendations.innerHTML = recommendationsHtml;
+                } else {
+                    analysisRecommendations.innerHTML = '<p>No optimization recommendations.</p>';
+                }
+
+                // Display formatted report if available
+                if (response.analysis_report) {
+                    analysisReport.innerHTML = `
+                        <h4>Detailed Analysis Report:</h4>
+                        <pre style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; overflow-x: auto;">${response.analysis_report}</pre>
+                    `;
+                }
+
+            } else {
+                // Handle analysis failure
+                analysisSummary.innerHTML = `
+                    <div class="status error">
+                        <h4>Analysis Failed</h4>
+                        <p><strong>Error:</strong> ${response.error || 'Unknown error'}</p>
+                        <p><strong>Type:</strong> ${response.type || 'Unknown'}</p>
+                    </div>
+                `;
+                analysisBottlenecks.innerHTML = '';
+                analysisRecommendations.innerHTML = '';
+                analysisReport.innerHTML = '';
+            }
+        }
+
+        function displayAnalysisError(message) {
+            const analysisSummary = document.getElementById('analysis-summary');
+            const analysisResults = document.getElementById('analysis-results');
+            
+            analysisResults.classList.remove('hidden');
+            analysisSummary.innerHTML = `
+                <div class="status error">
+                    <h4>Analysis Error</h4>
+                    <p>${message}</p>
+                </div>
+            `;
+            
+            // Clear other sections
+            document.getElementById('analysis-bottlenecks').innerHTML = '';
+            document.getElementById('analysis-recommendations').innerHTML = '';
+            document.getElementById('analysis-report').innerHTML = '';
         }
     </script>
 </body>

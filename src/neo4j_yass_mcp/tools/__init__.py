@@ -5,9 +5,9 @@ This module contains tools for analyzing query performance, detecting bottleneck
 and providing optimization recommendations.
 """
 
-from .query_analyzer import QueryPlanAnalyzer
 from .bottleneck_detector import BottleneckDetector
-from .recommendation_engine import RecommendationEngine
 from .cost_estimator import QueryCostEstimator
+from .query_analyzer import QueryPlanAnalyzer
+from .recommendation_engine import RecommendationEngine
 
 __all__ = ["QueryPlanAnalyzer", "BottleneckDetector", "RecommendationEngine", "QueryCostEstimator"]
