@@ -105,7 +105,7 @@ class QueryCostEstimator:
             pattern_multiplier = self._calculate_pattern_multiplier(query)
 
             # Plan-based cost adjustments (if available)
-            plan_cost = 0
+            plan_cost: float = 0.0
             plan_multipliers = {}
             if execution_plan:
                 plan_cost = self._calculate_plan_cost(execution_plan)
@@ -172,12 +172,12 @@ class QueryCostEstimator:
         delete_count = len(re.findall(r"\bDELETE\b", query_upper))
 
         # Calculate base cost
-        base_cost = (
-            match_count * 50
-            + optional_match_count * 80
-            + where_count * 20
-            + return_count * 10
-            + with_count * 30
+        base_cost: float = (
+            match_count * 50.0
+            + optional_match_count * 80.0
+            + where_count * 20.0
+            + return_count * 10.0
+            + with_count * 30.0
             + create_count * 100
             + merge_count * 150
             + delete_count * 80
@@ -222,7 +222,7 @@ class QueryCostEstimator:
 
     def _calculate_plan_cost(self, execution_plan: dict[str, Any]) -> float:
         """Calculate cost from execution plan operators."""
-        plan_cost = 0
+        plan_cost: float = 0.0
         operators = execution_plan.get("operators", [])
 
         for operator in operators:

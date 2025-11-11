@@ -169,7 +169,11 @@ class QueryPlanAnalyzer:
             Query results
         """
         # Use the graph's query method which includes security checks
-        return self.graph.query(query, params=parameters or {})
+        result = self.graph.query(query, params=parameters or {})
+        # Cast to expected return type - graph.query should return list[dict[str, Any]]
+        from typing import cast
+
+        return cast(list[dict[str, Any]], result)
 
     def _parse_execution_plan(self, plan_result: dict[str, Any]) -> dict[str, Any]:
         """
@@ -273,7 +277,7 @@ class QueryPlanAnalyzer:
         Returns:
             Extracted statistics
         """
-        statistics = {"rows": 0, "time_ms": 0, "db_hits": 0, "memory": 0}
+        statistics: dict[str, float] = {"rows": 0.0, "time_ms": 0.0, "db_hits": 0.0, "memory": 0.0}
 
         try:
             # Look for statistics in the result data

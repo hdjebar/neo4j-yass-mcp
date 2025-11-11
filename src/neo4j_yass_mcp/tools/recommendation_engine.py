@@ -27,7 +27,7 @@ class RecommendationEngine:
 
     def _init_optimization_rules(self):
         """Initialize optimization rules and recommendation templates."""
-        self.optimization_rules = {
+        self.optimization_rules: dict[str, dict[str, Any]] = {
             # Cartesian Product Rules
             "cartesian_product": {
                 "priority": "high",
@@ -238,7 +238,8 @@ class RecommendationEngine:
                 rule = self.optimization_rules[bottleneck_type]
 
                 # Find matching template for this bottleneck
-                matching_template = self._find_matching_template(bottleneck, rule["templates"])
+                templates = rule["templates"]  # type: list[dict[str, Any]]
+                matching_template = self._find_matching_template(bottleneck, templates)
 
                 if matching_template:
                     recommendation = self._build_recommendation(
