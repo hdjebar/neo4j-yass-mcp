@@ -121,6 +121,10 @@ resource_rate_limit_enabled = os.getenv("MCP_RESOURCE_RATE_LIMIT_ENABLED", "true
 RESOURCE_RATE_LIMIT = int(os.getenv("MCP_RESOURCE_LIMIT", "20"))
 RESOURCE_RATE_WINDOW = int(os.getenv("MCP_RESOURCE_WINDOW", "60"))
 
+# Query analysis rate limits
+ANALYZE_QUERY_RATE_LIMIT = int(os.getenv("MCP_ANALYZE_QUERY_LIMIT", "15"))
+ANALYZE_QUERY_RATE_WINDOW = int(os.getenv("MCP_ANALYZE_QUERY_WINDOW", "60"))
+
 
 def _format_reset_time(timestamp: float) -> str:
     """Convert a UNIX timestamp to ISO 8601."""
@@ -154,6 +158,18 @@ def _build_execute_rate_limit_error(info: dict[str, Any]) -> dict[str, Any]:
 def _build_refresh_schema_rate_limit_error(info: dict[str, Any]) -> dict[str, Any]:
     return {
         "error": f"Rate limit exceeded. Retry after {info['retry_after']:.1f}s",
+        "rate_limited": True,
+        "retry_after_seconds": info["retry_after"],
+        "reset_time": _format_reset_time(info["reset_time"]),
+        "limit": info["limit"],
+        "window": info["window"],
+        "success": False,
+    }
+
+
+def _build_analyze_query_rate_limit_error(info: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "error": f"Query analysis rate limit exceeded. Retry after {info['retry_after']:.1f}s",
         "rate_limited": True,
         "retry_after_seconds": info["retry_after"],
         "reset_time": _format_reset_time(info["reset_time"]),
@@ -1059,6 +1075,157 @@ async def refresh_schema(ctx: Context | None = None) -> dict[str, Any]:
         return {"error": str(e), "type": type(e).__name__, "success": False}
 
 
+# Tool definition without decorator applied at import time
+# Decorator is applied in register_mcp_components() called from main()
+async def analyze_query_performance(
+    query: str,
+    mode: str = "profile",
+    include_recommendations: bool = True,
+    ctx: Context | None = None,
+) -> dict[str, Any]:
+    """
+    Analyze Cypher query performance and provide optimization recommendations.
+
+    This tool analyzes query execution plans using Neo4j's EXPLAIN and PROFILE
+    capabilities to identify performance bottlenecks and suggest optimizations.
+
+    Analysis modes:
+    - "explain": Shows execution plan without running the query (faster)
+    - "profile": Shows execution plan with runtime statistics (more detailed)
+
+    The analysis includes:
+    - Performance bottleneck detection
+    - Optimization recommendations with severity scoring
+    - Cost estimation and resource usage prediction
+    - Execution time and memory usage estimates
+
+    This function runs asynchronously and integrates with the existing security
+    layer to ensure safe query analysis.
+
+    Args:
+        query: The Cypher query to analyze
+        mode: Analysis mode - "explain" or "profile" (default: "profile")
+        include_recommendations: Whether to include optimization recommendations (default: True)
+
+    Returns:
+        Dictionary containing analysis results including:
+        - execution_plan: Parsed execution plan details
+        - bottlenecks: List of detected performance bottlenecks
+        - recommendations: Prioritized optimization suggestions
+        - cost_estimate: Resource usage and risk assessment
+        - analysis_summary: High-level summary of findings
+
+    Examples:
+        - query: "MATCH (n:Person)-[:KNOWS]->(m:Person) RETURN n.name, m.name"
+        - query: "MATCH (n:Movie) WHERE n.rating > 8 RETURN n.title, n.rating"
+        - mode: "explain" for quick plan analysis
+        - mode: "profile" for detailed performance statistics
+    """
+    if graph is None:
+        return {"error": "Neo4j graph not initialized", "success": False}
+
+    # Audit log the analysis request
+    audit_logger = get_audit_logger()
+    if audit_logger:
+        audit_logger.log_query(
+            tool="analyze_query_performance", query=query, parameters={"mode": mode}
+        )
+
+    try:
+        logger.info(f"Analyzing query performance in {mode} mode: {query[:100]}...")
+
+        # Import the query analyzer (lazy import to avoid circular dependencies)
+        from neo4j_yass_mcp.tools import QueryPlanAnalyzer
+
+        # Initialize the analyzer with the secure graph
+        analyzer = QueryPlanAnalyzer(graph)
+
+        # Run the analysis
+        start_time = time.time()
+        result = await analyzer.analyze_query(
+            query=query,
+            mode=mode,
+            include_recommendations=include_recommendations,
+            include_cost_estimate=True,
+        )
+        execution_time_ms = (time.time() - start_time) * 1000
+
+        # Format the result for user-friendly output
+        formatted_result = {
+            "query": query,
+            "mode": mode,
+            "success": True,
+            "analysis_summary": result.get("analysis_summary", {}),
+            "bottlenecks_found": len(result.get("bottlenecks", [])),
+            "recommendations_count": len(result.get("recommendations", [])),
+            "cost_score": result.get("cost_estimate", {}).get("cost_score", 0),
+            "risk_level": result.get("cost_estimate", {}).get("risk_level", "unknown"),
+            "execution_time_ms": int(execution_time_ms),
+            "detailed_analysis": result
+            if include_recommendations
+            else {
+                "execution_plan": result.get("execution_plan", {}),
+                "cost_estimate": result.get("cost_estimate", {}),
+            },
+        }
+
+        # Add formatted report if recommendations are included
+        if include_recommendations:
+            formatted_report = analyzer.format_analysis_report(result, format_type="text")
+            formatted_result["analysis_report"] = formatted_report
+
+        # Audit log the successful analysis
+        if audit_logger:
+            audit_logger.log_response(
+                tool="analyze_query_performance",
+                query=query,
+                response=formatted_result,
+                execution_time_ms=execution_time_ms,
+                metadata={"mode": mode, "bottlenecks_found": formatted_result["bottlenecks_found"]},
+            )
+
+        logger.info(
+            f"Query analysis completed successfully. Found {formatted_result['bottlenecks_found']} bottlenecks, {formatted_result['recommendations_count']} recommendations"
+        )
+        return formatted_result
+
+    except ValueError as e:
+        # Handle analysis-specific errors (like invalid mode)
+        logger.warning(f"Query analysis failed: {str(e)}")
+        error_response = {"error": str(e), "success": False, "type": "analysis_error"}
+
+        # Audit log the error
+        if audit_logger:
+            audit_logger.log_error(
+                tool="analyze_query_performance",
+                query=query,
+                error=str(e),
+                error_type="analysis_error",
+            )
+
+        return error_response
+
+    except Exception as e:
+        # Handle unexpected errors
+        logger.error(f"Unexpected error in analyze_query_performance: {str(e)}", exc_info=True)
+
+        # Sanitize error message for security
+        safe_error_message = sanitize_error_message(e)
+
+        error_response = {"error": safe_error_message, "type": type(e).__name__, "success": False}
+
+        # Audit log the error (with full details for debugging)
+        if audit_logger:
+            audit_logger.log_error(
+                tool="analyze_query_performance",
+                query=query,
+                error=str(e),  # Log full error for debugging
+                error_type=type(e).__name__,
+            )
+
+        return error_response
+
+
 # =============================================================================
 # Main Entry Point
 # =============================================================================
@@ -1194,6 +1361,21 @@ def register_mcp_components():
                 tool_name="refresh_schema",
                 build_error_response=_build_refresh_schema_rate_limit_error,
             )(refresh_schema)
+        )
+    )
+
+    # Register query analysis tool
+    mcp.tool()(
+        log_tool_invocation("analyze_query_performance")(
+            rate_limit_tool(
+                limiter=lambda: tool_rate_limiter,
+                client_id_extractor=get_client_id_from_context,
+                limit=ANALYZE_QUERY_RATE_LIMIT,
+                window=ANALYZE_QUERY_RATE_WINDOW,
+                enabled=lambda: tool_rate_limit_enabled,
+                tool_name="analyze_query_performance",
+                build_error_response=_build_analyze_query_rate_limit_error,
+            )(analyze_query_performance)
         )
     )
 

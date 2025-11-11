@@ -51,6 +51,8 @@ Complete guide to all Neo4j YASS MCP documentation.
 - [examples/rate_limiting_example.py](examples/rate_limiting_example.py) - Rate limiting demo
 - [examples/README_RATE_LIMITING.md](examples/README_RATE_LIMITING.md) - Rate limiting guide
 - [examples/ARCHITECTURE_NOTE.md](examples/ARCHITECTURE_NOTE.md) - Production vs examples
+- [examples/query_analysis_examples.py](examples/query_analysis_examples.py) - Query analysis examples
+- [examples/README_QUERY_ANALYSIS.md](examples/README_QUERY_ANALYSIS.md) - Query analysis guide
 
 ### 🔮 Future Features
 - [docs/FutureFeatures/README.md](docs/FutureFeatures/README.md) - Planned features overview
@@ -58,6 +60,12 @@ Complete guide to all Neo4j YASS MCP documentation.
 - [docs/FutureFeatures/01-query-plan-analysis.md](docs/FutureFeatures/01-query-plan-analysis.md)
 - [docs/FutureFeatures/15-query-complexity-limits.md](docs/FutureFeatures/15-query-complexity-limits.md)
 - [docs/FutureFeatures/16-llm-log-analysis.md](docs/FutureFeatures/16-llm-log-analysis.md)
+
+### 📊 Query Analysis Tool (NEW - Highest ROI Feature)
+- [docs/inprogress/QUERY_PLAN_ANALYSIS_IMPLEMENTATION_PLAN.md](docs/inprogress/QUERY_PLAN_ANALYSIS_IMPLEMENTATION_PLAN.md) - Implementation plan
+- [docs/inprogress/QUERY_ANALYSIS_USER_GUIDE.md](docs/inprogress/QUERY_ANALYSIS_USER_GUIDE.md) - Comprehensive user guide
+- [docs/inprogress/QUERY_ANALYSIS_QUICK_REFERENCE.md](docs/inprogress/QUERY_ANALYSIS_QUICK_REFERENCE.md) - Quick reference card
+- [examples/query_analysis_examples.py](examples/query_analysis_examples.py) - Practical examples
 
 ### 📦 Audit Reports
 - [docs/repo-arai/COMPREHENSIVE_AUDIT_REPORT_2025-11-08.md](docs/repo-arai/COMPREHENSIVE_AUDIT_REPORT_2025-11-08.md)

@@ -41,6 +41,7 @@
 - 📦 **UV Package Manager**: Fast, modern Python package management
 - 📚 **MCP Resources**: Access database schema and connection information
 - 🛠️ **MCP Tools**: Query with natural language, execute raw Cypher, refresh schema
+- 📊 **Query Plan Analysis**: NEW! Analyze query performance and get optimization recommendations
 
 ## Quick Start
 
@@ -473,6 +474,76 @@ execute_cypher(
 
 Refresh the cached Neo4j schema after structural changes.
 
+### 4. `analyze_query_performance(query: str, mode: str = "profile", include_recommendations: bool = True)` ⭐ **NEW**
+
+Analyze Cypher query performance and get optimization recommendations. **Highest ROI feature!**
+
+**Features:**
+- **Execution Plan Analysis**: Detailed analysis using Neo4j's EXPLAIN/PROFILE
+- **Bottleneck Detection**: Identifies performance issues (Cartesian products, missing indexes, etc.)
+- **Optimization Recommendations**: Actionable suggestions with severity scoring (1-10)
+- **Cost Estimation**: Predicts execution time, memory usage, and resource requirements
+- **Risk Assessment**: Evaluates query risk level (low/medium/high) before execution
+
+**Analysis Modes:**
+- **"explain"**: Fast analysis without query execution (recommended for validation)
+- **"profile"**: Detailed analysis with runtime statistics (recommended for optimization)
+
+**Example:**
+```python
+# Quick performance check
+result = await analyze_query_performance(
+  query="MATCH (n:Person) WHERE n.age > 25 RETURN n.name",
+  mode="explain"
+)
+
+print(f"Risk: {result['risk_level']}")  # low/medium/high
+print(f"Cost Score: {result['cost_score']}/10")  # 1-10 severity
+print(f"Bottlenecks: {result['bottlenecks_found']}")
+print(f"Recommendations: {result['recommendations_count']}")
+
+# Get detailed optimization report
+if result['recommendations_count'] > 0:
+    print(result['analysis_report'])
+```
+
+**Sample Output:**
+```
+Query Performance Analysis Report
+================================
+
+Query: MATCH (n:Person) WHERE n.age > 25 RETURN n.name
+Mode: explain
+Overall Severity: 7/10
+Estimated Impact: high
+
+Bottlenecks Detected: 2
+Recommendations: 3
+
+Performance Bottlenecks:
+1. missing_index: Missing index on property filter
+   Severity: 8/10
+   Impact: High - full scan of ~1000 nodes
+   Suggestion: Create index on Person.age
+
+Optimization Recommendations:
+1. Create index on age property
+   CREATE INDEX person_age FOR (p:Person) ON (p.age)
+   Priority: high | Effort: low | Impact: high
+```
+
+**Common Use Cases:**
+- **Query Validation**: Check user queries before production deployment
+- **Performance Tuning**: Identify and fix slow queries
+- **Schema Optimization**: Discover missing indexes and improvements
+- **Risk Assessment**: Evaluate query safety before execution
+
+**Best Practices:**
+- Use `"explain"` mode for quick validation (faster)
+- Use `"profile"` mode for detailed optimization (slower but more accurate)
+- Focus on severity 7+ issues for immediate impact
+- Test optimizations in development before production
+
 ## Available Resources
 
 ### 1. `neo4j://schema`
@@ -690,6 +761,7 @@ All MCP tools and resources now share the same decorator stack for structured lo
 | `MCP_QUERY_GRAPH_LIMIT` / `MCP_QUERY_GRAPH_WINDOW` | `10` / `60` | `query_graph` | Max natural-language queries allowed per client per window (seconds). |
 | `MCP_EXECUTE_CYPHER_LIMIT` / `MCP_EXECUTE_CYPHER_WINDOW` | `10` / `60` | `execute_cypher` | Direct Cypher execution throttle. |
 | `MCP_REFRESH_SCHEMA_LIMIT` / `MCP_REFRESH_SCHEMA_WINDOW` | `5` / `120` | `refresh_schema` | Protects schema refresh calls; slower cadence by default. |
+| `MCP_ANALYZE_QUERY_LIMIT` / `MCP_ANALYZE_QUERY_WINDOW` | `15` / `60` | `analyze_query_performance` | Query analysis rate limiting (NEW feature). |
 | `MCP_RESOURCE_RATE_LIMIT_ENABLED` | `true` | MCP resources | Enables decorator limits on resources such as schema/database info. |
 | `MCP_RESOURCE_LIMIT` / `MCP_RESOURCE_WINDOW` | `20` / `60` | `get_schema`, `get_database_info` | Caps how often metadata resources can be fetched per client. |
 
