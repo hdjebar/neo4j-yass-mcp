@@ -6,7 +6,6 @@ This test simulates the expected JSON responses that the HTML page would receive
 and verifies they contain all the required fields for proper display.
 """
 
-import json
 import sys
 
 
@@ -27,31 +26,19 @@ def test_html_response_format():
             "recommendation_count": 3,
             "critical_issues": 1,
             "estimated_impact": "high",
-            "estimated_cost": 8500
+            "estimated_cost": 8500,
         },
         "bottlenecks_found": 2,
         "recommendations_count": 3,
         "cost_score": 7,
         "risk_level": "high",
         "execution_time_ms": 45,
-        "analysis_summary": {  # This is the field the JS function looks for
-            "overall_severity": 7,
-            "bottleneck_count": 2,
-            "recommendation_count": 3,
-            "critical_issues": 1,
-            "estimated_impact": "high",
-            "estimated_cost": 8500
-        },
         "detailed_analysis": {
             "execution_plan": {
                 "type": "explain",
                 "operators": [
-                    {
-                        "name": "NodeByLabelScan",
-                        "estimated_rows": 1000,
-                        "estimated_cost": 500
-                    }
-                ]
+                    {"name": "NodeByLabelScan", "estimated_rows": 1000, "estimated_cost": 500}
+                ],
             },
             "bottlenecks": [
                 {
@@ -60,7 +47,7 @@ def test_html_response_format():
                     "severity": 8,
                     "impact": "High - full scan of ~1000 nodes",
                     "location": "NodeByLabelScan",
-                    "suggestion": "Create index on Person.age"
+                    "suggestion": "Create index on Person.age",
                 },
                 {
                     "type": "missing_limit",
@@ -68,8 +55,8 @@ def test_html_response_format():
                     "severity": 4,
                     "impact": "Medium - can return large result sets",
                     "location": "RETURN clause",
-                    "suggestion": "Add LIMIT clause to control result set size"
-                }
+                    "suggestion": "Add LIMIT clause to control result set size",
+                },
             ],
             "recommendations": [
                 {
@@ -86,27 +73,11 @@ def test_html_response_format():
                     "bottleneck_location": "NodeByLabelScan",
                     "reasoning": "Detected missing_index with severity 8/10",
                     "implementation": "1. Analyze property selectivity 2. Create index 3. Test performance",
-                    "considerations": ["Index creation takes time and disk space", "Consider composite indexes for multiple properties"]
+                    "considerations": [
+                        "Index creation takes time and disk space",
+                        "Consider composite indexes for multiple properties",
+                    ],
                 }
-            ],
-            "cost_estimate": {
-                "total_cost": 8500,
-                "cost_score": 7,
-                "confidence": "high",
-                "resource_breakdown": {
-                    "cpu_cost": 3400,
-                    "memory_cost": 2550,
-                    "io_cost": 2550
-                },
-                "estimated_rows": 1000,
-                "risk_level": "high",
-                "risk_factors": ["High estimated cost", "Missing index detected"],
-                "execution_time_estimate_ms": 850,
-                "memory_estimate_mb": 9
-            }
-        },
-        "analysis_report": "Query Performance Analysis Report\n================================\n\nQuery: MATCH (n:Person) WHERE n.age > 25 RETURN n.name, n.age\nMode: explain\nOverall Severity: 7/10\nEstimated Impact: high\n\nBottlenecks Detected: 2\nRecommendations: 3\n\nPerformance Bottlenecks:\n1. missing_index: Missing index on property filter\n   Severity: 8/10\n   Impact: High - full scan of ~1000 nodes\n   Location: NodeByLabelScan\n   Suggestion: Create index on Person.age\n\nOptimization Recommendations:\n1. Create index on frequently queried property\n   CREATE INDEX person_age FOR (p:Person) ON (p.age)\n   Priority: high | Effort: low | Impact: high"
-    }
             ],
             "cost_estimate": {
                 "total_cost": 8500,
@@ -264,7 +235,7 @@ def test_html_response_format():
             print("✅ All expected report sections present")
 
         # Show sample of report
-        print(f"\n📄 Sample Report Content:")
+        print("\n📄 Sample Report Content:")
         sample_lines = report.split("\n")[:8]
         for line in sample_lines:
             print(f"   {line}")
@@ -374,7 +345,7 @@ def main():
 
     # Summary
     print("\n" + "=" * 60)
-    print(f"📊 TEST SUMMARY:")
+    print("📊 TEST SUMMARY:")
     print(f"   Tests Passed: {tests_passed}/{total_tests}")
     print(f"   Success Rate: {tests_passed / total_tests * 100:.1f}%")
 

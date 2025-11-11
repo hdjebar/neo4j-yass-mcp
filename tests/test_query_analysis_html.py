@@ -7,9 +7,7 @@ the new analyze_query_performance functionality.
 """
 
 import asyncio
-import json
 import sys
-from typing import Any, Dict
 
 # Add the src directory to Python path
 sys.path.insert(0, "/Users/hdjebar/Projects/kimi/neo4j-yass-mcp/src")
@@ -32,7 +30,7 @@ async def test_query_analysis_integration():
             include_recommendations=True,
         )
 
-        print(f"✅ EXPLAIN analysis successful!")
+        print("✅ EXPLAIN analysis successful!")
         print(f"   Success: {result['success']}")
         print(f"   Mode: {result['mode']}")
         print(f"   Cost Score: {result['cost_score']}/10")
@@ -71,7 +69,7 @@ async def test_query_analysis_integration():
             include_recommendations=True,
         )
 
-        print(f"✅ PROFILE analysis successful!")
+        print("✅ PROFILE analysis successful!")
         print(f"   Mode: {result['mode']}")
         print(f"   Detailed analysis available: {'detailed_analysis' in result}")
 
@@ -104,7 +102,7 @@ async def test_query_analysis_integration():
             query=problematic_query, mode="explain", include_recommendations=True
         )
 
-        print(f"✅ Problematic query analysis successful!")
+        print("✅ Problematic query analysis successful!")
         print(f"   Bottlenecks found: {result['bottlenecks_found']}")
         print(f"   Recommendations: {result['recommendations_count']}")
 
@@ -157,7 +155,7 @@ async def test_query_analysis_integration():
         )
 
         if not result["success"]:
-            print(f"✅ Error handling works correctly!")
+            print("✅ Error handling works correctly!")
             print(f"   Error: {result.get('error', 'Unknown error')}")
             print(f"   Error type: {result.get('type', 'Unknown')}")
         else:
@@ -216,7 +214,7 @@ async def test_html_page_compatibility():
 
         # Test the analysis report format (what HTML page displays)
         if "analysis_report" in result:
-            print(f"\n📄 Analysis Report Preview:")
+            print("\n📄 Analysis Report Preview:")
             report_preview = (
                 result["analysis_report"][:200] + "..."
                 if len(result["analysis_report"]) > 200
@@ -274,7 +272,7 @@ async def main():
 
     # Summary
     print("\n" + "=" * 60)
-    print(f"📊 TEST SUMMARY:")
+    print("📊 TEST SUMMARY:")
     print(f"   Tests Passed: {tests_passed}/{total_tests}")
     print(f"   Success Rate: {tests_passed / total_tests * 100:.1f}%")
 
