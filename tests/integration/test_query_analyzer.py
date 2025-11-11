@@ -369,7 +369,7 @@ class TestQueryAnalysisIntegration:
 
         # Mock complex execution plan
         mock_graph = Mock()
-        mock_graph.query = AsyncMock(
+        mock_graph.query = Mock(
             return_value=[
                 {
                     "operators": [
