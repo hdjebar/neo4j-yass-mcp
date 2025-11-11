@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "neo4j-yass-mcp"
-version = "1.2.0"
+version = "1.2.1"
 description = "YASS (Yet Another Secure Server) - Production-ready, security-enhanced MCP server for Neo4j with LLM integration"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -41,14 +41,14 @@ dependencies = [
     # LangChain Core & Providers
     "langchain>=1.0.0,<2.0.0", # Upgraded from 0.3.27 (Phase 3)
     "langchain-core>=1.0.4,<2.0.0", # Required for LangChain 1.0
-    "langchain-neo4j>=0.1.0,<1.0.0", # Neo4j integration
+    "langchain-neo4j>=0.6.0,<1.0.0", # Neo4j integration - Updated Jan 2025 (was 0.1.0)
     "langchain-openai>=1.0.0,<2.0.0", # Upgraded from 0.3.35 (Phase 3)
     "langchain-anthropic>=1.0.0,<2.0.0", # Upgraded from 0.3.22 (Phase 3)
     "langchain-google-genai>=2.0.0,<3.0.0", # Already v2.x+ (supports langchain-core>=1.0)
     # Database & Core Dependencies
-    "neo4j>=5.14.0,<6.0.0",
+    "neo4j>=5.28.0,<6.0.0", # Updated Jan 2025 (was 5.14.0) - Security fixes, Python 3.13 support
     "python-dotenv>=1.0.0,<2.0.0",
-    "pydantic>=2.0.0,<3.0.0",
+    "pydantic>=2.10.0,<3.0.0", # Updated Jan 2025 (was 2.0.0) - Latest stable
     "tokenizers>=0.19.1,<1.0.0", # Hugging Face tokenizers (for token counting)
     # Security & Sanitization libraries
     "confusable-homoglyphs>=3.2.0,<4.0.0", # Homograph attack detection

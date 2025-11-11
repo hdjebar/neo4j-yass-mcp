@@ -25,6 +25,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - Security improvements and fixes
 
+## [1.2.1] - 2025-01-12
+
+### Changed
+- **CRITICAL**: Updated `langchain-neo4j` from 0.1.0 to 0.6.0 (security & stability)
+  - Includes 11 months of bug fixes and improvements
+  - Enhanced GraphRAG capabilities
+  - Better LangChain 1.0 compatibility
+  - Performance optimizations
+- **CRITICAL**: Updated `neo4j` driver from 5.14.0 to 5.28.0 (security & performance)
+  - Security: mTLS support for 2FA authentication
+  - Performance: ~100x speedup for temporal operations
+  - Bug fixes: DateTime arithmetic corrections
+  - Python 3.13 full compatibility
+  - GQL-compliant error handling
+- Updated `pydantic` from 2.0.0 to 2.10.0 (latest stable)
+
+### Security
+- Addressed 14 months of security patches in Neo4j driver
+- Addressed 11 months of security patches in langchain-neo4j
+- Enhanced connection security with mTLS support
+
+### Performance
+- Temporal operations now ~100x faster (Neo4j driver 5.28.0)
+- Improved schema introspection performance
+- Better connection pool handling
+
 ## [1.2.0] - 2025-11-10
 
 ### Added
