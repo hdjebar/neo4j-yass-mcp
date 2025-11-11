@@ -313,7 +313,7 @@ class BottleneckDetector:
                 bottlenecks.append(
                     {
                         "type": "cartesian_product",
-                        "description": f"Cartesian product detected in execution plan",
+                        "description": "Cartesian product detected in execution plan",
                         "severity": self.severity_scores.get("cartesian_product", 9),
                         "impact": f"Very High - estimated {estimated_rows} row combinations",
                         "location": operator.get("name", "Unknown operator"),
