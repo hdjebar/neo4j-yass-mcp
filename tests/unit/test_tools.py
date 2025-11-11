@@ -23,7 +23,12 @@ class TestToolsModule:
 
         # Should export query analysis tools
         assert isinstance(__all__, list)
-        expected_exports = ["QueryPlanAnalyzer", "BottleneckDetector", "RecommendationEngine", "QueryCostEstimator"]
+        expected_exports = [
+            "QueryPlanAnalyzer",
+            "BottleneckDetector",
+            "RecommendationEngine",
+            "QueryCostEstimator",
+        ]
         assert len(__all__) == len(expected_exports)
         assert set(__all__) == set(expected_exports)
 

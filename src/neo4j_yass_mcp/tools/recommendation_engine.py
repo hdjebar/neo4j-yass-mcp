@@ -34,7 +34,9 @@ class RecommendationEngine:
                 "category": "query_structure",
                 "templates": [
                     {
-                        "condition": lambda b: "patterns in single MATCH" in b.get("description", "") or "many patterns" in b.get("description", ""),
+                        "condition": lambda b: "patterns in single MATCH"
+                        in b.get("description", "")
+                        or "many patterns" in b.get("description", ""),
                         "recommendation": {
                             "title": "Break complex MATCH into smaller parts",
                             "description": "Split the MATCH clause into multiple queries or use pattern comprehension",
@@ -96,7 +98,8 @@ class RecommendationEngine:
                 "category": "pattern_optimization",
                 "templates": [
                     {
-                        "condition": lambda b: "completely unbounded" in b.get("description", "").lower(),
+                        "condition": lambda b: "completely unbounded"
+                        in b.get("description", "").lower(),
                         "recommendation": {
                             "title": "Add reasonable bounds to variable-length pattern",
                             "description": "Unbounded patterns can explore the entire graph and cause memory issues",
