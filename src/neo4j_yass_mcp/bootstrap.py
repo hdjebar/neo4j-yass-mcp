@@ -92,7 +92,7 @@ def initialize_server_state(
 
     # Create MCP instance if not provided
     if mcp_instance is None:
-        mcp_instance = FastMCP("neo4j-yass-mcp", version="1.3.0")
+        mcp_instance = FastMCP("neo4j-yass-mcp", version="1.4.0")
 
     # Create state object
     state = ServerState(
