@@ -2,15 +2,22 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
-[![Neo4j 5.x](https://img.shields.io/badge/neo4j-5.x-green.svg)](https://neo4j.com/)
-[![FastMCP](https://img.shields.io/badge/framework-FastMCP-orange.svg)](https://github.com/jlowin/fastmcp)
+[![Neo4j 5.x](https://img.shields.io/badge/neo4j-5.28.2-green.svg)](https://neo4j.com/)
+[![FastMCP](https://img.shields.io/badge/framework-FastMCP%202.13-orange.svg)](https://github.com/jlowin/fastmcp)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
 [![CI/CD Pipeline](https://github.com/hdjebar/neo4j-yass-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/hdjebar/neo4j-yass-mcp/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-468%20passed-brightgreen)](https://github.com/hdjebar/neo4j-yass-mcp/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-83.54%25-brightgreen)](https://github.com/hdjebar/neo4j-yass-mcp/actions/workflows/ci.yml)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://hub.docker.com/)
 [![MCP Protocol](https://img.shields.io/badge/MCP-1.21.0-purple.svg)](https://modelcontextprotocol.io/)
 [![Security: Bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
 [![LangChain 1.0](https://img.shields.io/badge/langchain-1.0-green.svg)](https://python.langchain.com/)
+
+[![GitHub release](https://img.shields.io/github/v/release/hdjebar/neo4j-yass-mcp?include_prereleases)](https://github.com/hdjebar/neo4j-yass-mcp/releases)
+[![GitHub stars](https://img.shields.io/github/stars/hdjebar/neo4j-yass-mcp?style=social)](https://github.com/hdjebar/neo4j-yass-mcp/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/hdjebar/neo4j-yass-mcp?style=social)](https://github.com/hdjebar/neo4j-yass-mcp/network/members)
+[![GitHub contributors](https://img.shields.io/github/contributors/hdjebar/neo4j-yass-mcp)](https://github.com/hdjebar/neo4j-yass-mcp/graphs/contributors)
 
 **Yet Another Secure Server (YASS)** - A production-ready, security-enhanced Model Context Protocol (MCP) server that provides Neo4j graph database querying capabilities using LangChain's GraphCypherQAChain for natural language to Cypher query translation.
 
