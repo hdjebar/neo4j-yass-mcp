@@ -115,11 +115,13 @@ select = [
 ignore = [
     "E501",  # line too long (handled by black)
     "S101",  # use of assert (acceptable in tests)
+    "E402",  # module level import not at top (intentional for bootstrap ordering)
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101"]  # Allow assert in tests
+"tests/**/*.py" = ["S101", "S105", "S106", "S104"]  # Allow assert, test passwords/credentials, test bind addresses
 "tests/integration/test_server_integration.py" = ["S101", "S106"]  # Allow assert and hardcoded test passwords
+"src/neo4j_yass_mcp/config/runtime_config.py" = ["S105"]  # Password redaction constants (not actual passwords)
 
 [tool.black]
 line-length = 100
@@ -192,7 +194,12 @@ exclude_lines = [
 
 [tool.bandit]
 exclude_dirs = ["tests", ".venv", "venv"]
-skips = ["B101"]  # assert_used (acceptable in tests)
+skips = [
+    "B101",  # assert_used (acceptable in tests)
+    "B104",  # bind_all_interfaces (intentional for test containers)
+    "B105",  # hardcoded_password_string (false positives in test fixtures & redaction)
+    "B106",  # hardcoded_password_funcarg (false positives in test parameters)
+]
 
 
 [tool.setuptools.packages.find]
