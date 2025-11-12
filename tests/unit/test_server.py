@@ -419,9 +419,10 @@ class TestUtilityFunctions:
 
 
 class TestInitializeNeo4j:
-    """Test initialize_neo4j function."""
+    """Test initialize_neo4j function (Phase 4: Now async)."""
 
-    def test_initialize_neo4j_with_weak_password(self):
+    @pytest.mark.asyncio
+    async def test_initialize_neo4j_with_weak_password(self):
         """Test initialization fails with weak password (no override)."""
         with patch.dict(
             "os.environ",
@@ -440,17 +441,20 @@ class TestInitializeNeo4j:
                 # Mock LLM components to focus test on password validation
                 with patch("neo4j_yass_mcp.server.chatLLM"):
                     with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
-                        # Mock SecureNeo4jGraph to raise the weak password error
-                        with patch("neo4j_yass_mcp.server.SecureNeo4jGraph") as mock_graph:
+                        # Mock AsyncSecureNeo4jGraph to raise the weak password error
+                        with patch("neo4j_yass_mcp.async_graph.AsyncSecureNeo4jGraph") as mock_graph:
                             mock_graph.side_effect = ValueError("Weak password detected")
 
                             from neo4j_yass_mcp.server import initialize_neo4j
 
                             with pytest.raises(ValueError, match="Weak password detected"):
-                                initialize_neo4j()
+                                await initialize_neo4j()
 
-    def test_initialize_neo4j_with_weak_password_allowed(self):
+    @pytest.mark.asyncio
+    async def test_initialize_neo4j_with_weak_password_allowed(self):
         """Test initialization succeeds with weak password when override enabled."""
+        from unittest.mock import AsyncMock
+
         with patch.dict(
             "os.environ",
             {
@@ -465,18 +469,25 @@ class TestInitializeNeo4j:
             test_config = RuntimeConfig.from_env()
 
             with patch("neo4j_yass_mcp.server._config", test_config):
-                with patch("neo4j_yass_mcp.server.SecureNeo4jGraph") as mock_graph:
+                with patch("neo4j_yass_mcp.async_graph.AsyncSecureNeo4jGraph") as mock_graph:
+                    # Mock async refresh_schema method
+                    mock_instance = Mock()
+                    mock_instance.refresh_schema = AsyncMock()
+                    mock_instance.get_schema = "Node: Test"
+                    mock_graph.return_value = mock_instance
+
                     with patch("neo4j_yass_mcp.server.chatLLM"):
                         with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
                             from neo4j_yass_mcp.server import initialize_neo4j
 
                             # Should not raise error
-                            initialize_neo4j()
+                            await initialize_neo4j()
 
                             # Verify Neo4j connection was attempted
                             mock_graph.assert_called_once()
 
-    def test_initialize_neo4j_debug_mode_in_production(self):
+    @pytest.mark.asyncio
+    async def test_initialize_neo4j_debug_mode_in_production(self):
         """Test initialization fails with DEBUG_MODE in production."""
         with patch.dict(
             "os.environ",
@@ -495,7 +506,7 @@ class TestInitializeNeo4j:
 
             with patch("neo4j_yass_mcp.server._config", test_config):
                 # Mock all external dependencies
-                with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
+                with patch("neo4j_yass_mcp.async_graph.AsyncSecureNeo4jGraph"):
                     with patch("neo4j_yass_mcp.server.chatLLM"):
                         with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
                             from neo4j_yass_mcp.server import initialize_neo4j
@@ -503,10 +514,13 @@ class TestInitializeNeo4j:
                             with pytest.raises(
                                 ValueError, match="DEBUG_MODE=true is not allowed in production"
                             ):
-                                initialize_neo4j()
+                                await initialize_neo4j()
 
-    def test_initialize_neo4j_debug_mode_in_development(self):
+    @pytest.mark.asyncio
+    async def test_initialize_neo4j_debug_mode_in_development(self):
         """Test initialization succeeds with DEBUG_MODE in development."""
+        from unittest.mock import AsyncMock
+
         with patch.dict(
             "os.environ",
             {
@@ -522,17 +536,26 @@ class TestInitializeNeo4j:
             test_config = RuntimeConfig.from_env()
 
             with patch("neo4j_yass_mcp.server._config", test_config):
-                with patch("neo4j_yass_mcp.server.SecureNeo4jGraph") as mock_graph:
+                with patch("neo4j_yass_mcp.async_graph.AsyncSecureNeo4jGraph") as mock_graph:
+                    # Mock async refresh_schema method
+                    mock_instance = Mock()
+                    mock_instance.refresh_schema = AsyncMock()
+                    mock_instance.get_schema = "Node: Test"
+                    mock_graph.return_value = mock_instance
+
                     with patch("neo4j_yass_mcp.server.chatLLM"):
                         with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
                             from neo4j_yass_mcp.server import initialize_neo4j
 
-                            initialize_neo4j()
+                            await initialize_neo4j()
 
                             mock_graph.assert_called_once()
 
-    def test_initialize_neo4j_read_only_mode(self):
+    @pytest.mark.asyncio
+    async def test_initialize_neo4j_read_only_mode(self):
         """Test initialization with read-only mode enabled."""
+        from unittest.mock import AsyncMock
+
         with patch.dict(
             "os.environ",
             {
@@ -547,20 +570,29 @@ class TestInitializeNeo4j:
             test_config = RuntimeConfig.from_env()
 
             with patch("neo4j_yass_mcp.server._config", test_config):
-                with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
+                with patch("neo4j_yass_mcp.async_graph.AsyncSecureNeo4jGraph") as mock_graph:
+                    # Mock async refresh_schema method
+                    mock_instance = Mock()
+                    mock_instance.refresh_schema = AsyncMock()
+                    mock_instance.get_schema = "Node: Test"
+                    mock_graph.return_value = mock_instance
+
                     with patch("neo4j_yass_mcp.server.chatLLM"):
                         with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
                             from neo4j_yass_mcp.server import initialize_neo4j
 
-                            initialize_neo4j()
+                            await initialize_neo4j()
 
                             # Verify read-only mode was set
                             from neo4j_yass_mcp.server import _read_only_mode
 
                             assert _read_only_mode is True
 
-    def test_initialize_neo4j_with_response_token_limit(self):
+    @pytest.mark.asyncio
+    async def test_initialize_neo4j_with_response_token_limit(self):
         """Test initialization with response token limit."""
+        from unittest.mock import AsyncMock
+
         with patch.dict(
             "os.environ",
             {
@@ -575,19 +607,28 @@ class TestInitializeNeo4j:
             test_config = RuntimeConfig.from_env()
 
             with patch("neo4j_yass_mcp.server._config", test_config):
-                with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
+                with patch("neo4j_yass_mcp.async_graph.AsyncSecureNeo4jGraph") as mock_graph:
+                    # Mock async refresh_schema method
+                    mock_instance = Mock()
+                    mock_instance.refresh_schema = AsyncMock()
+                    mock_instance.get_schema = "Node: Test"
+                    mock_graph.return_value = mock_instance
+
                     with patch("neo4j_yass_mcp.server.chatLLM"):
                         with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
                             from neo4j_yass_mcp.server import initialize_neo4j
 
-                            initialize_neo4j()
+                            await initialize_neo4j()
 
                             from neo4j_yass_mcp.server import _response_token_limit
 
                             assert _response_token_limit == 5000
 
-    def test_initialize_neo4j_with_invalid_token_limit(self):
+    @pytest.mark.asyncio
+    async def test_initialize_neo4j_with_invalid_token_limit(self):
         """Test initialization with invalid response token limit."""
+        from unittest.mock import AsyncMock
+
         with patch.dict(
             "os.environ",
             {
@@ -602,16 +643,25 @@ class TestInitializeNeo4j:
             test_config = RuntimeConfig.from_env()
 
             with patch("neo4j_yass_mcp.server._config", test_config):
-                with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
+                with patch("neo4j_yass_mcp.async_graph.AsyncSecureNeo4jGraph") as mock_graph:
+                    # Mock async refresh_schema method
+                    mock_instance = Mock()
+                    mock_instance.refresh_schema = AsyncMock()
+                    mock_instance.get_schema = "Node: Test"
+                    mock_graph.return_value = mock_instance
+
                     with patch("neo4j_yass_mcp.server.chatLLM"):
                         with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
                             from neo4j_yass_mcp.server import initialize_neo4j
 
                             # Should not raise error, just log warning
-                            initialize_neo4j()
+                            await initialize_neo4j()
 
-    def test_initialize_neo4j_with_langchain_dangerous_requests(self):
+    @pytest.mark.asyncio
+    async def test_initialize_neo4j_with_langchain_dangerous_requests(self):
         """Test initialization with LANGCHAIN_ALLOW_DANGEROUS_REQUESTS."""
+        from unittest.mock import AsyncMock
+
         with patch.dict(
             "os.environ",
             {
@@ -626,14 +676,20 @@ class TestInitializeNeo4j:
             test_config = RuntimeConfig.from_env()
 
             with patch("neo4j_yass_mcp.server._config", test_config):
-                with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
+                with patch("neo4j_yass_mcp.async_graph.AsyncSecureNeo4jGraph") as mock_graph:
+                    # Mock async refresh_schema method
+                    mock_instance = Mock()
+                    mock_instance.refresh_schema = AsyncMock()
+                    mock_instance.get_schema = "Node: Test"
+                    mock_graph.return_value = mock_instance
+
                     with patch("neo4j_yass_mcp.server.chatLLM"):
                         with patch(
                             "neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"
                         ) as mock_chain:
                             from neo4j_yass_mcp.server import initialize_neo4j
 
-                            initialize_neo4j()
+                            await initialize_neo4j()
 
                             # Verify chain was created with allow_dangerous_requests=True
                             mock_chain.assert_called_once()
@@ -824,7 +880,14 @@ class TestAuditLoggerIntegration:
 
     @pytest.mark.asyncio
     async def test_execute_cypher_sanitizer_logs_error(self, mock_neo4j_graph):
-        """Test execute_cypher logs sanitizer blocks."""
+        """Test execute_cypher logs sanitizer blocks (Phase 4: AsyncMock)."""
+        from unittest.mock import AsyncMock
+
+        # Phase 4: Mock graph.query() to raise ValueError (security check)
+        mock_neo4j_graph.query = AsyncMock(
+            side_effect=ValueError("Query blocked by sanitizer: LOAD CSV not allowed")
+        )
+
         mock_audit_logger = Mock()
         mock_audit_logger.log_error = Mock()
 
@@ -843,7 +906,14 @@ class TestAuditLoggerIntegration:
 
     @pytest.mark.asyncio
     async def test_execute_cypher_read_only_logs_error(self, mock_neo4j_graph):
-        """Test execute_cypher logs read-only violations."""
+        """Test execute_cypher logs read-only violations (Phase 4: AsyncMock)."""
+        from unittest.mock import AsyncMock
+
+        # Phase 4: Mock graph.query() to raise ValueError (read-only check)
+        mock_neo4j_graph.query = AsyncMock(
+            side_effect=ValueError("Query blocked in read-only mode: Write operation not allowed")
+        )
+
         mock_audit_logger = Mock()
         mock_audit_logger.log_error = Mock()
 
