@@ -78,18 +78,17 @@ class TestQueryGraph:
 
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
             with patch("neo4j_yass_mcp.server.chain", unsafe_chain):
-                with patch("neo4j_yass_mcp.server.sanitizer_enabled", True):
-                    with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
-                        from neo4j_yass_mcp.server import query_graph
+                with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+                    from neo4j_yass_mcp.server import query_graph
 
-                        result = await query_graph("Load system files", ctx=create_mock_context())
+                    result = await query_graph("Load system files", ctx=create_mock_context())
 
-                        # Should fail due to sanitizer
-                        assert result["success"] is False
-                        assert (
-                            "sanitizer" in result.get("error", "").lower()
-                            or "blocked" in result.get("error", "").lower()
-                        )
+                    # Should fail due to sanitizer
+                    assert result["success"] is False
+                    assert (
+                        "sanitizer" in result.get("error", "").lower()
+                        or "blocked" in result.get("error", "").lower()
+                    )
 
     @pytest.mark.asyncio
     async def test_query_graph_empty_query(self):
@@ -188,20 +187,19 @@ class TestExecuteCypher:
     async def test_execute_cypher_sanitizer_blocks_unsafe(self, mock_neo4j_graph):
         """Test sanitizer blocks unsafe queries."""
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
-            with patch("neo4j_yass_mcp.server.sanitizer_enabled", True):
-                with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
-                    from neo4j_yass_mcp.server import execute_cypher
+            with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+                from neo4j_yass_mcp.server import execute_cypher
 
-                    # Unsafe query - use a clearly dangerous pattern
-                    result = await execute_cypher(
-                        "LOAD CSV FROM 'file.csv' AS line RETURN line", ctx=create_mock_context()
-                    )
+                # Unsafe query - use a clearly dangerous pattern
+                result = await execute_cypher(
+                    "LOAD CSV FROM 'file.csv' AS line RETURN line", ctx=create_mock_context()
+                )
 
-                    assert result["success"] is False
-                    assert (
-                        "blocked" in result.get("error", "").lower()
-                        or "dangerous" in result.get("error", "").lower()
-                    )
+                assert result["success"] is False
+                assert (
+                    "blocked" in result.get("error", "").lower()
+                    or "dangerous" in result.get("error", "").lower()
+                )
 
     @pytest.mark.asyncio
     async def test_execute_cypher_exception_handling(self, mock_neo4j_graph):
@@ -427,16 +425,21 @@ class TestInitializeNeo4j:
                 "LLM_API_KEY": "test-key",
             },
         ):
-            with patch("neo4j_yass_mcp.server.SecureNeo4jGraph") as mock_graph:
-                with patch("neo4j_yass_mcp.server.chatLLM"):
-                    with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
-                        from neo4j_yass_mcp.server import initialize_neo4j
+            # Reload config with new environment
+            from neo4j_yass_mcp.config import RuntimeConfig
+            test_config = RuntimeConfig.from_env()
 
-                        # Should not raise error
-                        initialize_neo4j()
+            with patch("neo4j_yass_mcp.server._config", test_config):
+                with patch("neo4j_yass_mcp.server.SecureNeo4jGraph") as mock_graph:
+                    with patch("neo4j_yass_mcp.server.chatLLM"):
+                        with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
+                            from neo4j_yass_mcp.server import initialize_neo4j
 
-                        # Verify Neo4j connection was attempted
-                        mock_graph.assert_called_once()
+                            # Should not raise error
+                            initialize_neo4j()
+
+                            # Verify Neo4j connection was attempted
+                            mock_graph.assert_called_once()
 
     def test_initialize_neo4j_debug_mode_in_production(self):
         """Test initialization fails with DEBUG_MODE in production."""
@@ -448,10 +451,15 @@ class TestInitializeNeo4j:
                 "NEO4J_PASSWORD": "StrongP@ssw0rd!123",
             },
         ):
-            from neo4j_yass_mcp.server import initialize_neo4j
+            # Reload config with new environment
+            from neo4j_yass_mcp.config import RuntimeConfig
+            test_config = RuntimeConfig.from_env()
 
-            with pytest.raises(ValueError, match="DEBUG_MODE=true is not allowed in production"):
-                initialize_neo4j()
+            with patch("neo4j_yass_mcp.server._config", test_config):
+                from neo4j_yass_mcp.server import initialize_neo4j
+
+                with pytest.raises(ValueError, match="DEBUG_MODE=true is not allowed in production"):
+                    initialize_neo4j()
 
     def test_initialize_neo4j_debug_mode_in_development(self):
         """Test initialization succeeds with DEBUG_MODE in development."""
@@ -464,14 +472,19 @@ class TestInitializeNeo4j:
                 "LLM_API_KEY": "test-key",
             },
         ):
-            with patch("neo4j_yass_mcp.server.SecureNeo4jGraph") as mock_graph:
-                with patch("neo4j_yass_mcp.server.chatLLM"):
-                    with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
-                        from neo4j_yass_mcp.server import initialize_neo4j
+            # Reload config with new environment
+            from neo4j_yass_mcp.config import RuntimeConfig
+            test_config = RuntimeConfig.from_env()
 
-                        initialize_neo4j()
+            with patch("neo4j_yass_mcp.server._config", test_config):
+                with patch("neo4j_yass_mcp.server.SecureNeo4jGraph") as mock_graph:
+                    with patch("neo4j_yass_mcp.server.chatLLM"):
+                        with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
+                            from neo4j_yass_mcp.server import initialize_neo4j
 
-                        mock_graph.assert_called_once()
+                            initialize_neo4j()
+
+                            mock_graph.assert_called_once()
 
     def test_initialize_neo4j_read_only_mode(self):
         """Test initialization with read-only mode enabled."""
@@ -483,17 +496,22 @@ class TestInitializeNeo4j:
                 "LLM_API_KEY": "test-key",
             },
         ):
-            with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
-                with patch("neo4j_yass_mcp.server.chatLLM"):
-                    with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
-                        from neo4j_yass_mcp.server import initialize_neo4j
+            # Reload config with new environment
+            from neo4j_yass_mcp.config import RuntimeConfig
+            test_config = RuntimeConfig.from_env()
 
-                        initialize_neo4j()
+            with patch("neo4j_yass_mcp.server._config", test_config):
+                with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
+                    with patch("neo4j_yass_mcp.server.chatLLM"):
+                        with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
+                            from neo4j_yass_mcp.server import initialize_neo4j
 
-                        # Verify read-only mode was set
-                        from neo4j_yass_mcp.server import _read_only_mode
+                            initialize_neo4j()
 
-                        assert _read_only_mode is True
+                            # Verify read-only mode was set
+                            from neo4j_yass_mcp.server import _read_only_mode
+
+                            assert _read_only_mode is True
 
     def test_initialize_neo4j_with_response_token_limit(self):
         """Test initialization with response token limit."""
@@ -505,16 +523,21 @@ class TestInitializeNeo4j:
                 "LLM_API_KEY": "test-key",
             },
         ):
-            with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
-                with patch("neo4j_yass_mcp.server.chatLLM"):
-                    with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
-                        from neo4j_yass_mcp.server import initialize_neo4j
+            # Reload config with new environment
+            from neo4j_yass_mcp.config import RuntimeConfig
+            test_config = RuntimeConfig.from_env()
 
-                        initialize_neo4j()
+            with patch("neo4j_yass_mcp.server._config", test_config):
+                with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
+                    with patch("neo4j_yass_mcp.server.chatLLM"):
+                        with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
+                            from neo4j_yass_mcp.server import initialize_neo4j
 
-                        from neo4j_yass_mcp.server import _response_token_limit
+                            initialize_neo4j()
 
-                        assert _response_token_limit == 5000
+                            from neo4j_yass_mcp.server import _response_token_limit
+
+                            assert _response_token_limit == 5000
 
     def test_initialize_neo4j_with_invalid_token_limit(self):
         """Test initialization with invalid response token limit."""
@@ -526,13 +549,18 @@ class TestInitializeNeo4j:
                 "LLM_API_KEY": "test-key",
             },
         ):
-            with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
-                with patch("neo4j_yass_mcp.server.chatLLM"):
-                    with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
-                        from neo4j_yass_mcp.server import initialize_neo4j
+            # Reload config with new environment
+            from neo4j_yass_mcp.config import RuntimeConfig
+            test_config = RuntimeConfig.from_env()
 
-                        # Should not raise error, just log warning
-                        initialize_neo4j()
+            with patch("neo4j_yass_mcp.server._config", test_config):
+                with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
+                    with patch("neo4j_yass_mcp.server.chatLLM"):
+                        with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
+                            from neo4j_yass_mcp.server import initialize_neo4j
+
+                            # Should not raise error, just log warning
+                            initialize_neo4j()
 
     def test_initialize_neo4j_with_langchain_dangerous_requests(self):
         """Test initialization with LANGCHAIN_ALLOW_DANGEROUS_REQUESTS."""
@@ -544,17 +572,22 @@ class TestInitializeNeo4j:
                 "LLM_API_KEY": "test-key",
             },
         ):
-            with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
-                with patch("neo4j_yass_mcp.server.chatLLM"):
-                    with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm") as mock_chain:
-                        from neo4j_yass_mcp.server import initialize_neo4j
+            # Reload config with new environment
+            from neo4j_yass_mcp.config import RuntimeConfig
+            test_config = RuntimeConfig.from_env()
 
-                        initialize_neo4j()
+            with patch("neo4j_yass_mcp.server._config", test_config):
+                with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
+                    with patch("neo4j_yass_mcp.server.chatLLM"):
+                        with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm") as mock_chain:
+                            from neo4j_yass_mcp.server import initialize_neo4j
 
-                        # Verify chain was created with allow_dangerous_requests=True
-                        mock_chain.assert_called_once()
-                        call_kwargs = mock_chain.call_args[1]
-                        assert call_kwargs["allow_dangerous_requests"] is True
+                            initialize_neo4j()
+
+                            # Verify chain was created with allow_dangerous_requests=True
+                            mock_chain.assert_called_once()
+                            call_kwargs = mock_chain.call_args[1]
+                            assert call_kwargs["allow_dangerous_requests"] is True
 
 
 class TestCleanup:
@@ -678,16 +711,15 @@ class TestAuditLoggerIntegration:
 
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
             with patch("neo4j_yass_mcp.server.chain", unsafe_chain):
-                with patch("neo4j_yass_mcp.server.sanitizer_enabled", True):
-                    with patch(
-                        "neo4j_yass_mcp.server.get_audit_logger", return_value=mock_audit_logger
-                    ):
-                        from neo4j_yass_mcp.server import query_graph
+                with patch(
+                    "neo4j_yass_mcp.server.get_audit_logger", return_value=mock_audit_logger
+                ):
+                    from neo4j_yass_mcp.server import query_graph
 
-                        await query_graph("Load files", ctx=create_mock_context())
+                    await query_graph("Load files", ctx=create_mock_context())
 
-                        # Verify error was logged
-                        mock_audit_logger.log_error.assert_called_once()
+                    # Verify error was logged
+                    mock_audit_logger.log_error.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_query_graph_read_only_mode_logs_error(self, mock_neo4j_graph):
@@ -743,18 +775,17 @@ class TestAuditLoggerIntegration:
         mock_audit_logger.log_error = Mock()
 
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
-            with patch("neo4j_yass_mcp.server.sanitizer_enabled", True):
-                with patch(
-                    "neo4j_yass_mcp.server.get_audit_logger", return_value=mock_audit_logger
-                ):
-                    from neo4j_yass_mcp.server import execute_cypher
+            with patch(
+                "neo4j_yass_mcp.server.get_audit_logger", return_value=mock_audit_logger
+            ):
+                from neo4j_yass_mcp.server import execute_cypher
 
-                    await execute_cypher(
-                        "LOAD CSV FROM 'file.csv' AS line RETURN line", ctx=create_mock_context()
-                    )
+                await execute_cypher(
+                    "LOAD CSV FROM 'file.csv' AS line RETURN line", ctx=create_mock_context()
+                )
 
-                    # Verify error was logged
-                    mock_audit_logger.log_error.assert_called_once()
+                # Verify error was logged
+                mock_audit_logger.log_error.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_execute_cypher_read_only_logs_error(self, mock_neo4j_graph):
@@ -834,24 +865,23 @@ class TestSanitizerWarnings:
     async def test_execute_cypher_sanitizer_warnings(self, mock_neo4j_graph):
         """Test execute_cypher logs sanitizer warnings."""
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
-            with patch("neo4j_yass_mcp.server.sanitizer_enabled", True):
-                with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
-                    # Mock sanitize_query to return warnings
-                    with patch("neo4j_yass_mcp.server.sanitize_query") as mock_sanitize:
-                        mock_sanitize.return_value = (
-                            True,  # is_safe
-                            None,  # error
-                            ["Query uses complex pattern"],  # warnings
-                        )
+            with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+                # Mock sanitize_query to return warnings
+                with patch("neo4j_yass_mcp.server.sanitize_query") as mock_sanitize:
+                    mock_sanitize.return_value = (
+                        True,  # is_safe
+                        None,  # error
+                        ["Query uses complex pattern"],  # warnings
+                    )
 
-                        from neo4j_yass_mcp.server import execute_cypher
+                    from neo4j_yass_mcp.server import execute_cypher
 
-                        result = await execute_cypher(
-                            "MATCH (n)-->(m) RETURN n, m", ctx=create_mock_context()
-                        )
+                    result = await execute_cypher(
+                        "MATCH (n)-->(m) RETURN n, m", ctx=create_mock_context()
+                    )
 
-                        # Query should succeed but log warnings
-                        assert result["success"] is True
+                    # Query should succeed but log warnings
+                    assert result["success"] is True
 
 
 if __name__ == "__main__":

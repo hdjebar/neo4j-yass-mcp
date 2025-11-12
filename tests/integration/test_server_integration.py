@@ -46,26 +46,31 @@ class TestServerInitialization:
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
-            # Mock Neo4j and LangChain components
-            with patch("neo4j_yass_mcp.server.SecureNeo4jGraph") as mock_graph_class:
-                with patch("neo4j_yass_mcp.server.chatLLM") as mock_llm_func:
-                    with patch(
-                        "neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"
-                    ) as mock_chain_func:
-                        # Set up mock returns
-                        mock_graph_instance = Mock()
-                        mock_graph_class.return_value = mock_graph_instance
+            # Reload config with new environment
+            from neo4j_yass_mcp.config import RuntimeConfig
+            test_config = RuntimeConfig.from_env()
 
-                        mock_llm_instance = Mock()
-                        mock_llm_func.return_value = mock_llm_instance
+            with patch("neo4j_yass_mcp.server._config", test_config):
+                # Mock Neo4j and LangChain components
+                with patch("neo4j_yass_mcp.server.SecureNeo4jGraph") as mock_graph_class:
+                    with patch("neo4j_yass_mcp.server.chatLLM") as mock_llm_func:
+                        with patch(
+                            "neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"
+                        ) as mock_chain_func:
+                            # Set up mock returns
+                            mock_graph_instance = Mock()
+                            mock_graph_class.return_value = mock_graph_instance
 
-                        mock_chain_instance = Mock()
-                        mock_chain_func.return_value = mock_chain_instance
+                            mock_llm_instance = Mock()
+                            mock_llm_func.return_value = mock_llm_instance
 
-                        # Import and call initialize
-                        from neo4j_yass_mcp.server import initialize_neo4j
+                            mock_chain_instance = Mock()
+                            mock_chain_func.return_value = mock_chain_instance
 
-                        initialize_neo4j()
+                            # Import and call initialize
+                            from neo4j_yass_mcp.server import initialize_neo4j
+
+                            initialize_neo4j()
 
                         # Verify SecureNeo4jGraph was created with security params
                         mock_graph_class.assert_called_once_with(
@@ -105,11 +110,16 @@ class TestServerInitialization:
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
-            from neo4j_yass_mcp.server import initialize_neo4j
+            # Reload config with new environment
+            from neo4j_yass_mcp.config import RuntimeConfig
+            test_config = RuntimeConfig.from_env()
 
-            # Should raise ValueError due to DEBUG_MODE in production
-            with pytest.raises(ValueError, match="DEBUG_MODE=true is not allowed in production"):
-                initialize_neo4j()
+            with patch("neo4j_yass_mcp.server._config", test_config):
+                from neo4j_yass_mcp.server import initialize_neo4j
+
+                # Should raise ValueError due to DEBUG_MODE in production
+                with pytest.raises(ValueError, match="DEBUG_MODE=true is not allowed in production"):
+                    initialize_neo4j()
 
     def test_development_environment_allows_debug(self):
         """Test development environment allows debug mode with weak password override."""
@@ -122,16 +132,21 @@ class TestServerInitialization:
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
-            with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
-                with patch("neo4j_yass_mcp.server.chatLLM"):
-                    with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
-                        from neo4j_yass_mcp.server import _debug_mode, initialize_neo4j
+            # Reload config with new environment
+            from neo4j_yass_mcp.config import RuntimeConfig
+            test_config = RuntimeConfig.from_env()
 
-                        # Should succeed
-                        initialize_neo4j()
+            with patch("neo4j_yass_mcp.server._config", test_config):
+                with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
+                    with patch("neo4j_yass_mcp.server.chatLLM"):
+                        with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
+                            from neo4j_yass_mcp.server import _debug_mode, initialize_neo4j
 
-                        # Verify debug mode is set
-                        assert _debug_mode is True
+                            # Should succeed
+                            initialize_neo4j()
+
+                            # Verify debug mode is set
+                            assert _debug_mode is True
 
 
 class TestEndToEndQueryFlow:
@@ -156,27 +171,26 @@ class TestEndToEndQueryFlow:
 
         with patch("neo4j_yass_mcp.server.graph", mock_graph):
             with patch("neo4j_yass_mcp.server.chain", mock_chain):
-                with patch("neo4j_yass_mcp.server.sanitizer_enabled", True):
-                    with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
-                        from neo4j_yass_mcp.server import query_graph
+                with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+                    from neo4j_yass_mcp.server import query_graph
 
-                        result = await query_graph(
-                            "How old is John Doe?", ctx=create_mock_context()
-                        )
+                    result = await query_graph(
+                        "How old is John Doe?", ctx=create_mock_context()
+                    )
 
-                        # Verify result structure
-                        assert result["success"] is True
-                        assert "John Doe is 35 years old" in result["answer"]
-                        assert (
-                            result["generated_cypher"]
-                            == "MATCH (p:Person {name: 'John Doe'}) RETURN p.age AS age"
-                        )
-                        assert result["question"] == "How old is John Doe?"
+                    # Verify result structure
+                    assert result["success"] is True
+                    assert "John Doe is 35 years old" in result["answer"]
+                    assert (
+                        result["generated_cypher"]
+                        == "MATCH (p:Person {name: 'John Doe'}) RETURN p.age AS age"
+                    )
+                    assert result["question"] == "How old is John Doe?"
 
-                        # Verify chain was invoked with question
-                        mock_chain.invoke.assert_called_once()
-                        call_args = mock_chain.invoke.call_args[0][0]
-                        assert "How old is John Doe?" in call_args["query"]
+                    # Verify chain was invoked with question
+                    mock_chain.invoke.assert_called_once()
+                    call_args = mock_chain.invoke.call_args[0][0]
+                    assert "How old is John Doe?" in call_args["query"]
 
     @pytest.mark.asyncio
     async def test_query_graph_with_suspicious_cypher_warning(self):
@@ -198,17 +212,16 @@ class TestEndToEndQueryFlow:
 
         with patch("neo4j_yass_mcp.server.graph", mock_graph):
             with patch("neo4j_yass_mcp.server.chain", mock_chain):
-                with patch("neo4j_yass_mcp.server.sanitizer_enabled", True):
-                    with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
-                        from neo4j_yass_mcp.server import query_graph
+                with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+                    from neo4j_yass_mcp.server import query_graph
 
-                        result = await query_graph(
-                            "Show me the apoc count function", ctx=create_mock_context()
-                        )
+                    result = await query_graph(
+                        "Show me the apoc count function", ctx=create_mock_context()
+                    )
 
-                        # Should succeed but with warnings logged
-                        assert result["success"] is True
-                        assert "CALL apoc.help('count')" in result["generated_cypher"]
+                    # Should succeed but with warnings logged
+                    assert result["success"] is True
+                    assert "CALL apoc.help('count')" in result["generated_cypher"]
 
     @pytest.mark.asyncio
     async def test_execute_cypher_end_to_end(self):
@@ -223,26 +236,25 @@ class TestEndToEndQueryFlow:
         mock_audit_logger.log_response = Mock()
 
         with patch("neo4j_yass_mcp.server.graph", mock_graph):
-            with patch("neo4j_yass_mcp.server.sanitizer_enabled", True):
-                with patch(
-                    "neo4j_yass_mcp.server.get_audit_logger", return_value=mock_audit_logger
-                ):
-                    from neo4j_yass_mcp.server import execute_cypher
+            with patch(
+                "neo4j_yass_mcp.server.get_audit_logger", return_value=mock_audit_logger
+            ):
+                from neo4j_yass_mcp.server import execute_cypher
 
-                    query = "MATCH (p:Person) RETURN p.name AS name, p.age AS age"
-                    result = await execute_cypher(query, ctx=create_mock_context())
+                query = "MATCH (p:Person) RETURN p.name AS name, p.age AS age"
+                result = await execute_cypher(query, ctx=create_mock_context())
 
-                    # Verify successful execution
-                    assert result["success"] is True
-                    assert len(result["result"]) == 2
-                    assert result["query"] == query
+                # Verify successful execution
+                assert result["success"] is True
+                assert len(result["result"]) == 2
+                assert result["query"] == query
 
-                    # Verify audit logging
-                    mock_audit_logger.log_query.assert_called_once()
-                    mock_audit_logger.log_response.assert_called_once()
+                # Verify audit logging
+                mock_audit_logger.log_query.assert_called_once()
+                mock_audit_logger.log_response.assert_called_once()
 
-                    # Verify graph was queried
-                    mock_graph.query.assert_called_once_with(query, params={})
+                # Verify graph was queried
+                mock_graph.query.assert_called_once_with(query, params={})
 
     @pytest.mark.asyncio
     async def test_sanitizer_blocks_unsafe_query_end_to_end(self):
@@ -253,28 +265,27 @@ class TestEndToEndQueryFlow:
         mock_audit_logger.log_error = Mock()
 
         with patch("neo4j_yass_mcp.server.graph", mock_graph):
-            with patch("neo4j_yass_mcp.server.sanitizer_enabled", True):
-                with patch(
-                    "neo4j_yass_mcp.server.get_audit_logger", return_value=mock_audit_logger
-                ):
-                    from neo4j_yass_mcp.server import execute_cypher
+            with patch(
+                "neo4j_yass_mcp.server.get_audit_logger", return_value=mock_audit_logger
+            ):
+                from neo4j_yass_mcp.server import execute_cypher
 
-                    # Attempt unsafe query
-                    unsafe_query = "LOAD CSV FROM 'file:///etc/passwd' AS line RETURN line"
-                    result = await execute_cypher(unsafe_query, ctx=create_mock_context())
+                # Attempt unsafe query
+                unsafe_query = "LOAD CSV FROM 'file:///etc/passwd' AS line RETURN line"
+                result = await execute_cypher(unsafe_query, ctx=create_mock_context())
 
-                    # Verify query was blocked
-                    assert result["success"] is False
-                    assert (
-                        "blocked" in result["error"].lower()
-                        or "dangerous" in result["error"].lower()
-                    )
+                # Verify query was blocked
+                assert result["success"] is False
+                assert (
+                    "blocked" in result["error"].lower()
+                    or "dangerous" in result["error"].lower()
+                )
 
-                    # Verify audit logger recorded the block
-                    mock_audit_logger.log_error.assert_called_once()
+                # Verify audit logger recorded the block
+                mock_audit_logger.log_error.assert_called_once()
 
-                    # Verify graph was never queried
-                    mock_graph.query.assert_not_called()
+                # Verify graph was never queried
+                mock_graph.query.assert_not_called()
 
 
 class TestReadOnlyModeIntegration:

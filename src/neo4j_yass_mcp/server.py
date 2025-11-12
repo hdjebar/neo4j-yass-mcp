@@ -830,7 +830,7 @@ async def _execute_cypher_impl(
         return {"error": "Neo4j graph not initialized", "success": False}
 
     # Sanitize query and parameters (SISO prevention)
-    if sanitizer_enabled:
+    if _config.sanitizer.enabled:
         is_safe, sanitize_error, warnings = sanitize_query(cypher_query, parameters)
 
         if not is_safe:
@@ -860,7 +860,7 @@ async def _execute_cypher_impl(
                 logger.warning(f"Query sanitizer warning: {warning}")
 
     # Check query complexity
-    if complexity_limit_enabled:
+    if _config.complexity_limiter.enabled:
         is_allowed, complexity_error, complexity_score = check_query_complexity(cypher_query)
 
         if not is_allowed:

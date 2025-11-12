@@ -6,6 +6,7 @@ Tests lines 562-587, 760-785 in server.py
 """
 
 from unittest.mock import MagicMock, Mock, patch
+from copy import deepcopy
 
 import pytest
 from fastmcp import Context
@@ -60,10 +61,12 @@ class TestComplexityLimitEnforcement:
 
         server.chain = mock_chain
         server.graph = MagicMock()
-        original_complexity_enabled = server.complexity_limit_enabled
-        server.complexity_limit_enabled = True
 
-        try:
+        # Create test config with complexity limiter enabled
+        test_config = deepcopy(server._config)
+        test_config.complexity_limiter.enabled = True
+
+        with patch.object(server, "_config", test_config):
             # Call query_graph
             result = await server.query_graph(
                 query="Show me everything connected", ctx=create_mock_context()
@@ -80,10 +83,6 @@ class TestComplexityLimitEnforcement:
             call_args = mock_audit_logger.log_error.call_args[1]
             assert call_args["tool"] == "query_graph"
             assert call_args["error_type"] == "complexity_blocked"
-
-        finally:
-            # Restore original state
-            server.complexity_limit_enabled = original_complexity_enabled
 
     @pytest.mark.asyncio
     @patch("neo4j_yass_mcp.server.check_query_complexity")
@@ -112,10 +111,12 @@ class TestComplexityLimitEnforcement:
 
         # Setup server state
         server.graph = MagicMock()
-        original_complexity_enabled = server.complexity_limit_enabled
-        server.complexity_limit_enabled = True
 
-        try:
+        # Create test config with complexity limiter enabled
+        test_config = deepcopy(server._config)
+        test_config.complexity_limiter.enabled = True
+
+        with patch.object(server, "_config", test_config):
             # Call execute_cypher with complex query
             complex_query = "MATCH (n)-[r*1..20]->(m) RETURN n, r, m"
             result = await server.execute_cypher(
@@ -142,10 +143,6 @@ class TestComplexityLimitEnforcement:
             # Verify complexity check was called
             mock_check_complexity.assert_called_once_with(complex_query)
 
-        finally:
-            # Restore original state
-            server.complexity_limit_enabled = original_complexity_enabled
-
     @pytest.mark.asyncio
     async def test_query_graph_complexity_allowed(self):
         """Test query_graph proceeds when complexity is within limits.
@@ -166,20 +163,18 @@ class TestComplexityLimitEnforcement:
 
         server.chain = mock_chain
         server.graph = mock_graph
-        original_complexity_enabled = server.complexity_limit_enabled
-        server.complexity_limit_enabled = True
 
-        try:
+        # Create test config with complexity limiter enabled
+        test_config = deepcopy(server._config)
+        test_config.complexity_limiter.enabled = True
+
+        with patch.object(server, "_config", test_config):
             # Call query_graph
             result = await server.query_graph(query="Show me 10 people", ctx=create_mock_context())
 
             # Verify it proceeded past complexity check
             assert result["success"] is True
             assert "security_blocked" not in result or result.get("security_blocked") is False
-
-        finally:
-            # Restore original state
-            server.complexity_limit_enabled = original_complexity_enabled
 
     @pytest.mark.asyncio
     @patch("neo4j_yass_mcp.server.check_query_complexity")
@@ -193,10 +188,11 @@ class TestComplexityLimitEnforcement:
         server.graph.query = mock_session
         mock_session.return_value = [{"n": 1}]
 
-        original_complexity_enabled = server.complexity_limit_enabled
-        server.complexity_limit_enabled = False
+        # Create test config with complexity limiter disabled
+        test_config = deepcopy(server._config)
+        test_config.complexity_limiter.enabled = False
 
-        try:
+        with patch.object(server, "_config", test_config):
             # Call execute_cypher
             result = await server.execute_cypher(
                 cypher_query="MATCH (n) RETURN n LIMIT 1", ctx=create_mock_context()
@@ -207,10 +203,6 @@ class TestComplexityLimitEnforcement:
 
             # Verify query proceeded
             assert result["success"] is True
-
-        finally:
-            # Restore original state
-            server.complexity_limit_enabled = original_complexity_enabled
 
     @pytest.mark.asyncio
     @patch("neo4j_yass_mcp.server.check_query_complexity")
@@ -223,10 +215,12 @@ class TestComplexityLimitEnforcement:
 
         # Setup server state
         server.graph = MagicMock()
-        original_complexity_enabled = server.complexity_limit_enabled
-        server.complexity_limit_enabled = True
 
-        try:
+        # Create test config with complexity limiter enabled
+        test_config = deepcopy(server._config)
+        test_config.complexity_limiter.enabled = True
+
+        with patch.object(server, "_config", test_config):
             # Call execute_cypher
             result = await server.execute_cypher(
                 cypher_query="MATCH (n) RETURN n", ctx=create_mock_context()
@@ -237,10 +231,6 @@ class TestComplexityLimitEnforcement:
             assert result["complexity_blocked"] is True
             assert result["complexity_score"] is None
             assert result["complexity_limit"] is None
-
-        finally:
-            # Restore original state
-            server.complexity_limit_enabled = original_complexity_enabled
 
 
 if __name__ == "__main__":

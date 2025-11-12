@@ -301,6 +301,27 @@ class RuntimeConfig(BaseModel):
     server: ServerConfig
     environment: EnvironmentConfig
 
+    @staticmethod
+    def _parse_token_limit(value: str | None) -> int | None:
+        """
+        Parse token limit from environment variable, handling invalid values gracefully.
+
+        Args:
+            value: Environment variable value
+
+        Returns:
+            Parsed integer value or None if invalid/missing
+        """
+        if not value:
+            return None
+        try:
+            return int(value)
+        except ValueError:
+            # Log warning but don't fail - return None for invalid values
+            import logging
+            logging.warning(f"Invalid NEO4J_RESPONSE_TOKEN_LIMIT value '{value}', ignoring")
+            return None
+
     @classmethod
     def from_env(cls) -> "RuntimeConfig":
         """
@@ -325,10 +346,8 @@ class RuntimeConfig(BaseModel):
                 database=os.getenv("NEO4J_DATABASE", "neo4j"),
                 read_timeout=int(os.getenv("NEO4J_READ_TIMEOUT", "30")),
                 read_only=os.getenv("NEO4J_READ_ONLY", "false").lower() == "true",
-                response_token_limit=(
-                    int(token_limit)
-                    if (token_limit := os.getenv("NEO4J_RESPONSE_TOKEN_LIMIT"))
-                    else None
+                response_token_limit=cls._parse_token_limit(
+                    os.getenv("NEO4J_RESPONSE_TOKEN_LIMIT")
                 ),
                 allow_dangerous_requests=(
                     os.getenv("LANGCHAIN_ALLOW_DANGEROUS_REQUESTS", "false").lower() == "true"
