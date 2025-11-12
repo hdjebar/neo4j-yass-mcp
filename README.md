@@ -7,7 +7,7 @@
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
 [![CI/CD Pipeline](https://github.com/hdjebar/neo4j-yass-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/hdjebar/neo4j-yass-mcp/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-468%20passed-brightgreen)](https://github.com/hdjebar/neo4j-yass-mcp/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-554%20passed-brightgreen)](https://github.com/hdjebar/neo4j-yass-mcp/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-83.54%25-brightgreen)](https://github.com/hdjebar/neo4j-yass-mcp/actions/workflows/ci.yml)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://hub.docker.com/)
 [![MCP Protocol](https://img.shields.io/badge/MCP-1.21.0-purple.svg)](https://modelcontextprotocol.io/)
@@ -22,6 +22,24 @@
 **Yet Another Secure Server (YASS)** - A production-ready, security-enhanced Model Context Protocol (MCP) server that provides Neo4j graph database querying capabilities using LangChain's GraphCypherQAChain for natural language to Cypher query translation.
 
 > Transform natural language into graph insights with enterprise-grade security and compliance.
+
+## What's New in v1.3.0 🎉
+
+**Major Architectural Improvements** - Released January 2025
+
+v1.3.0 brings significant internal improvements while maintaining 100% backwards compatibility:
+
+- **🔧 Centralized Configuration**: Replaced 26 scattered `os.getenv()` calls with Pydantic-validated `RuntimeConfig`
+- **📝 Strong Typing**: Added TypedDict response types for better IDE support and type checking
+- **🏗️ Bootstrap Module**: Foundation for multi-instance deployments and better test isolation
+- **✅ All Tests Passing**: 554 tests (543 + 11 new), 0 failures
+- **📚 Comprehensive Documentation**: 500+ line migration guide for advanced usage patterns
+
+**For Existing Users:** No changes required! All existing code continues to work.
+
+**See:** [RELEASE_NOTES_v1.3.0.md](RELEASE_NOTES_v1.3.0.md) | [Bootstrap Migration Guide](docs/bootstrap-migration-guide.md)
+
+---
 
 ## Features
 

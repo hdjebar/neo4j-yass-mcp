@@ -207,7 +207,7 @@ def _resource_rate_limit_message(resource_label: str) -> Callable[[dict[str, Any
 # ============================================================================
 
 # Initialize FastMCP server (module-level for now, will move to bootstrap state)
-mcp = FastMCP("neo4j-yass-mcp", version="1.1.0")
+mcp = FastMCP("neo4j-yass-mcp", version="1.3.0")
 
 # Global variables for Neo4j and LangChain components
 graph: SecureNeo4jGraph | None = None
