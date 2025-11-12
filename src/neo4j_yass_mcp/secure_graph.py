@@ -124,9 +124,9 @@ class SecureNeo4jGraph(Neo4jGraph):
 
         # SECURITY CHECK 3: Read-only mode enforcement
         if self.read_only_mode:
-            from neo4j_yass_mcp.server import check_read_only_access
+            from neo4j_yass_mcp.security.validators import check_read_only_access
 
-            read_only_error = check_read_only_access(query)
+            read_only_error = check_read_only_access(query, read_only_mode=True)
 
             if read_only_error:
                 error_msg = f"Query blocked in read-only mode: {read_only_error}"
