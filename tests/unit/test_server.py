@@ -319,16 +319,14 @@ class TestGetDatabaseInfo:
     async def test_get_database_info_success(self, mock_neo4j_graph):
         """Test successful database info retrieval."""
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
-            with patch("neo4j_yass_mcp.server.sanitizer_enabled", True):
-                with patch("neo4j_yass_mcp.server._read_only_mode", False):
-                    from neo4j_yass_mcp.server import get_database_info
+            from neo4j_yass_mcp.server import get_database_info
 
-                    result = await get_database_info()
+            result = await get_database_info()
 
-                    assert isinstance(result, str)
-                    # Should contain configuration info
-                    assert len(result) > 0
-                    assert "connected" in result.lower() or "uri" in result.lower()
+            assert isinstance(result, str)
+            # Should contain configuration info
+            assert len(result) > 0
+            assert "connected" in result.lower() or "uri" in result.lower()
 
 
 class TestUtilityFunctions:

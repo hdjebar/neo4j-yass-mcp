@@ -38,6 +38,7 @@ except ImportError:
 
 from neo4j_yass_mcp.config import (
     LLMConfig,
+    RuntimeConfig,
     chatLLM,
     configure_logging,
     find_available_port,
@@ -70,42 +71,42 @@ load_dotenv()
 configure_logging()
 logger = logging.getLogger(__name__)
 
+# Load runtime configuration from environment
+_config = RuntimeConfig.from_env()
+
 # Initialize audit logger for compliance
 initialize_audit_logger()
 
 # Initialize query sanitizer for security
-sanitizer_enabled = os.getenv("SANITIZER_ENABLED", "true").lower() == "true"
-if sanitizer_enabled:
+if _config.sanitizer.enabled:
     initialize_sanitizer(
-        strict_mode=os.getenv("SANITIZER_STRICT_MODE", "false").lower() == "true",
-        allow_apoc=os.getenv("SANITIZER_ALLOW_APOC", "false").lower() == "true",
-        allow_schema_changes=os.getenv("SANITIZER_ALLOW_SCHEMA_CHANGES", "false").lower() == "true",
-        block_non_ascii=os.getenv("SANITIZER_BLOCK_NON_ASCII", "false").lower() == "true",
-        max_query_length=int(os.getenv("SANITIZER_MAX_QUERY_LENGTH", "10000")),
+        strict_mode=_config.sanitizer.strict_mode,
+        allow_apoc=_config.sanitizer.allow_apoc,
+        allow_schema_changes=_config.sanitizer.allow_schema_changes,
+        block_non_ascii=_config.sanitizer.block_non_ascii,
+        max_query_length=_config.sanitizer.max_query_length,
     )
     logger.info("Query sanitizer enabled (injection + UTF-8 attack protection active)")
 else:  # pragma: no cover - Module initialization, tested in production
     logger.warning("⚠️  Query sanitizer disabled - injection protection is OFF!")
 
 # Initialize query complexity limiter
-complexity_limit_enabled = os.getenv("COMPLEXITY_LIMIT_ENABLED", "true").lower() == "true"
-if complexity_limit_enabled:
+if _config.complexity_limiter.enabled:
     initialize_complexity_limiter(
-        max_complexity=int(os.getenv("MAX_QUERY_COMPLEXITY", "100")),
-        max_variable_path_length=int(os.getenv("MAX_VARIABLE_PATH_LENGTH", "10")),
-        require_limit_unbounded=os.getenv("REQUIRE_LIMIT_UNBOUNDED", "true").lower() == "true",
+        max_complexity=_config.complexity_limiter.max_complexity,
+        max_variable_path_length=_config.complexity_limiter.max_variable_path_length,
+        require_limit_unbounded=_config.complexity_limiter.require_limit_unbounded,
     )
     logger.info("Query complexity limiter enabled (prevents resource exhaustion attacks)")
 else:  # pragma: no cover - Module initialization, tested in production
     logger.warning("⚠️  Query complexity limiter disabled - no protection against complex queries!")
 
 # Initialize rate limiter
-rate_limit_enabled = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
-if rate_limit_enabled:
+if _config.rate_limiter.enabled:
     initialize_rate_limiter(
-        rate=int(os.getenv("RATE_LIMIT_REQUESTS", "10")),
-        per_seconds=int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60")),
-        burst=int(os.getenv("RATE_LIMIT_BURST", "20")) if os.getenv("RATE_LIMIT_BURST") else None,
+        rate=_config.rate_limiter.rate,
+        per_seconds=_config.rate_limiter.per_seconds,
+        burst=_config.rate_limiter.burst,
     )
     logger.info("Rate limiter enabled (prevents abuse through excessive requests)")
 else:  # pragma: no cover - Module initialization, tested in production
@@ -113,20 +114,20 @@ else:  # pragma: no cover - Module initialization, tested in production
 
 # Decorator-based MCP tool rate limiter
 tool_rate_limiter = RateLimiterService()
-tool_rate_limit_enabled = os.getenv("MCP_TOOL_RATE_LIMIT_ENABLED", "true").lower() == "true"
-QUERY_GRAPH_RATE_LIMIT = int(os.getenv("MCP_QUERY_GRAPH_LIMIT", "10"))
-QUERY_GRAPH_RATE_WINDOW = int(os.getenv("MCP_QUERY_GRAPH_WINDOW", "60"))
-EXECUTE_CYPHER_RATE_LIMIT = int(os.getenv("MCP_EXECUTE_CYPHER_LIMIT", "10"))
-EXECUTE_CYPHER_RATE_WINDOW = int(os.getenv("MCP_EXECUTE_CYPHER_WINDOW", "60"))
-REFRESH_SCHEMA_RATE_LIMIT = int(os.getenv("MCP_REFRESH_SCHEMA_LIMIT", "5"))
-REFRESH_SCHEMA_RATE_WINDOW = int(os.getenv("MCP_REFRESH_SCHEMA_WINDOW", "120"))
-resource_rate_limit_enabled = os.getenv("MCP_RESOURCE_RATE_LIMIT_ENABLED", "true").lower() == "true"
-RESOURCE_RATE_LIMIT = int(os.getenv("MCP_RESOURCE_LIMIT", "20"))
-RESOURCE_RATE_WINDOW = int(os.getenv("MCP_RESOURCE_WINDOW", "60"))
+tool_rate_limit_enabled = _config.tool_rate_limit.enabled
+QUERY_GRAPH_RATE_LIMIT = _config.tool_rate_limit.query_graph_limit
+QUERY_GRAPH_RATE_WINDOW = _config.tool_rate_limit.query_graph_window
+EXECUTE_CYPHER_RATE_LIMIT = _config.tool_rate_limit.execute_cypher_limit
+EXECUTE_CYPHER_RATE_WINDOW = _config.tool_rate_limit.execute_cypher_window
+REFRESH_SCHEMA_RATE_LIMIT = _config.tool_rate_limit.refresh_schema_limit
+REFRESH_SCHEMA_RATE_WINDOW = _config.tool_rate_limit.refresh_schema_window
+resource_rate_limit_enabled = _config.resource_rate_limit.enabled
+RESOURCE_RATE_LIMIT = _config.resource_rate_limit.limit
+RESOURCE_RATE_WINDOW = _config.resource_rate_limit.window
 
 # Query analysis rate limits
-ANALYZE_QUERY_RATE_LIMIT = int(os.getenv("MCP_ANALYZE_QUERY_LIMIT", "15"))
-ANALYZE_QUERY_RATE_WINDOW = int(os.getenv("MCP_ANALYZE_QUERY_WINDOW", "60"))
+ANALYZE_QUERY_RATE_LIMIT = _config.tool_rate_limit.analyze_query_limit
+ANALYZE_QUERY_RATE_WINDOW = _config.tool_rate_limit.analyze_query_window
 
 
 def _format_reset_time(timestamp: float) -> str:
@@ -467,12 +468,12 @@ def initialize_neo4j():
     """Initialize Neo4j graph and LangChain components"""
     global graph, chain, _read_only_mode, _response_token_limit, _debug_mode
 
-    # Neo4j connection
-    neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-    neo4j_username = os.getenv("NEO4J_USERNAME", "neo4j")
-    neo4j_password = os.getenv("NEO4J_PASSWORD", "password")
-    neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")
-    neo4j_timeout = int(os.getenv("NEO4J_READ_TIMEOUT", "30"))
+    # Neo4j connection from config
+    neo4j_uri = _config.neo4j.uri
+    neo4j_username = _config.neo4j.username
+    neo4j_password = _config.neo4j.password
+    neo4j_database = _config.neo4j.database
+    neo4j_timeout = _config.neo4j.read_timeout
 
     # Security: Check for default/weak passwords using zxcvbn (DRY approach)
     is_weak, weakness_reason = is_password_weak(
@@ -484,11 +485,8 @@ def initialize_neo4j():
         logger.error("   Set a strong password in NEO4J_PASSWORD environment variable")
 
         # Only allow weak passwords in development environment
-        allow_weak_passwords = os.getenv("ALLOW_WEAK_PASSWORDS", "false").lower() == "true"
-        environment = os.getenv("ENVIRONMENT", "development").lower()
-
-        if allow_weak_passwords:
-            if environment in ("production", "prod"):
+        if _config.environment.allow_weak_passwords:
+            if _config.environment.environment == "production":
                 logger.error("❌ ALLOW_WEAK_PASSWORDS cannot be enabled in production environment")
                 raise ValueError(
                     "ALLOW_WEAK_PASSWORDS=true is not allowed in production. "
@@ -504,10 +502,9 @@ def initialize_neo4j():
             )
 
     # Debug mode with production environment check
-    _debug_mode = os.getenv("DEBUG_MODE", "false").lower() == "true"
+    _debug_mode = _config.environment.debug_mode
     if _debug_mode:
-        environment = os.getenv("ENVIRONMENT", "development").lower()
-        if environment in ("production", "prod"):
+        if _config.environment.environment == "production":
             logger.error("❌ DEBUG_MODE cannot be enabled in production environment")
             raise ValueError(
                 "DEBUG_MODE=true is not allowed in production. "
@@ -520,20 +517,16 @@ def initialize_neo4j():
         logger.info("Production mode: Error messages will be sanitized")
 
     # Read-only mode
-    _read_only_mode = os.getenv("NEO4J_READ_ONLY", "false").lower() == "true"
+    _read_only_mode = _config.neo4j.read_only
     if _read_only_mode:
         logger.warning(
             "⚠️  Server running in READ-ONLY mode - write-capable tools will be hidden from MCP clients"
         )
 
     # Response token limit
-    token_limit_str = os.getenv("NEO4J_RESPONSE_TOKEN_LIMIT")
-    if token_limit_str:
-        try:
-            _response_token_limit = int(token_limit_str)
-            logger.info(f"Response token limit set to {_response_token_limit}")
-        except ValueError:
-            logger.warning(f"Invalid NEO4J_RESPONSE_TOKEN_LIMIT value: {token_limit_str}")
+    if _config.neo4j.response_token_limit:
+        _response_token_limit = _config.neo4j.response_token_limit
+        logger.info(f"Response token limit set to {_response_token_limit}")
 
     logger.info(f"Connecting to Neo4j at {neo4j_uri} (timeout: {neo4j_timeout}s)")
     graph = SecureNeo4jGraph(
@@ -542,18 +535,18 @@ def initialize_neo4j():
         password=neo4j_password,
         database=neo4j_database,
         timeout=neo4j_timeout,
-        sanitizer_enabled=sanitizer_enabled,
-        complexity_limit_enabled=complexity_limit_enabled,
+        sanitizer_enabled=_config.sanitizer.enabled,
+        complexity_limit_enabled=_config.complexity_limiter.enabled,
         read_only_mode=_read_only_mode,
     )
 
-    # LLM configuration
+    # LLM configuration from config
     llm_config = LLMConfig(
-        provider=os.getenv("LLM_PROVIDER", "openai"),
-        model=os.getenv("LLM_MODEL", "gpt-4"),
-        temperature=float(os.getenv("LLM_TEMPERATURE", "0")),
-        api_key=os.getenv("LLM_API_KEY", ""),
-        streaming=os.getenv("LLM_STREAMING", "false").lower() == "true",
+        provider=_config.llm.provider,
+        model=_config.llm.model,
+        temperature=_config.llm.temperature,
+        api_key=_config.llm.api_key,
+        streaming=_config.llm.streaming,
     )
 
     logger.info(f"Initializing LLM: {llm_config.provider}/{llm_config.model}")
@@ -562,7 +555,7 @@ def initialize_neo4j():
     # Create GraphCypherQAChain
     # Note: allow_dangerous_requests is required for LangChain's GraphCypherQAChain
     # but we add our own security layer via query sanitizer
-    allow_dangerous = os.getenv("LANGCHAIN_ALLOW_DANGEROUS_REQUESTS", "false").lower() == "true"
+    allow_dangerous = _config.neo4j.allow_dangerous_requests
 
     if allow_dangerous:
         logger.warning(
@@ -616,8 +609,8 @@ async def get_database_info(ctx: Context | None = None) -> str:
 
     Returns details about the connected database.
     """
-    neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-    neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")
+    neo4j_uri = _config.neo4j.uri
+    neo4j_database = _config.neo4j.database
 
     return f"""Neo4j Database Information:
 
@@ -1378,15 +1371,15 @@ def main():
     else:
         logger.info("Tool 'execute_cypher' hidden (read-only mode active)")
 
-    transport = os.getenv("MCP_TRANSPORT", "stdio").lower()
+    transport = _config.server.transport
 
     if transport in ("sse", "http"):
         # Network transport (SSE legacy or HTTP modern)
-        host = os.getenv("MCP_SERVER_HOST", "127.0.0.1")
+        host = _config.server.host
 
         # Get preferred ports from environment
         preferred_ports = get_preferred_ports_from_env()
-        requested_port = int(os.getenv("MCP_SERVER_PORT", "8000"))
+        requested_port = _config.server.port
 
         # If requested port is not in preferred list, add it as first choice
         if requested_port not in preferred_ports:
@@ -1409,19 +1402,19 @@ def main():
         # Start server based on transport mode
         if transport == "http":
             # Modern Streamable HTTP transport (recommended for production)
-            server_path = os.getenv("MCP_SERVER_PATH", "/mcp/")
+            server_path = _config.server.path
             logger.info(f"Starting MCP server with HTTP transport on {host}:{port}{server_path}")
-            logger.info(f"Async worker threads: {os.getenv('MCP_MAX_WORKERS', '10')}")
+            logger.info(f"Async worker threads: {_config.server.max_workers}")
             logger.info("HTTP transport uses modern Streamable HTTP protocol (MCP 2025 standard)")
             mcp.run(transport="http", host=host, port=port, path=server_path)
         else:
             # SSE transport (legacy, backward compatibility)
             logger.info(f"Starting MCP server with SSE transport on {host}:{port}")
             logger.warning("SSE transport is legacy. Consider using 'http' for new deployments.")
-            logger.info(f"Async worker threads: {os.getenv('MCP_MAX_WORKERS', '10')}")
+            logger.info(f"Async worker threads: {_config.server.max_workers}")
             mcp.run(transport="sse", host=host, port=port)
     else:
         # stdio transport (default) for MCP clients like Claude Desktop
         logger.info("Starting MCP server with stdio transport")
-        logger.info(f"Async worker threads: {os.getenv('MCP_MAX_WORKERS', '10')}")
+        logger.info(f"Async worker threads: {_config.server.max_workers}")
         mcp.run()
