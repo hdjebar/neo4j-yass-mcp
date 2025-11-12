@@ -234,7 +234,7 @@ def cleanup():
         import asyncio
         try:
             # Try to get running event loop
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
             # If we're in an async context, create a task
             asyncio.create_task(state.graph._driver.close())
         except RuntimeError:

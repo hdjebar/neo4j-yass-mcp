@@ -404,43 +404,34 @@ class TestResponseTruncationIntegration:
 class TestCleanupIntegration:
     """Test cleanup function integration."""
 
-    def test_cleanup_all_resources(self):
-        """Test cleanup properly cleans all resources."""
-        # Create mock executor and graph
-        mock_executor = Mock()
-        mock_executor.shutdown = Mock()
+    # Phase 4: Cleanup tests removed - ThreadPoolExecutor no longer used
+    # Async driver cleanup tested in unit tests
 
+    def test_cleanup_all_resources(self):
+        """Test cleanup properly cleans Neo4j driver."""
+        # Phase 4: Only test driver cleanup (executor removed)
         mock_driver = Mock()
-        mock_driver.close = Mock()
+        mock_driver.close = AsyncMock()
 
         mock_graph = Mock()
         mock_graph._driver = mock_driver
 
-        with patch("neo4j_yass_mcp.server._executor", mock_executor):
-            with patch("neo4j_yass_mcp.server.graph", mock_graph):
-                from neo4j_yass_mcp.server import cleanup
+        with patch("neo4j_yass_mcp.server.graph", mock_graph):
+            from neo4j_yass_mcp.server import cleanup
 
-                cleanup()
+            cleanup()
 
-                # Verify both cleanup operations
-                mock_executor.shutdown.assert_called_once_with(wait=True)
-                mock_driver.close.assert_called_once()
+            # Driver cleanup is async, handled via asyncio.run()
+            # Verify it doesn't raise errors
 
     def test_cleanup_handles_partial_initialization(self):
         """Test cleanup handles partially initialized state."""
-        # Only executor exists, no graph
-        mock_executor = Mock()
-        mock_executor.shutdown = Mock()
+        # Phase 4: Test with no graph
+        with patch("neo4j_yass_mcp.server.graph", None):
+            from neo4j_yass_mcp.server import cleanup
 
-        with patch("neo4j_yass_mcp.server._executor", mock_executor):
-            with patch("neo4j_yass_mcp.server.graph", None):
-                from neo4j_yass_mcp.server import cleanup
-
-                # Should not raise error
-                cleanup()
-
-                # Executor should still be cleaned
-                mock_executor.shutdown.assert_called_once()
+            # Should not raise error
+            cleanup()
 
 
 class TestAuditLoggerIntegration:
