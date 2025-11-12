@@ -37,8 +37,8 @@ class TestQueryPlanAnalyzer:
             }
         ]
 
-        # Use AsyncMock to properly handle async calls
-        graph.query = AsyncMock(return_value=profile_result)
+        # graph.query is synchronous (not async), so use regular Mock
+        graph.query = Mock(return_value=profile_result)
         return graph
 
     @pytest.fixture
@@ -46,11 +46,8 @@ class TestQueryPlanAnalyzer:
         """Create a mock SecureNeo4jGraph that raises errors."""
         graph = Mock()
 
-        # Set the mock to raise an exception when called with any parameters
-        async def error_query(query, params=None):
-            raise Exception("Query execution failed")
-
-        graph.query = error_query
+        # graph.query is synchronous (not async), so use Mock with side_effect
+        graph.query = Mock(side_effect=Exception("Query execution failed"))
         return graph
 
     @pytest.fixture
@@ -105,14 +102,13 @@ class TestQueryPlanAnalyzer:
         assert result["bottlenecks"] == []
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Test needs debugging - mock exception not being raised properly")
     async def test_analyze_query_execution_error(self, error_mock_graph):
         """Test query analysis when execution fails."""
         query = "MATCH (n) RETURN n"
         # Create analyzer with error mock
         analyzer = QueryPlanAnalyzer(error_mock_graph)
 
-        with pytest.raises(ValueError, match="Failed to execute EXPLAIN"):
+        with pytest.raises(ValueError, match="Query analysis failed"):
             await analyzer.analyze_query(query, mode="explain")
 
     def test_parse_execution_plan(self, analyzer):

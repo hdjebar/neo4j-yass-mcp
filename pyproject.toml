@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "neo4j-yass-mcp"
-version = "1.2.1"
+version = "1.2.2"
 description = "YASS (Yet Another Secure Server) - Production-ready, security-enhanced MCP server for Neo4j with LLM integration"
 readme = "README.md"
 requires-python = ">=3.13"

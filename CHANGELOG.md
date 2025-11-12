@@ -25,6 +25,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - Security improvements and fixes
 
+## [1.2.2] - 2025-11-12
+
+### Fixed
+- **Test Infrastructure**: Fixed hardcoded test path in `test_query_analysis_html.py` (Issue #6)
+  - Dynamic path resolution using `pathlib.Path(__file__).parents[1]`
+  - Tests now work on any machine/checkout location
+- **Test Coverage**: Fixed skipped test in `test_query_analyzer.py` (mock exception issue)
+  - Corrected `error_mock_graph` fixture to use synchronous `Mock` instead of `AsyncMock`
+  - Test now properly validates error handling in query analysis
+
+### Changed
+- Improved test fixture mocking consistency
+  - `mock_graph.query` now uses regular `Mock` instead of `AsyncMock` (query is synchronous)
+  - Better alignment with actual Neo4j driver behavior
+
+### Documentation
+- Added `ARCHITECTURE_REFACTORING_PLAN.md` - Technical debt resolution roadmap
+  - 7 architectural issues identified with solutions
+  - 3-phase implementation plan (v1.2.2, v1.3.0, v1.4.0)
+  - Target: 90% test coverage, 95% mypy coverage, server.py <800 LOC
+- Added `REFACTORING_RECOMMENDATIONS.md` - Publication preparation guide
+  - Priority matrix (HIGH/MEDIUM/LOW)
+  - Dependency analysis and timeline
+- Added `GITHUB_SETUP.md` - Repository configuration guide
+  - Topics, social preview, issue templates
+- Added `RELEASE_GUIDE.md` - Release management process
+
 ## [1.2.1] - 2025-01-12
 
 ### Changed

@@ -8,11 +8,14 @@ the new analyze_query_performance functionality.
 
 import asyncio
 import sys
+from pathlib import Path
 
 import pytest
 
-# Add the src directory to Python path
-sys.path.insert(0, "/Users/hdjebar/Projects/kimi/neo4j-yass-mcp/src")
+# Add the src directory to Python path (dynamically resolved)
+project_root = Path(__file__).parents[1]
+src_path = project_root / "src"
+sys.path.insert(0, str(src_path))
 
 from neo4j_yass_mcp.server import analyze_query_performance
 
