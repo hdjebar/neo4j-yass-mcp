@@ -26,8 +26,8 @@ class TestComplexityLimitEnforcement:
     """Test complexity limit enforcement in MCP tools."""
 
     @pytest.mark.asyncio
-    @patch("neo4j_yass_mcp.server.check_query_complexity")
-    @patch("neo4j_yass_mcp.server.get_audit_logger")
+    @patch("neo4j_yass_mcp.handlers.tools.check_query_complexity")
+    @patch("neo4j_yass_mcp.handlers.tools.get_audit_logger")
     async def test_query_graph_complexity_exceeded_llm_generated(
         self, mock_get_audit, mock_check_complexity
     ):
@@ -85,8 +85,8 @@ class TestComplexityLimitEnforcement:
             assert call_args["error_type"] == "complexity_blocked"
 
     @pytest.mark.asyncio
-    @patch("neo4j_yass_mcp.server.check_query_complexity")
-    @patch("neo4j_yass_mcp.server.get_audit_logger")
+    @patch("neo4j_yass_mcp.handlers.tools.check_query_complexity")
+    @patch("neo4j_yass_mcp.handlers.tools.get_audit_logger")
     async def test_execute_cypher_complexity_exceeded(self, mock_get_audit, mock_check_complexity):
         """Lines 760-785: Test execute_cypher blocks complex queries"""
         from neo4j_yass_mcp import server
@@ -177,7 +177,7 @@ class TestComplexityLimitEnforcement:
             assert "security_blocked" not in result or result.get("security_blocked") is False
 
     @pytest.mark.asyncio
-    @patch("neo4j_yass_mcp.server.check_query_complexity")
+    @patch("neo4j_yass_mcp.handlers.tools.check_query_complexity")
     async def test_complexity_limit_disabled_skips_check(self, mock_check_complexity):
         """Test that complexity check is skipped when disabled"""
         from neo4j_yass_mcp import server
@@ -205,7 +205,7 @@ class TestComplexityLimitEnforcement:
             assert result["success"] is True
 
     @pytest.mark.asyncio
-    @patch("neo4j_yass_mcp.server.check_query_complexity")
+    @patch("neo4j_yass_mcp.handlers.tools.check_query_complexity")
     async def test_complexity_score_none_handling(self, mock_check_complexity):
         """Test handling when complexity_score is None"""
         from neo4j_yass_mcp import server

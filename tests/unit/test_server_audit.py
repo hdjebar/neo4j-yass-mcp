@@ -23,7 +23,7 @@ class TestErrorAuditLogging:
     """Test audit logging for errors in MCP tools."""
 
     @pytest.mark.asyncio
-    @patch("neo4j_yass_mcp.server.get_audit_logger")
+    @patch("neo4j_yass_mcp.handlers.tools.get_audit_logger")
     async def test_query_graph_error_audit_logging(self, mock_get_audit):
         """Line 653: Test query_graph logs errors to audit logger"""
         from neo4j_yass_mcp import server
@@ -60,7 +60,7 @@ class TestErrorAuditLogging:
         assert "blocked" in call_args["error_type"]
 
     @pytest.mark.asyncio
-    @patch("neo4j_yass_mcp.server.get_audit_logger")
+    @patch("neo4j_yass_mcp.handlers.tools.get_audit_logger")
     async def test_execute_cypher_error_audit_logging(self, mock_get_audit):
         """Line 868: Test execute_cypher logs errors to audit logger"""
         from neo4j_yass_mcp import server
@@ -97,7 +97,7 @@ class TestErrorAuditLogging:
         assert call_args["error_type"] == "RuntimeError"
 
     @pytest.mark.asyncio
-    @patch("neo4j_yass_mcp.server.get_audit_logger")
+    @patch("neo4j_yass_mcp.handlers.tools.get_audit_logger")
     async def test_query_graph_no_audit_logger(self, mock_get_audit):
         """Test query_graph handles missing audit logger gracefully"""
         from neo4j_yass_mcp import server
@@ -123,7 +123,7 @@ class TestErrorAuditLogging:
         mock_get_audit.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("neo4j_yass_mcp.server.get_audit_logger")
+    @patch("neo4j_yass_mcp.handlers.tools.get_audit_logger")
     async def test_execute_cypher_no_audit_logger(self, mock_get_audit):
         """Test execute_cypher handles missing audit logger gracefully"""
         from neo4j_yass_mcp import server
@@ -150,7 +150,7 @@ class TestErrorAuditLogging:
         mock_get_audit.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("neo4j_yass_mcp.server.get_audit_logger")
+    @patch("neo4j_yass_mcp.handlers.tools.get_audit_logger")
     async def test_audit_logging_with_complex_exception(self, mock_get_audit):
         """Test audit logging captures complex exception details"""
         from neo4j_yass_mcp import server

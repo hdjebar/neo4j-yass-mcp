@@ -171,7 +171,7 @@ class TestEndToEndQueryFlow:
 
         with patch("neo4j_yass_mcp.server.graph", mock_graph):
             with patch("neo4j_yass_mcp.server.chain", mock_chain):
-                with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+                with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
                     from neo4j_yass_mcp.server import query_graph
 
                     result = await query_graph(
@@ -212,7 +212,7 @@ class TestEndToEndQueryFlow:
 
         with patch("neo4j_yass_mcp.server.graph", mock_graph):
             with patch("neo4j_yass_mcp.server.chain", mock_chain):
-                with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+                with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
                     from neo4j_yass_mcp.server import query_graph
 
                     result = await query_graph(
@@ -237,7 +237,7 @@ class TestEndToEndQueryFlow:
 
         with patch("neo4j_yass_mcp.server.graph", mock_graph):
             with patch(
-                "neo4j_yass_mcp.server.get_audit_logger", return_value=mock_audit_logger
+                "neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=mock_audit_logger
             ):
                 from neo4j_yass_mcp.server import execute_cypher
 
@@ -266,7 +266,7 @@ class TestEndToEndQueryFlow:
 
         with patch("neo4j_yass_mcp.server.graph", mock_graph):
             with patch(
-                "neo4j_yass_mcp.server.get_audit_logger", return_value=mock_audit_logger
+                "neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=mock_audit_logger
             ):
                 from neo4j_yass_mcp.server import execute_cypher
 
@@ -300,7 +300,7 @@ class TestReadOnlyModeIntegration:
         with patch("neo4j_yass_mcp.server.graph", mock_graph):
             with patch("neo4j_yass_mcp.server._read_only_mode", True):
                 with patch(
-                    "neo4j_yass_mcp.server.get_audit_logger", return_value=mock_audit_logger
+                    "neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=mock_audit_logger
                 ):
                     from neo4j_yass_mcp.server import execute_cypher
 
@@ -328,7 +328,7 @@ class TestReadOnlyModeIntegration:
 
         with patch("neo4j_yass_mcp.server.graph", mock_graph):
             with patch("neo4j_yass_mcp.server._read_only_mode", True):
-                with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+                with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
                     from neo4j_yass_mcp.server import execute_cypher
 
                     read_queries = [
@@ -358,7 +358,7 @@ class TestResponseTruncationIntegration:
 
         with patch("neo4j_yass_mcp.server.graph", mock_graph):
             with patch("neo4j_yass_mcp.server._response_token_limit", 1000):
-                with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+                with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
                     from neo4j_yass_mcp.server import execute_cypher
 
                     result = await execute_cypher("MATCH (n) RETURN n", ctx=create_mock_context())

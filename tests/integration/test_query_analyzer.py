@@ -80,7 +80,7 @@ class TestQueryAnalysisIntegration:
     async def test_analyze_query_performance_end_to_end(self, mock_graph_with_plan, mock_context):
         """Test complete query analysis workflow."""
         with patch("neo4j_yass_mcp.server.graph", mock_graph_with_plan):
-            with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+            with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
                 query = "MATCH (n:Person) WHERE n.age > 25 RETURN n.name, n.age"
 
                 result = await analyze_query_performance(
@@ -104,7 +104,7 @@ class TestQueryAnalysisIntegration:
     async def test_analyze_query_performance_explain_mode(self, mock_graph_with_plan, mock_context):
         """Test query analysis in explain mode."""
         with patch("neo4j_yass_mcp.server.graph", mock_graph_with_plan):
-            with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+            with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
                 query = "MATCH (n:Movie) RETURN n.title"
 
                 result = await analyze_query_performance(
@@ -123,7 +123,7 @@ class TestQueryAnalysisIntegration:
     ):
         """Test query analysis without recommendations."""
         with patch("neo4j_yass_mcp.server.graph", mock_graph_with_plan):
-            with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+            with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
                 query = "MATCH (n:Person) RETURN n LIMIT 10"
 
                 result = await analyze_query_performance(
@@ -139,7 +139,7 @@ class TestQueryAnalysisIntegration:
     async def test_analyze_query_performance_invalid_mode(self, mock_graph_with_plan, mock_context):
         """Test query analysis with invalid mode."""
         with patch("neo4j_yass_mcp.server.graph", mock_graph_with_plan):
-            with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+            with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
                 query = "MATCH (n) RETURN n"
 
                 result = await analyze_query_performance(
@@ -172,7 +172,7 @@ class TestQueryAnalysisIntegration:
         mock_graph.query.side_effect = ValueError("Query blocked by sanitizer: dangerous pattern")
 
         with patch("neo4j_yass_mcp.server.graph", mock_graph):
-            with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+            with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
                 result = await analyze_query_performance(
                     query="MATCH (n) RETURN n",
                     mode="explain",
@@ -194,7 +194,7 @@ class TestQueryAnalysisIntegration:
         mock_audit_logger.log_query = Mock()
         mock_audit_logger.log_response = Mock()
 
-        with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=mock_audit_logger):
+        with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=mock_audit_logger):
             with patch("neo4j_yass_mcp.server.graph", mock_graph_with_plan):
                 query = "MATCH (n:Person) RETURN n.name"
 
@@ -266,7 +266,7 @@ class TestQueryAnalysisIntegration:
     async def test_performance_characteristics(self, mock_graph_with_plan, mock_context):
         """Test performance characteristics of query analysis."""
         with patch("neo4j_yass_mcp.server.graph", mock_graph_with_plan):
-            with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+            with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
                 # Test multiple queries to ensure reasonable performance
                 queries = [
                     "MATCH (n) RETURN n",
@@ -300,7 +300,7 @@ class TestQueryAnalysisIntegration:
     async def test_concurrent_analysis_requests(self, mock_graph_with_plan, mock_context):
         """Test concurrent query analysis requests."""
         with patch("neo4j_yass_mcp.server.graph", mock_graph_with_plan):
-            with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+            with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
                 query = "MATCH (n:Person) RETURN n.name"
 
                 # Create multiple concurrent analysis requests
@@ -336,7 +336,7 @@ class TestQueryAnalysisIntegration:
             mock_graph.query.side_effect = scenario["error"]
 
             with patch("neo4j_yass_mcp.server.graph", mock_graph):
-                with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+                with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
                     result = await analyze_query_performance(
                         query="MATCH (n) RETURN n",
                         mode="explain",
@@ -381,7 +381,7 @@ class TestQueryAnalysisIntegration:
         )
 
         with patch("neo4j_yass_mcp.server.graph", mock_graph):
-            with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+            with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
                 result = await analyze_query_performance(
                     query=complex_query,
                     mode="explain",
@@ -427,7 +427,7 @@ class TestQueryAnalysisRealWorldScenarios:
             )
 
             with patch("neo4j_yass_mcp.server.graph", mock_graph):
-                with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+                with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
                     result = await analyze_query_performance(
                         query=query, mode="explain", include_recommendations=True, ctx=Mock()
                     )
@@ -466,7 +466,7 @@ class TestQueryAnalysisRealWorldScenarios:
             )
 
             with patch("neo4j_yass_mcp.server.graph", mock_graph):
-                with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+                with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
                     result = await analyze_query_performance(
                         query=query, mode="explain", include_recommendations=True, ctx=Mock()
                     )
@@ -508,7 +508,7 @@ class TestQueryAnalysisRealWorldScenarios:
             )
 
             with patch("neo4j_yass_mcp.server.graph", mock_graph):
-                with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+                with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
                     result = await analyze_query_performance(
                         query=query, mode="explain", include_recommendations=True, ctx=Mock()
                     )
@@ -542,7 +542,7 @@ class TestQueryAnalysisRealWorldScenarios:
             )
 
             with patch("neo4j_yass_mcp.server.graph", mock_graph):
-                with patch("neo4j_yass_mcp.server.get_audit_logger", return_value=None):
+                with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
                     result = await analyze_query_performance(
                         query=query, mode="explain", include_recommendations=True, ctx=Mock()
                     )
