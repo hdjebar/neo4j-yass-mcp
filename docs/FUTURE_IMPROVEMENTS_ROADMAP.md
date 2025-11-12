@@ -111,37 +111,80 @@ self._driver = AsyncGraphDatabase.driver(
 #### Proposed Enhancements
 
 ##### 2.1 Health Check Mechanism
+
 ```python
 class AsyncNeo4jGraph:
     async def health_check(self) -> dict[str, Any]:
-        """Check connection pool health."""
+        """Check Neo4j connectivity and server info."""
         try:
             await self._driver.verify_connectivity()
-            pool_stats = self._driver.get_server_info()
+            server_info = await self._driver.get_server_info()
             return {
                 "status": "healthy",
-                "pool_size": pool_stats.agent,
-                "active_connections": pool_stats.protocol_version,
+                "server_address": server_info.address,
+                "server_agent": server_info.agent,
+                "protocol_version": server_info.protocol_version,
             }
         except Exception as e:
             return {"status": "unhealthy", "error": str(e)}
 ```
 
-##### 2.2 Connection Pool Metrics
-```python
-from contextlib import asynccontextmanager
+**Note**: The Python Neo4j driver doesn't expose detailed connection pool metrics like the Java driver. For detailed pool monitoring (active connections, idle connections, wait times), we'll implement custom instrumentation.
 
-@asynccontextmanager
-async def _get_session_with_metrics(self):
-    """Track connection pool usage."""
-    start = time.perf_counter()
-    session = self._driver.session(database=self._database)
-    try:
-        logger.debug(f"Connection acquired in {time.perf_counter() - start:.3f}s")
-        yield session
-    finally:
-        await session.close()
-        logger.debug("Connection returned to pool")
+##### 2.2 Connection Acquisition Tracking
+
+```python
+import time
+from dataclasses import dataclass, field
+from typing import ClassVar
+
+@dataclass
+class ConnectionMetrics:
+    """Track connection acquisition metrics."""
+    total_acquisitions: int = 0
+    total_acquisition_time: float = 0.0
+    max_acquisition_time: float = 0.0
+    min_acquisition_time: float = float('inf')
+
+    def record_acquisition(self, duration: float):
+        """Record a connection acquisition."""
+        self.total_acquisitions += 1
+        self.total_acquisition_time += duration
+        self.max_acquisition_time = max(self.max_acquisition_time, duration)
+        self.min_acquisition_time = min(self.min_acquisition_time, duration)
+
+    @property
+    def avg_acquisition_time(self) -> float:
+        """Calculate average acquisition time."""
+        if self.total_acquisitions == 0:
+            return 0.0
+        return self.total_acquisition_time / self.total_acquisitions
+
+class AsyncNeo4jGraph:
+    def __init__(self, ...):
+        # ... existing init ...
+        self._metrics = ConnectionMetrics()
+
+    async def query(self, query: str, params: dict[str, Any] | None = None):
+        """Execute query with metrics tracking."""
+        start = time.perf_counter()
+        async with self._driver.session(database=self._database) as session:
+            acquisition_time = time.perf_counter() - start
+            self._metrics.record_acquisition(acquisition_time)
+
+            if acquisition_time > 1.0:  # Warn if > 1s
+                logger.warning(f"⚠️  Slow connection acquisition: {acquisition_time:.3f}s")
+
+            # Execute query...
+
+    def get_metrics(self) -> dict[str, Any]:
+        """Get current connection metrics."""
+        return {
+            "total_queries": self._metrics.total_acquisitions,
+            "avg_acquisition_time_ms": self._metrics.avg_acquisition_time * 1000,
+            "max_acquisition_time_ms": self._metrics.max_acquisition_time * 1000,
+            "min_acquisition_time_ms": self._metrics.min_acquisition_time * 1000,
+        }
 ```
 
 ##### 2.3 Retry Logic with Exponential Backoff
@@ -166,18 +209,31 @@ async def _execute_with_retry(
 ```
 
 #### Benefits
+
 - ✅ Better error handling for transient failures
-- ✅ Improved observability (health checks, metrics)
+- ✅ Improved observability (health checks, custom metrics)
 - ✅ Automatic retry for recoverable errors
 - ✅ Foundation for monitoring dashboards
+- ✅ Early detection of connection pool issues (slow acquisitions)
 
 #### Implementation Steps
-1. Add health check method to `AsyncNeo4jGraph`
-2. Implement connection pool metrics logging
-3. Add retry logic for transient errors
-4. Create `/health` resource endpoint (MCP protocol)
-5. Add tests for retry logic and health checks
-6. Document health check usage in README
+
+1. Add `health_check()` method to `AsyncNeo4jGraph` (uses `verify_connectivity()` + `get_server_info()`)
+2. Implement `ConnectionMetrics` dataclass for tracking acquisition times
+3. Add `get_metrics()` method to expose connection statistics
+4. Instrument `query()` method to track connection acquisition time
+5. Add retry logic for transient errors (exponential backoff)
+6. Create `/health` MCP resource endpoint
+7. Add tests for health checks, metrics tracking, and retry logic
+8. Document metrics usage in README
+
+#### Note on Connection Pool Metrics
+
+The Python Neo4j driver doesn't expose the same detailed pool metrics as the Java driver (active connections, idle connections, pool exhaustion). Our approach uses:
+
+- **`verify_connectivity()`** - Validates connection health
+- **`get_server_info()`** - Returns server metadata (address, agent, protocol)
+- **Custom instrumentation** - Tracks connection acquisition times to detect pool contention
 
 ---
 
