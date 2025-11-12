@@ -182,7 +182,11 @@ async def query_graph(query: str, ctx: Context | None = None) -> dict[str, Any]:
         # Sanitize error message for security
         safe_error_message = sanitize_error_message(e)
 
-        error_response = {"error": safe_error_message, "error_type": type(e).__name__, "success": False}
+        error_response = {
+            "error": safe_error_message,
+            "error_type": type(e).__name__,
+            "success": False,
+        }
 
         # Audit log the error (with full details)
         if audit_logger:
@@ -538,7 +542,9 @@ async def analyze_query_performance(
         # Could be security violations OR analysis failures (invalid mode, etc.)
         if "blocked" in str(e).lower():
             # Security violation from AsyncSecureNeo4jGraph
-            logger.warning(f"🔒 Security check blocked query in analyze_query_performance: {str(e)}")
+            logger.warning(
+                f"🔒 Security check blocked query in analyze_query_performance: {str(e)}"
+            )
         else:
             # Analysis-specific validation error (e.g., invalid mode)
             logger.warning(f"⚠️  Query analysis validation failed: {str(e)}")

@@ -184,9 +184,7 @@ class TestExecuteCypher:
                 from neo4j_yass_mcp.server import execute_cypher
 
                 # Try to execute a write query
-                result = await execute_cypher(
-                    "CREATE (n:Test) RETURN n", ctx=create_mock_context()
-                )
+                result = await execute_cypher("CREATE (n:Test) RETURN n", ctx=create_mock_context())
 
                 assert "error" in result
                 assert "read-only" in result["error"].lower()
@@ -442,7 +440,9 @@ class TestInitializeNeo4j:
                 with patch("neo4j_yass_mcp.server.chatLLM"):
                     with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
                         # Mock AsyncSecureNeo4jGraph to raise the weak password error
-                        with patch("neo4j_yass_mcp.async_graph.AsyncSecureNeo4jGraph") as mock_graph:
+                        with patch(
+                            "neo4j_yass_mcp.async_graph.AsyncSecureNeo4jGraph"
+                        ) as mock_graph:
                             mock_graph.side_effect = ValueError("Weak password detected")
 
                             from neo4j_yass_mcp.server import initialize_neo4j

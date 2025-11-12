@@ -10,9 +10,10 @@ Reference: https://coverage.readthedocs.io/en/latest/subprocess.html
 import os
 
 # Only start coverage if COVERAGE_PROCESS_START is set
-if 'COVERAGE_PROCESS_START' in os.environ:
+if "COVERAGE_PROCESS_START" in os.environ:
     try:
         import coverage
+
         coverage.process_startup()
     except ImportError:
         # coverage not installed, skip

@@ -61,7 +61,9 @@ class TestServerInitialization:
                         ) as mock_chain_func:
                             # Set up mock returns
                             mock_graph_instance = Mock()
-                            mock_graph_instance.refresh_schema = AsyncMock()  # Phase 4: Async method
+                            mock_graph_instance.refresh_schema = (
+                                AsyncMock()
+                            )  # Phase 4: Async method
                             mock_graph_instance.get_schema = "Node: Test"
                             mock_graph_class.return_value = mock_graph_instance
 
@@ -82,7 +84,9 @@ class TestServerInitialization:
                             username="testuser",
                             password="StrongP@ssw0rd!123",
                             database="testdb",
-                            driver_config={"connection_timeout": 60},  # Phase 4: Async driver config
+                            driver_config={
+                                "connection_timeout": 60
+                            },  # Phase 4: Async driver config
                             sanitizer_enabled=True,
                             complexity_limit_enabled=True,
                             read_only_mode=False,

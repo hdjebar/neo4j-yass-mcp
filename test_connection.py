@@ -21,12 +21,12 @@ print()
 # Test 1: Environment Variables
 print("✓ Testing environment variables...")
 required_vars = {
-    'NEO4J_URI': os.getenv('NEO4J_URI'),
-    'NEO4J_USERNAME': os.getenv('NEO4J_USERNAME'),
-    'NEO4J_PASSWORD': os.getenv('NEO4J_PASSWORD'),
-    'LLM_PROVIDER': os.getenv('LLM_PROVIDER'),
-    'LLM_MODEL': os.getenv('LLM_MODEL'),
-    'LLM_API_KEY': os.getenv('LLM_API_KEY'),
+    "NEO4J_URI": os.getenv("NEO4J_URI"),
+    "NEO4J_USERNAME": os.getenv("NEO4J_USERNAME"),
+    "NEO4J_PASSWORD": os.getenv("NEO4J_PASSWORD"),
+    "LLM_PROVIDER": os.getenv("LLM_PROVIDER"),
+    "LLM_MODEL": os.getenv("LLM_MODEL"),
+    "LLM_API_KEY": os.getenv("LLM_API_KEY"),
 }
 
 missing_vars = [k for k, v in required_vars.items() if not v]
@@ -47,8 +47,8 @@ try:
     from neo4j import GraphDatabase
 
     driver = GraphDatabase.driver(
-        required_vars['NEO4J_URI'],
-        auth=(required_vars['NEO4J_USERNAME'], required_vars['NEO4J_PASSWORD'])
+        required_vars["NEO4J_URI"],
+        auth=(required_vars["NEO4J_USERNAME"], required_vars["NEO4J_PASSWORD"]),
     )
 
     # Verify connectivity
@@ -57,13 +57,13 @@ try:
     # Count nodes
     with driver.session() as session:
         result = session.run("MATCH (n) RETURN count(n) as count")
-        node_count = result.single()['count']
+        node_count = result.single()["count"]
         print("  ✓ Connected successfully!")
         print(f"  ✓ Database contains {node_count:,} nodes")
 
         # Check for Movie nodes
         result = session.run("MATCH (m:Movie) RETURN count(m) as count")
-        movie_count = result.single()['count']
+        movie_count = result.single()["count"]
         print(f"  ✓ Found {movie_count} Movie nodes")
 
         # Get sample movie
@@ -86,9 +86,7 @@ try:
     from langchain_google_genai import ChatGoogleGenerativeAI
 
     llm = ChatGoogleGenerativeAI(
-        model=required_vars['LLM_MODEL'],
-        google_api_key=required_vars['LLM_API_KEY'],
-        temperature=0
+        model=required_vars["LLM_MODEL"], google_api_key=required_vars["LLM_API_KEY"], temperature=0
     )
 
     # Test with simple query
@@ -109,9 +107,9 @@ try:
 
     # Create graph
     graph = Neo4jGraph(
-        url=required_vars['NEO4J_URI'],
-        username=required_vars['NEO4J_USERNAME'],
-        password=required_vars['NEO4J_PASSWORD'],
+        url=required_vars["NEO4J_URI"],
+        username=required_vars["NEO4J_USERNAME"],
+        password=required_vars["NEO4J_PASSWORD"],
     )
 
     # Create chain
@@ -132,8 +130,8 @@ try:
     print("  ✓ Query successful!")
     print(f"  ✓ Answer: {result['result']}")
 
-    if 'intermediate_steps' in result and result['intermediate_steps']:
-        cypher = result['intermediate_steps'][0].get('query', 'N/A')
+    if "intermediate_steps" in result and result["intermediate_steps"]:
+        cypher = result["intermediate_steps"][0].get("query", "N/A")
         print(f"  ✓ Generated Cypher: {cypher[:200]}")
 
     print()

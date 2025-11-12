@@ -68,9 +68,7 @@ class RateLimiterService:
         self.default_window = default_window
         # Store: {client_id: [timestamp1, timestamp2, ...]}
         self._request_log: dict[str, list[float]] = defaultdict(list)
-        logger.info(
-            f"RateLimiterService initialized: {default_limit} req/{default_window}s"
-        )
+        logger.info(f"RateLimiterService initialized: {default_limit} req/{default_window}s")
 
     def check_and_record(
         self, client_id: str, limit: int | None = None, window: int | None = None
@@ -102,7 +100,9 @@ class RateLimiterService:
 
         if current_count >= limit:
             # Rate limit exceeded
-            oldest_request = min(self._request_log[client_id]) if self._request_log[client_id] else now
+            oldest_request = (
+                min(self._request_log[client_id]) if self._request_log[client_id] else now
+            )
             reset_time = oldest_request + window
             retry_after = max(0, reset_time - now)
 
@@ -200,9 +200,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         )
 
         if not is_allowed:
-            logger.warning(
-                f"HTTP rate limit exceeded for {client_ip} on {request.url.path}"
-            )
+            logger.warning(f"HTTP rate limit exceeded for {client_ip} on {request.url.path}")
             return JSONResponse(
                 {
                     "error": "Rate limit exceeded",
@@ -258,8 +256,7 @@ def rate_limit_mcp_tool(limit: int = 5, window: int = 10):
             else:
                 client_id = "mcp_unknown"
                 logger.warning(
-                    f"No session_id in Context for {func.__name__}, "
-                    "using shared 'unknown' bucket"
+                    f"No session_id in Context for {func.__name__}, using shared 'unknown' bucket"
                 )
 
             # Check rate limit
@@ -268,9 +265,7 @@ def rate_limit_mcp_tool(limit: int = 5, window: int = 10):
             )
 
             if not is_allowed:
-                logger.warning(
-                    f"MCP tool '{func.__name__}' rate limit exceeded for {client_id}"
-                )
+                logger.warning(f"MCP tool '{func.__name__}' rate limit exceeded for {client_id}")
                 # Return error as dict (MCP format)
                 return {
                     "success": False,
