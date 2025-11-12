@@ -18,8 +18,7 @@ class TestGetExecutor:
 
     def test_lazy_initialization(self):
         """Lines 121-123: Executor is lazily initialized"""
-        from neo4j_yass_mcp import server
-        from neo4j_yass_mcp import bootstrap
+        from neo4j_yass_mcp import bootstrap, server
 
         # Save original bootstrap state
         original_state = bootstrap._server_state
@@ -70,8 +69,7 @@ class TestGetExecutor:
 
     def test_executor_returns_existing_instance(self):
         """Verify executor returns existing instance if already initialized"""
-        from neo4j_yass_mcp import server
-        from neo4j_yass_mcp import bootstrap
+        from neo4j_yass_mcp import bootstrap, server
 
         # Save original bootstrap state
         original_state = bootstrap._server_state

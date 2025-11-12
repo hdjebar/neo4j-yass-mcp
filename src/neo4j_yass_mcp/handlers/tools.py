@@ -51,7 +51,12 @@ async def query_graph(query: str, ctx: Context | None = None) -> dict[str, Any]:
         - "Show me actors who have worked together"
     """
     # Lazy imports to avoid circular dependencies
-    from neo4j_yass_mcp.server import _get_chain, _get_graph, sanitize_error_message, truncate_response
+    from neo4j_yass_mcp.server import (
+        _get_chain,
+        _get_graph,
+        sanitize_error_message,
+        truncate_response,
+    )
 
     # Phase 3.3: Use state accessor functions for bootstrap support
     current_chain = _get_chain()
@@ -228,7 +233,13 @@ async def _execute_cypher_impl(
           parameters: {"name": "Tom Cruise"}
     """
     # Lazy imports to avoid circular dependencies
-    from neo4j_yass_mcp.server import _get_config, _get_graph, check_read_only_access, sanitize_error_message, truncate_response
+    from neo4j_yass_mcp.server import (
+        _get_config,
+        _get_graph,
+        check_read_only_access,
+        sanitize_error_message,
+        truncate_response,
+    )
 
     # Phase 3.3: Use state accessor functions for bootstrap support
     current_graph = _get_graph()

@@ -12,12 +12,8 @@ Features:
 - Response size limiting and read-only mode
 """
 
-import asyncio
 import json
 import logging
-import os
-import re
-import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
@@ -36,11 +32,6 @@ except ImportError:
     Tokenizer = None  # type: ignore[assignment]
     TOKENIZER_BACKEND = "fallback"
 
-from neo4j_yass_mcp.bootstrap import (
-    ServerState,
-    get_server_state,
-    initialize_server_state,
-)
 from neo4j_yass_mcp.config import (
     LLMConfig,
     RuntimeConfig,
@@ -52,13 +43,10 @@ from neo4j_yass_mcp.config import (
 from neo4j_yass_mcp.config.security_config import is_password_weak
 from neo4j_yass_mcp.secure_graph import SecureNeo4jGraph
 from neo4j_yass_mcp.security import (
-    check_query_complexity,
-    get_audit_logger,
     initialize_audit_logger,
     initialize_complexity_limiter,
     initialize_rate_limiter,
     initialize_sanitizer,
-    sanitize_query,
 )
 from neo4j_yass_mcp.security.validators import (
     check_read_only_access as _check_read_only_access_impl,

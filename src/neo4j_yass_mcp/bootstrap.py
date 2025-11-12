@@ -20,7 +20,7 @@ Benefits:
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from fastmcp import FastMCP
 from langchain_neo4j import GraphCypherQAChain
@@ -52,8 +52,8 @@ class ServerState:
     # Core components
     config: RuntimeConfig
     mcp: FastMCP
-    graph: Optional[SecureNeo4jGraph] = None
-    chain: Optional[GraphCypherQAChain] = None
+    graph: SecureNeo4jGraph | None = None
+    chain: GraphCypherQAChain | None = None
 
     # Rate limiting
     tool_rate_limiter: RateLimiterService = field(default_factory=RateLimiterService)
@@ -63,15 +63,15 @@ class ServerState:
     # Server flags
     _debug_mode: bool = False
     _read_only_mode: bool = False
-    _response_token_limit: Optional[int] = None
+    _response_token_limit: int | None = None
 
     # Thread pool executor (for LangChain sync operations)
     _executor: Any = None  # ThreadPoolExecutor, created on demand
 
 
 def initialize_server_state(
-    config: Optional[RuntimeConfig] = None,
-    mcp_instance: Optional[FastMCP] = None,
+    config: RuntimeConfig | None = None,
+    mcp_instance: FastMCP | None = None,
 ) -> ServerState:
     """
     Initialize server state from configuration.
@@ -156,7 +156,7 @@ def initialize_server_state(
 
 
 # Module-level state (lazy initialization)
-_server_state: Optional[ServerState] = None
+_server_state: ServerState | None = None
 
 
 def get_server_state() -> ServerState:

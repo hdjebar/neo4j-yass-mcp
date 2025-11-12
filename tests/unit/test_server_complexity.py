@@ -5,8 +5,8 @@ Covers complexity limit checking in query_graph and execute_cypher tools.
 Tests lines 562-587, 760-785 in server.py
 """
 
-from unittest.mock import MagicMock, Mock, patch
 from copy import deepcopy
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from fastmcp import Context

@@ -13,7 +13,6 @@ All response types follow a consistent pattern:
 
 from typing import Any, Literal, NotRequired, TypedDict
 
-
 # ============================================================================
 # Base Response Types
 # ============================================================================
