@@ -655,23 +655,11 @@ def cleanup():
     This function is registered with atexit to ensure cleanup
     happens even on unexpected termination.
     """
-    global _executor, graph
+    global graph
 
     logger.info("Starting cleanup process...")
 
-    # Shutdown thread pool executor
-    if _executor is not None:
-        logger.info("Shutting down thread pool executor...")
-        try:
-            # Wait for tasks to complete
-            _executor.shutdown(wait=True)
-            logger.info("✓ Thread pool executor shutdown complete")
-        except Exception as e:
-            logger.error(f"✗ Error shutting down executor: {e}", exc_info=True)
-        finally:
-            _executor = None
-    else:
-        logger.debug("Thread pool executor already cleaned up or not initialized")
+    # Phase 4: ThreadPoolExecutor removed - no longer needed with native async
 
     # Close Neo4j driver connections
     if graph is not None:
@@ -679,8 +667,16 @@ def cleanup():
         try:
             # Check if graph has a driver attribute
             if hasattr(graph, "_driver") and graph._driver is not None:
-                # Close the driver (this closes all sessions and connections)
-                graph._driver.close()
+                # Phase 4: AsyncDriver.close() is async, need to run in event loop
+                import asyncio
+                try:
+                    # Try to get running event loop
+                    loop = asyncio.get_running_loop()
+                    # If we're in an async context, create a task
+                    asyncio.create_task(graph._driver.close())
+                except RuntimeError:
+                    # No running loop, use asyncio.run()
+                    asyncio.run(graph._driver.close())
                 logger.info("✓ Neo4j driver closed successfully")
             else:
                 logger.warning("Neo4j graph has no driver to close")

@@ -230,6 +230,15 @@ def cleanup():
     # Close Neo4j driver
     if state.graph is not None and hasattr(state.graph, "_driver"):
         logger.info("Closing Neo4j driver...")
-        state.graph._driver.close()
+        # Phase 4: AsyncDriver.close() is async, need to run in event loop
+        import asyncio
+        try:
+            # Try to get running event loop
+            loop = asyncio.get_running_loop()
+            # If we're in an async context, create a task
+            asyncio.create_task(state.graph._driver.close())
+        except RuntimeError:
+            # No running loop, use asyncio.run()
+            asyncio.run(state.graph._driver.close())
 
     logger.info("✅ Server cleanup complete")
