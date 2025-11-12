@@ -25,8 +25,8 @@ from dataclasses import dataclass, field
 from fastmcp import FastMCP
 from langchain_neo4j import GraphCypherQAChain
 
+from .async_graph import AsyncSecureNeo4jGraph
 from .config import RuntimeConfig
-from .secure_graph import SecureNeo4jGraph
 from .security import initialize_audit_logger
 from .security.complexity_limiter import initialize_complexity_limiter
 from .security.rate_limiter import initialize_rate_limiter
@@ -52,7 +52,7 @@ class ServerState:
     # Core components
     config: RuntimeConfig
     mcp: FastMCP
-    graph: SecureNeo4jGraph | None = None
+    graph: AsyncSecureNeo4jGraph | None = None  # Phase 4: Now async!
     chain: GraphCypherQAChain | None = None
 
     # Rate limiting

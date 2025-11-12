@@ -159,7 +159,7 @@ class QueryPlanAnalyzer:
         self, query: str, parameters: dict | None = None
     ) -> list[dict[str, Any]]:
         """
-        Safely execute a Cypher query using the secure graph.
+        Safely execute a Cypher query using the async secure graph.
 
         Args:
             query: Cypher query to execute
@@ -168,8 +168,9 @@ class QueryPlanAnalyzer:
         Returns:
             Query results
         """
-        # Use the graph's query method which includes security checks
-        result = self.graph.query(query, params=parameters or {})
+        # Phase 4: Native async query execution (graph.query is now async)
+        # ✅ NATIVE ASYNC - NO sync wrapper!
+        result = await self.graph.query(query, params=parameters or {})
         # Cast to expected return type - graph.query should return list[dict[str, Any]]
         from typing import cast
 

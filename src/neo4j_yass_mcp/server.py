@@ -32,6 +32,7 @@ except ImportError:
     Tokenizer = None  # type: ignore[assignment]
     TOKENIZER_BACKEND = "fallback"
 
+from neo4j_yass_mcp.async_graph import AsyncSecureNeo4jGraph
 from neo4j_yass_mcp.config import (
     LLMConfig,
     RuntimeConfig,
@@ -41,7 +42,6 @@ from neo4j_yass_mcp.config import (
     get_preferred_ports_from_env,
 )
 from neo4j_yass_mcp.config.security_config import is_password_weak
-from neo4j_yass_mcp.secure_graph import SecureNeo4jGraph
 from neo4j_yass_mcp.security import (
     initialize_audit_logger,
     initialize_complexity_limiter,
@@ -215,12 +215,13 @@ def _get_config() -> RuntimeConfig:
     return _config
 
 
-def _get_graph() -> SecureNeo4jGraph | None:
+def _get_graph() -> AsyncSecureNeo4jGraph | None:
     """
     Get Neo4j graph instance with bootstrap support.
 
     Phase 3.3: Tries to get graph from bootstrap state first,
     falls back to module-level graph for backwards compatibility.
+    Phase 4: Returns AsyncSecureNeo4jGraph (async graph).
     """
     # Check if bootstrap state is available (but don't force initialization)
     from neo4j_yass_mcp.bootstrap import _server_state
@@ -249,7 +250,7 @@ def _get_chain() -> GraphCypherQAChain | None:
 mcp = FastMCP("neo4j-yass-mcp", version="1.3.0")
 
 # Global variables for Neo4j and LangChain components
-graph: SecureNeo4jGraph | None = None
+graph: AsyncSecureNeo4jGraph | None = None  # Phase 4: Now async!
 chain: GraphCypherQAChain | None = None
 
 # Thread pool for async operations (LangChain is sync)
@@ -528,8 +529,8 @@ def truncate_response(data: Any, max_tokens: int | None = None) -> tuple[Any, bo
         return truncated_str, True
 
 
-def initialize_neo4j():
-    """Initialize Neo4j graph and LangChain components"""
+async def initialize_neo4j():
+    """Initialize Neo4j graph and LangChain components (async)"""
     global graph, chain, _read_only_mode, _response_token_limit, _debug_mode
 
     # Neo4j connection from config
@@ -593,16 +594,23 @@ def initialize_neo4j():
         logger.info(f"Response token limit set to {_response_token_limit}")
 
     logger.info(f"Connecting to Neo4j at {neo4j_uri} (timeout: {neo4j_timeout}s)")
-    graph = SecureNeo4jGraph(
+
+    # Phase 4: Use AsyncSecureNeo4jGraph with native async driver
+    from neo4j_yass_mcp.async_graph import AsyncSecureNeo4jGraph
+
+    graph = AsyncSecureNeo4jGraph(
         url=neo4j_uri,
         username=neo4j_username,
         password=neo4j_password,
         database=neo4j_database,
-        timeout=neo4j_timeout,
+        driver_config={"connection_timeout": neo4j_timeout},
         sanitizer_enabled=_config.sanitizer.enabled,
         complexity_limit_enabled=_config.complexity_limiter.enabled,
         read_only_mode=_read_only_mode,
     )
+
+    # Refresh schema on initialization
+    await graph.refresh_schema()
 
     # LLM configuration from config
     llm_config = LLMConfig(
@@ -814,13 +822,15 @@ def register_mcp_components():
 
 def main():
     """Main entry point for the MCP server"""
+    import asyncio
     import atexit
 
     atexit.register(cleanup)
 
     # Initialize connections (Neo4j, LLM, chain) here instead of at import time.
+    # Phase 4: initialize_neo4j() is now async, so we use asyncio.run()
     try:
-        initialize_neo4j()
+        asyncio.run(initialize_neo4j())
     except Exception as e:
         logger.error(f"Failed to initialize Neo4j/LLM components: {e}", exc_info=True)
         raise

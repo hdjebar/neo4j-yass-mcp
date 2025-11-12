@@ -12,13 +12,17 @@ import pytest
 
 @pytest.fixture
 def mock_neo4j_graph():
-    """Mock Neo4jGraph instance."""
+    """Mock AsyncNeo4jGraph instance (Phase 4: Now async)."""
+    from unittest.mock import AsyncMock
+
     graph = Mock()
     graph.get_schema = "Node: Movie\nRelationship: ACTED_IN"
-    graph.query = Mock(return_value=[{"name": "Tom Cruise", "title": "Top Gun"}])
-    graph.refresh_schema = Mock()
+    # Phase 4: query() is now async, use AsyncMock
+    graph.query = AsyncMock(return_value=[{"name": "Tom Cruise", "title": "Top Gun"}])
+    # Phase 4: refresh_schema() is now async, use AsyncMock
+    graph.refresh_schema = AsyncMock()
     graph._driver = Mock()
-    graph._driver.close = Mock()
+    graph._driver.close = AsyncMock()  # Driver close is also async
     return graph
 
 

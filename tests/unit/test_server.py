@@ -170,22 +170,38 @@ class TestExecuteCypher:
     @pytest.mark.asyncio
     async def test_execute_cypher_read_only_mode(self):
         """Test execute_cypher in read-only mode blocks writes."""
-        with patch("neo4j_yass_mcp.server.graph", Mock()):
-            with patch("neo4j_yass_mcp.server._read_only_mode", True):
-                with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
-                    from neo4j_yass_mcp.server import execute_cypher
+        # Phase 4: Security checks now done in AsyncSecureNeo4jGraph.query()
+        # Mock query() to raise ValueError for read-only violation
+        from unittest.mock import AsyncMock
 
-                    # Try to execute a write query
-                    result = await execute_cypher(
-                        "CREATE (n:Test) RETURN n", ctx=create_mock_context()
-                    )
+        mock_graph = Mock()
+        mock_graph.query = AsyncMock(
+            side_effect=ValueError("Query blocked in read-only mode: Write operation not allowed")
+        )
 
-                    assert "error" in result
-                    assert "read-only" in result["error"].lower()
+        with patch("neo4j_yass_mcp.server.graph", mock_graph):
+            with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
+                from neo4j_yass_mcp.server import execute_cypher
+
+                # Try to execute a write query
+                result = await execute_cypher(
+                    "CREATE (n:Test) RETURN n", ctx=create_mock_context()
+                )
+
+                assert "error" in result
+                assert "read-only" in result["error"].lower()
 
     @pytest.mark.asyncio
     async def test_execute_cypher_sanitizer_blocks_unsafe(self, mock_neo4j_graph):
         """Test sanitizer blocks unsafe queries."""
+        # Phase 4: Security checks now done in AsyncSecureNeo4jGraph.query()
+        # Mock query() to raise ValueError for security violation
+        from unittest.mock import AsyncMock
+
+        mock_neo4j_graph.query = AsyncMock(
+            side_effect=ValueError("Query blocked by sanitizer: Dangerous pattern detected")
+        )
+
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
             with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
                 from neo4j_yass_mcp.server import execute_cypher
@@ -196,15 +212,15 @@ class TestExecuteCypher:
                 )
 
                 assert result["success"] is False
-                assert (
-                    "blocked" in result.get("error", "").lower()
-                    or "dangerous" in result.get("error", "").lower()
-                )
+                assert "blocked" in result.get("error", "").lower()
 
     @pytest.mark.asyncio
     async def test_execute_cypher_exception_handling(self, mock_neo4j_graph):
         """Test execute_cypher handles exceptions."""
-        mock_neo4j_graph.query.side_effect = Exception("Database error")
+        from unittest.mock import AsyncMock
+
+        # Phase 4: query() is async, side_effect needs AsyncMock
+        mock_neo4j_graph.query = AsyncMock(side_effect=Exception("Database error"))
 
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
             with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):

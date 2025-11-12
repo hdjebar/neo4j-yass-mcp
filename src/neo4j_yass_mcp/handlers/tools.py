@@ -248,98 +248,22 @@ async def _execute_cypher_impl(
     if current_graph is None:
         return {"error": "Neo4j graph not initialized", "success": False}
 
-    # Sanitize query and parameters (SISO prevention)
-    if current_config.sanitizer.enabled:
-        is_safe, sanitize_error, warnings = sanitize_query(cypher_query, parameters)
-
-        if not is_safe:
-            logger.warning(f"Blocked unsafe query: {sanitize_error}")
-            error_response = {
-                "error": f"Query blocked by sanitizer: {sanitize_error}",
-                "query": cypher_query[:200],  # Only show first 200 chars
-                "sanitizer_blocked": True,
-                "success": False,
-            }
-
-            # Audit log the blocked query
-            audit_logger = get_audit_logger()
-            if audit_logger:
-                audit_logger.log_error(
-                    tool="execute_cypher",
-                    query=cypher_query,
-                    error=sanitize_error or "Query blocked by sanitizer",
-                    metadata={"sanitizer_blocked": True},
-                )
-
-            return error_response
-
-        # Log warnings if any
-        if warnings:
-            for warning in warnings:
-                logger.warning(f"Query sanitizer warning: {warning}")
-
-    # Check query complexity
-    if current_config.complexity_limiter.enabled:
-        is_allowed, complexity_error, complexity_score = check_query_complexity(cypher_query)
-
-        if not is_allowed:
-            logger.warning(f"Blocked complex query: {complexity_error}")
-            error_response = {
-                "error": f"Query blocked by complexity limiter: {complexity_error}",
-                "query": cypher_query[:200],
-                "complexity_score": complexity_score.total_score if complexity_score else None,
-                "complexity_limit": complexity_score.max_allowed if complexity_score else None,
-                "complexity_blocked": True,
-                "success": False,
-            }
-
-            # Audit log the blocked query
-            audit_logger = get_audit_logger()
-            if audit_logger:
-                audit_logger.log_error(
-                    tool="execute_cypher",
-                    query=cypher_query,
-                    error=complexity_error or "Query blocked by complexity limiter",
-                    metadata={
-                        "complexity_blocked": True,
-                        "complexity_score": complexity_score.total_score
-                        if complexity_score
-                        else None,
-                    },
-                )
-
-            return error_response
-
-        # Log complexity warnings if any
-        if complexity_score and complexity_score.warnings:
-            for warning in complexity_score.warnings:
-                logger.info(f"Query complexity warning: {warning}")
-
     # Audit log the query
     audit_logger = get_audit_logger()
     if audit_logger:
         audit_logger.log_query(tool="execute_cypher", query=cypher_query, parameters=parameters)
-
-    # Check read-only access control
-    read_only_error_msg = check_read_only_access(cypher_query)
-    if read_only_error_msg:
-        # Audit log the error
-        if audit_logger:
-            audit_logger.log_error(
-                tool="execute_cypher", query=cypher_query, error=read_only_error_msg
-            )
-        return {"error": read_only_error_msg}
 
     try:
         logger.info(f"Executing Cypher query: {cypher_query}")
 
         params = parameters or {}
 
-        # Run query in thread pool (Neo4j driver is sync)
+        # Phase 4: Native async query execution (no asyncio.to_thread)
+        # Security checks (sanitization, complexity, read-only) now handled by AsyncSecureNeo4jGraph
         start_time = time.time()
 
-        # Use modern asyncio.to_thread() pattern (Python 3.9+)
-        result = await asyncio.to_thread(current_graph.query, cypher_query, params=params)
+        # ✅ NATIVE ASYNC - NO asyncio.to_thread!
+        result = await current_graph.query(cypher_query, params=params)
 
         execution_time_ms = (time.time() - start_time) * 1000
 
@@ -376,6 +300,28 @@ async def _execute_cypher_impl(
 
         return response
 
+    except ValueError as e:
+        # ValueError raised by AsyncSecureNeo4jGraph when security checks fail
+        logger.warning(f"Security check failed in execute_cypher: {str(e)}")
+
+        error_response = {
+            "error": str(e),
+            "error_type": "SecurityError",
+            "query": cypher_query[:100] + "..." if len(cypher_query) > 100 else cypher_query,
+            "success": False,
+        }
+
+        # Audit log the security violation
+        if audit_logger:
+            audit_logger.log_error(
+                tool="execute_cypher",
+                query=cypher_query,
+                error=str(e),
+                metadata={"security_blocked": True},
+            )
+
+        return error_response
+
     except Exception as e:
         logger.error(f"Error in execute_cypher: {str(e)}", exc_info=True)
 
@@ -384,7 +330,7 @@ async def _execute_cypher_impl(
 
         error_response = {
             "error": safe_error_message,
-            "type": type(e).__name__,
+            "error_type": type(e).__name__,
             "query": cypher_query[:100] + "..." if len(cypher_query) > 100 else cypher_query,
             "success": False,
         }
@@ -449,16 +395,16 @@ async def refresh_schema(ctx: Context | None = None) -> dict[str, Any]:
     try:
         logger.info("Refreshing graph schema")
 
-        # Run schema refresh in thread pool
-        # Use modern asyncio.to_thread() pattern (Python 3.9+)
-        await asyncio.to_thread(current_graph.refresh_schema)
+        # Phase 4: Native async schema refresh (no asyncio.to_thread)
+        # ✅ NATIVE ASYNC - NO asyncio.to_thread!
+        await current_graph.refresh_schema()
         schema = current_graph.get_schema
 
         return {"schema": schema, "message": "Schema refreshed successfully", "success": True}
 
     except Exception as e:
         logger.error(f"Error in refresh_schema: {str(e)}", exc_info=True)
-        return {"error": str(e), "type": type(e).__name__, "success": False}
+        return {"error": str(e), "error_type": type(e).__name__, "success": False}
 
 
 # Tool definition without decorator applied at import time
