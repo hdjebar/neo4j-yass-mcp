@@ -410,10 +410,12 @@ class TestInitializeNeo4j:
         with patch.dict(
             "os.environ", {"NEO4J_PASSWORD": "password", "ALLOW_WEAK_PASSWORDS": "false"}
         ):
-            from neo4j_yass_mcp.server import initialize_neo4j
+            # Mock LLM to avoid requiring API keys
+            with patch("neo4j_yass_mcp.server.chatLLM"):
+                from neo4j_yass_mcp.server import initialize_neo4j
 
-            with pytest.raises(ValueError, match="Weak password detected"):
-                initialize_neo4j()
+                with pytest.raises(ValueError, match="Weak password detected"):
+                    initialize_neo4j()
 
     def test_initialize_neo4j_with_weak_password_allowed(self):
         """Test initialization succeeds with weak password when override enabled."""
@@ -450,6 +452,7 @@ class TestInitializeNeo4j:
                 "DEBUG_MODE": "true",
                 "ENVIRONMENT": "production",
                 "NEO4J_PASSWORD": "StrongP@ssw0rd!123",
+                "LLM_API_KEY": "test-key",
             },
         ):
             # Reload config with new environment
@@ -458,12 +461,14 @@ class TestInitializeNeo4j:
             test_config = RuntimeConfig.from_env()
 
             with patch("neo4j_yass_mcp.server._config", test_config):
-                from neo4j_yass_mcp.server import initialize_neo4j
+                # Mock LLM to avoid requiring real API keys
+                with patch("neo4j_yass_mcp.server.chatLLM"):
+                    from neo4j_yass_mcp.server import initialize_neo4j
 
-                with pytest.raises(
-                    ValueError, match="DEBUG_MODE=true is not allowed in production"
-                ):
-                    initialize_neo4j()
+                    with pytest.raises(
+                        ValueError, match="DEBUG_MODE=true is not allowed in production"
+                    ):
+                        initialize_neo4j()
 
     def test_initialize_neo4j_debug_mode_in_development(self):
         """Test initialization succeeds with DEBUG_MODE in development."""
