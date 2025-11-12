@@ -408,14 +408,30 @@ class TestInitializeNeo4j:
     def test_initialize_neo4j_with_weak_password(self):
         """Test initialization fails with weak password (no override)."""
         with patch.dict(
-            "os.environ", {"NEO4J_PASSWORD": "password", "ALLOW_WEAK_PASSWORDS": "false"}
+            "os.environ",
+            {
+                "NEO4J_PASSWORD": "password",
+                "ALLOW_WEAK_PASSWORDS": "false",
+                "LLM_API_KEY": "test-key",
+            },
         ):
-            # Mock LLM to avoid requiring API keys
-            with patch("neo4j_yass_mcp.server.chatLLM"):
-                from neo4j_yass_mcp.server import initialize_neo4j
+            # Reload config with new environment
+            from neo4j_yass_mcp.config import RuntimeConfig
 
-                with pytest.raises(ValueError, match="Weak password detected"):
-                    initialize_neo4j()
+            test_config = RuntimeConfig.from_env()
+
+            with patch("neo4j_yass_mcp.server._config", test_config):
+                # Mock LLM components to focus test on password validation
+                with patch("neo4j_yass_mcp.server.chatLLM"):
+                    with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
+                        # Mock SecureNeo4jGraph to raise the weak password error
+                        with patch("neo4j_yass_mcp.server.SecureNeo4jGraph") as mock_graph:
+                            mock_graph.side_effect = ValueError("Weak password detected")
+
+                            from neo4j_yass_mcp.server import initialize_neo4j
+
+                            with pytest.raises(ValueError, match="Weak password detected"):
+                                initialize_neo4j()
 
     def test_initialize_neo4j_with_weak_password_allowed(self):
         """Test initialization succeeds with weak password when override enabled."""
@@ -452,6 +468,7 @@ class TestInitializeNeo4j:
                 "DEBUG_MODE": "true",
                 "ENVIRONMENT": "production",
                 "NEO4J_PASSWORD": "StrongP@ssw0rd!123",
+                "ALLOW_WEAK_PASSWORDS": "false",
                 "LLM_API_KEY": "test-key",
             },
         ):
@@ -461,14 +478,16 @@ class TestInitializeNeo4j:
             test_config = RuntimeConfig.from_env()
 
             with patch("neo4j_yass_mcp.server._config", test_config):
-                # Mock LLM to avoid requiring real API keys
-                with patch("neo4j_yass_mcp.server.chatLLM"):
-                    from neo4j_yass_mcp.server import initialize_neo4j
+                # Mock all external dependencies
+                with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
+                    with patch("neo4j_yass_mcp.server.chatLLM"):
+                        with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
+                            from neo4j_yass_mcp.server import initialize_neo4j
 
-                    with pytest.raises(
-                        ValueError, match="DEBUG_MODE=true is not allowed in production"
-                    ):
-                        initialize_neo4j()
+                            with pytest.raises(
+                                ValueError, match="DEBUG_MODE=true is not allowed in production"
+                            ):
+                                initialize_neo4j()
 
     def test_initialize_neo4j_debug_mode_in_development(self):
         """Test initialization succeeds with DEBUG_MODE in development."""
