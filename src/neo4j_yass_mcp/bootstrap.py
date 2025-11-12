@@ -21,7 +21,6 @@ Benefits:
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from typing import Any
 
 from fastmcp import FastMCP
 from langchain_neo4j import GraphCypherQAChain
