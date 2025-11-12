@@ -36,6 +36,11 @@ except ImportError:
     Tokenizer = None  # type: ignore[assignment]
     TOKENIZER_BACKEND = "fallback"
 
+from neo4j_yass_mcp.bootstrap import (
+    ServerState,
+    get_server_state,
+    initialize_server_state,
+)
 from neo4j_yass_mcp.config import (
     LLMConfig,
     RuntimeConfig,
@@ -201,10 +206,56 @@ def _resource_rate_limit_message(resource_label: str) -> Callable[[dict[str, Any
 # Strategy: Keep existing module-level variables but add opt-in bootstrap support
 # This allows gradual migration without breaking existing code
 #
-# Phase 3.2 (Current): Add bootstrap imports and helper functions
-# Phase 3.3 (Future): Replace module variables with state delegation
+# Phase 3.2 (Completed): Added bootstrap imports and helper functions
+# Phase 3.3 (Current): Replace module variables with state delegation
 # Phase 3.4 (Future): Remove module variables entirely
 # ============================================================================
+
+
+def _get_config() -> RuntimeConfig:
+    """
+    Get runtime configuration with bootstrap support.
+
+    Phase 3.3: Tries to get config from bootstrap state first,
+    falls back to module-level _config for backwards compatibility.
+    """
+    # Check if bootstrap state is available (but don't force initialization)
+    from neo4j_yass_mcp.bootstrap import _server_state
+
+    if _server_state is not None:
+        return _server_state.config
+    return _config
+
+
+def _get_graph() -> SecureNeo4jGraph | None:
+    """
+    Get Neo4j graph instance with bootstrap support.
+
+    Phase 3.3: Tries to get graph from bootstrap state first,
+    falls back to module-level graph for backwards compatibility.
+    """
+    # Check if bootstrap state is available (but don't force initialization)
+    from neo4j_yass_mcp.bootstrap import _server_state
+
+    if _server_state is not None:
+        return _server_state.graph
+    return graph
+
+
+def _get_chain() -> GraphCypherQAChain | None:
+    """
+    Get LangChain chain instance with bootstrap support.
+
+    Phase 3.3: Tries to get chain from bootstrap state first,
+    falls back to module-level chain for backwards compatibility.
+    """
+    # Check if bootstrap state is available (but don't force initialization)
+    from neo4j_yass_mcp.bootstrap import _server_state
+
+    if _server_state is not None:
+        return _server_state.chain
+    return chain
+
 
 # Initialize FastMCP server (module-level for now, will move to bootstrap state)
 mcp = FastMCP("neo4j-yass-mcp", version="1.3.0")
@@ -279,11 +330,23 @@ def get_client_id_from_context(ctx: Context | None = None) -> str:
 
 
 def get_executor() -> ThreadPoolExecutor:
-    """Get or create the thread pool executor for running sync LangChain operations."""
+    """
+    Get or create the thread pool executor for running sync LangChain operations.
+
+    Phase 3.3: Now delegates to bootstrap module's get_executor() for better
+    state management. Falls back to module-level _executor for backwards compatibility.
+    """
     global _executor
-    if _executor is None:
-        _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="langchain_")
-    return _executor
+
+    # Try to get executor from bootstrap state (preferred)
+    try:
+        from neo4j_yass_mcp.bootstrap import get_executor as bootstrap_get_executor
+        return bootstrap_get_executor()
+    except Exception:
+        # Fallback to module-level executor for backwards compatibility
+        if _executor is None:
+            _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="langchain_")
+        return _executor
 
 
 def check_read_only_access(cypher_query: str) -> str | None:
@@ -605,11 +668,14 @@ async def get_schema(ctx: Context | None = None) -> str:
     Returns the complete schema including node labels, relationship types,
     and their properties.
     """
-    if graph is None:
+    # Phase 3.3: Use state accessor function for bootstrap support
+    current_graph = _get_graph()
+
+    if current_graph is None:
         return "Error: Neo4j graph not initialized"
 
     try:
-        schema = graph.get_schema
+        schema = current_graph.get_schema
         return f"Neo4j Graph Schema:\n\n{schema}"
     except Exception as e:
         return f"Error retrieving schema: {str(e)}"
@@ -668,7 +734,11 @@ async def query_graph(query: str, ctx: Context | None = None) -> dict[str, Any]:
         - "What are all the movies in the database?"
         - "Show me actors who have worked together"
     """
-    if chain is None or graph is None:
+    # Phase 3.3: Use state accessor functions for bootstrap support
+    current_chain = _get_chain()
+    current_graph = _get_graph()
+
+    if current_chain is None or current_graph is None:
         return {"error": "Neo4j or LangChain not initialized", "success": False}
 
     # Audit log the query
@@ -685,7 +755,7 @@ async def query_graph(query: str, ctx: Context | None = None) -> dict[str, Any]:
         start_time = time.time()
 
         # Use modern asyncio.to_thread() pattern (Python 3.9+)
-        result = await asyncio.to_thread(chain.invoke, {"query": query})
+        result = await asyncio.to_thread(current_chain.invoke, {"query": query})
 
         execution_time_ms = (time.time() - start_time) * 1000
 
@@ -838,11 +908,15 @@ async def _execute_cypher_impl(
         - cypher_query: "MATCH (p:Person {name: $name}) RETURN p"
           parameters: {"name": "Tom Cruise"}
     """
-    if graph is None:
+    # Phase 3.3: Use state accessor functions for bootstrap support
+    current_graph = _get_graph()
+    current_config = _get_config()
+
+    if current_graph is None:
         return {"error": "Neo4j graph not initialized", "success": False}
 
     # Sanitize query and parameters (SISO prevention)
-    if _config.sanitizer.enabled:
+    if current_config.sanitizer.enabled:
         is_safe, sanitize_error, warnings = sanitize_query(cypher_query, parameters)
 
         if not is_safe:
@@ -872,7 +946,7 @@ async def _execute_cypher_impl(
                 logger.warning(f"Query sanitizer warning: {warning}")
 
     # Check query complexity
-    if _config.complexity_limiter.enabled:
+    if current_config.complexity_limiter.enabled:
         is_allowed, complexity_error, complexity_score = check_query_complexity(cypher_query)
 
         if not is_allowed:
@@ -932,7 +1006,7 @@ async def _execute_cypher_impl(
         start_time = time.time()
 
         # Use modern asyncio.to_thread() pattern (Python 3.9+)
-        result = await asyncio.to_thread(graph.query, cypher_query, params=params)
+        result = await asyncio.to_thread(current_graph.query, cypher_query, params=params)
 
         execution_time_ms = (time.time() - start_time) * 1000
 
@@ -1030,7 +1104,10 @@ async def refresh_schema(ctx: Context | None = None) -> dict[str, Any]:
     Returns:
         Dictionary containing the updated schema and success status
     """
-    if graph is None:
+    # Phase 3.3: Use state accessor function for bootstrap support
+    current_graph = _get_graph()
+
+    if current_graph is None:
         return {"error": "Neo4j graph not initialized", "success": False}
 
     try:
@@ -1038,8 +1115,8 @@ async def refresh_schema(ctx: Context | None = None) -> dict[str, Any]:
 
         # Run schema refresh in thread pool
         # Use modern asyncio.to_thread() pattern (Python 3.9+)
-        await asyncio.to_thread(graph.refresh_schema)
-        schema = graph.get_schema
+        await asyncio.to_thread(current_graph.refresh_schema)
+        schema = current_graph.get_schema
 
         return {"schema": schema, "message": "Schema refreshed successfully", "success": True}
 
@@ -1094,7 +1171,10 @@ async def analyze_query_performance(
         - mode: "explain" for quick plan analysis
         - mode: "profile" for detailed performance statistics
     """
-    if graph is None:
+    # Phase 3.3: Use state accessor function for bootstrap support
+    current_graph = _get_graph()
+
+    if current_graph is None:
         return {"error": "Neo4j graph not initialized", "success": False}
 
     # Audit log the analysis request
@@ -1111,7 +1191,7 @@ async def analyze_query_performance(
         from neo4j_yass_mcp.tools import QueryPlanAnalyzer
 
         # Initialize the analyzer with the secure graph
-        analyzer = QueryPlanAnalyzer(graph)
+        analyzer = QueryPlanAnalyzer(current_graph)
 
         # Run the analysis
         start_time = time.time()
