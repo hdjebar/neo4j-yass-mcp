@@ -8,8 +8,9 @@ These tests verify the async graph wrapper functionality including:
 - Security layer integration
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from neo4j_yass_mcp.async_graph import AsyncNeo4jGraph, AsyncSecureNeo4jGraph
 

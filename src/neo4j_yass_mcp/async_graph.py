@@ -12,7 +12,7 @@ Phase 4: Async Migration - Native async Neo4j driver support
 import logging
 from typing import Any
 
-from neo4j import AsyncGraphDatabase, AsyncDriver, AsyncSession
+from neo4j import AsyncDriver, AsyncGraphDatabase
 
 from neo4j_yass_mcp.security import check_query_complexity, sanitize_query
 

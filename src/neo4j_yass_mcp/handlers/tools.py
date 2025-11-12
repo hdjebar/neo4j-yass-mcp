@@ -14,9 +14,7 @@ from typing import Any
 from fastmcp import Context
 
 from neo4j_yass_mcp.security import (
-    check_query_complexity,
     get_audit_logger,
-    sanitize_query,
 )
 
 logger = logging.getLogger(__name__)
@@ -239,16 +237,13 @@ async def _execute_cypher_impl(
     """
     # Lazy imports to avoid circular dependencies
     from neo4j_yass_mcp.server import (
-        _get_config,
         _get_graph,
-        check_read_only_access,
         sanitize_error_message,
         truncate_response,
     )
 
     # Phase 3.3: Use state accessor functions for bootstrap support
     current_graph = _get_graph()
-    current_config = _get_config()
 
     if current_graph is None:
         return {"error": "Neo4j graph not initialized", "success": False}
