@@ -215,7 +215,9 @@ class TestQueryAnalysisIntegration:
 
     @pytest.mark.asyncio
     async def test_query_analyzer_integration_with_real_plans(self):
-        """Test analyzer with realistic execution plan scenarios."""
+        """Test analyzer with realistic execution plan scenarios (Phase 4: AsyncMock)."""
+        from unittest.mock import AsyncMock
+
         # Create analyzer with mock graph
         mock_graph = Mock()
 
@@ -248,7 +250,8 @@ class TestQueryAnalysisIntegration:
         ]
 
         for scenario in scenarios:
-            mock_graph.query = Mock(return_value=scenario["plan"])
+            # Phase 4: Use AsyncMock for async graph.query()
+            mock_graph.query = AsyncMock(return_value=scenario["plan"])
             analyzer = QueryPlanAnalyzer(mock_graph)
 
             result = await analyzer.analyze_query(
@@ -352,7 +355,9 @@ class TestQueryAnalysisIntegration:
 
     @pytest.mark.asyncio
     async def test_complex_query_analysis(self, mock_context):
-        """Test analysis of complex real-world queries."""
+        """Test analysis of complex real-world queries (Phase 4: AsyncMock)."""
+        from unittest.mock import AsyncMock
+
         # Complex query with multiple patterns and operations
         complex_query = """
         MATCH (p:Person)-[:ACTED_IN]->(m:Movie)<-[:DIRECTED]-(d:Person),
@@ -371,7 +376,8 @@ class TestQueryAnalysisIntegration:
 
         # Mock complex execution plan (flat list format matching Neo4j EXPLAIN output)
         mock_graph = Mock()
-        mock_graph.query = Mock(
+        # Phase 4: Use AsyncMock for async graph.query()
+        mock_graph.query = AsyncMock(
             return_value=[
                 {"name": "NodeByLabelScan", "estimated_rows": 50000},
                 {"name": "ExpandAll", "estimated_rows": 200000},

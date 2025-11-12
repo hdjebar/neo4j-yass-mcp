@@ -342,7 +342,8 @@ class AsyncSecureNeo4jGraph(AsyncNeo4jGraph):
 
             if not is_safe:
                 error_msg = f"Query blocked by sanitizer: {sanitize_error}"
-                logger.error(error_msg)
+                # Phase 4: Use warning for expected security violations (not system errors)
+                logger.warning(f"🔒 SECURITY: {error_msg}")
                 raise ValueError(error_msg)
 
             # Log warnings (non-blocking)
@@ -356,7 +357,8 @@ class AsyncSecureNeo4jGraph(AsyncNeo4jGraph):
 
             if not is_allowed:
                 error_msg = f"Query blocked by complexity limiter: {complexity_error}"
-                logger.error(error_msg)
+                # Phase 4: Use warning for expected security violations (not system errors)
+                logger.warning(f"🔒 SECURITY: {error_msg}")
                 raise ValueError(error_msg)
 
             # Log complexity warnings (non-blocking)
@@ -372,7 +374,8 @@ class AsyncSecureNeo4jGraph(AsyncNeo4jGraph):
 
             if read_only_error:
                 error_msg = f"Query blocked in read-only mode: {read_only_error}"
-                logger.error(error_msg)
+                # Phase 4: Use warning for expected security violations (not system errors)
+                logger.warning(f"🔒 SECURITY: {error_msg}")
                 raise ValueError(error_msg)
 
         # ALL SECURITY CHECKS PASSED - Execute query

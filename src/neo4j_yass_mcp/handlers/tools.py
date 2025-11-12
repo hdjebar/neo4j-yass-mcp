@@ -132,9 +132,9 @@ async def query_graph(query: str, ctx: Context | None = None) -> dict[str, Any]:
         return response
 
     except ValueError as e:
-        # ValueError raised by SecureNeo4jGraph when security checks fail
-        # (sanitization, complexity, or read-only mode violations)
-        logger.warning(f"Security check blocked query: {str(e)}")
+        # Phase 4: ValueError raised by AsyncSecureNeo4jGraph when security checks fail
+        # Use warning (not error) since these are expected security violations, not system errors
+        logger.warning(f"🔒 Security check blocked query in query_graph: {str(e)}")
 
         # Extract generated Cypher if available for audit logging
         generated_cypher = ""
@@ -176,7 +176,8 @@ async def query_graph(query: str, ctx: Context | None = None) -> dict[str, Any]:
         return error_response
 
     except Exception as e:
-        logger.error(f"Error in query_graph: {str(e)}", exc_info=True)
+        # Phase 4: Unexpected errors (LLM, database, or chain errors)
+        logger.error(f"❌ Unexpected error in query_graph: {str(e)}", exc_info=True)
 
         # Sanitize error message for security
         safe_error_message = sanitize_error_message(e)
@@ -301,8 +302,9 @@ async def _execute_cypher_impl(
         return response
 
     except ValueError as e:
-        # ValueError raised by AsyncSecureNeo4jGraph when security checks fail
-        logger.warning(f"Security check failed in execute_cypher: {str(e)}")
+        # Phase 4: ValueError raised by AsyncSecureNeo4jGraph when security checks fail
+        # Use warning (not error) since these are expected security violations, not system errors
+        logger.warning(f"🔒 Security check blocked query in execute_cypher: {str(e)}")
 
         error_response = {
             "error": str(e),
@@ -323,7 +325,8 @@ async def _execute_cypher_impl(
         return error_response
 
     except Exception as e:
-        logger.error(f"Error in execute_cypher: {str(e)}", exc_info=True)
+        # Phase 4: Unexpected errors (system/database errors)
+        logger.error(f"❌ Unexpected error in execute_cypher: {str(e)}", exc_info=True)
 
         # Sanitize error message for security
         safe_error_message = sanitize_error_message(e)
@@ -403,7 +406,8 @@ async def refresh_schema(ctx: Context | None = None) -> dict[str, Any]:
         return {"schema": schema, "message": "Schema refreshed successfully", "success": True}
 
     except Exception as e:
-        logger.error(f"Error in refresh_schema: {str(e)}", exc_info=True)
+        # Phase 4: Unexpected errors (database connection, driver errors)
+        logger.error(f"❌ Unexpected error in refresh_schema: {str(e)}", exc_info=True)
         return {"error": str(e), "error_type": type(e).__name__, "success": False}
 
 
@@ -530,8 +534,15 @@ async def analyze_query_performance(
         return formatted_result
 
     except ValueError as e:
-        # Handle analysis-specific errors (like invalid mode)
-        logger.warning(f"Query analysis failed: {str(e)}")
+        # Phase 4: ValueError from validation or security checks
+        # Could be security violations OR analysis failures (invalid mode, etc.)
+        if "blocked" in str(e).lower():
+            # Security violation from AsyncSecureNeo4jGraph
+            logger.warning(f"🔒 Security check blocked query in analyze_query_performance: {str(e)}")
+        else:
+            # Analysis-specific validation error (e.g., invalid mode)
+            logger.warning(f"⚠️  Query analysis validation failed: {str(e)}")
+
         error_response = {"error": str(e), "success": False, "error_type": "ValueError"}
 
         # Audit log the error
@@ -546,8 +557,8 @@ async def analyze_query_performance(
         return error_response
 
     except Exception as e:
-        # Handle unexpected errors
-        logger.error(f"Unexpected error in analyze_query_performance: {str(e)}", exc_info=True)
+        # Phase 4: Unexpected errors (system/analysis errors)
+        logger.error(f"❌ Unexpected error in analyze_query_performance: {str(e)}", exc_info=True)
 
         # Sanitize error message for security
         safe_error_message = sanitize_error_message(e)
