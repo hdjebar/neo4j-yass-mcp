@@ -232,6 +232,7 @@ def cleanup():
         logger.info("Closing Neo4j driver...")
         # Phase 4: AsyncDriver.close() is async, need to run in event loop
         import asyncio
+
         try:
             # Try to get running event loop
             asyncio.get_running_loop()

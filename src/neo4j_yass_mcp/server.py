@@ -669,6 +669,7 @@ def cleanup():
             if hasattr(graph, "_driver") and graph._driver is not None:
                 # Phase 4: AsyncDriver.close() is async, need to run in event loop
                 import asyncio
+
                 try:
                     # Try to get running event loop
                     asyncio.get_running_loop()
