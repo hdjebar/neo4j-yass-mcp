@@ -83,7 +83,7 @@ class TestErrorAuditLogging:
         # Verify error response
         assert result["success"] is False
         assert "error" in result
-        assert result["type"] == "RuntimeError"
+        assert result["error_type"] == "RuntimeError"
         assert "query" in result
 
         # Verify audit logging was called
@@ -172,7 +172,7 @@ class TestErrorAuditLogging:
 
         # Verify error response
         assert result["success"] is False
-        assert result["type"] == "RuntimeError"
+        assert result["error_type"] == "RuntimeError"
 
         # Verify audit logging captured full error
         mock_audit_logger.log_error.assert_called_once()

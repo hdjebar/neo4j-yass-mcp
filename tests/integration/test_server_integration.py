@@ -24,7 +24,8 @@ def create_mock_context(session_id: str = "test_session_123") -> Mock:
 class TestServerInitialization:
     """Test complete server initialization flow."""
 
-    def test_initialize_neo4j_full_flow(self):
+    @pytest.mark.asyncio
+    async def test_initialize_neo4j_full_flow(self):
         """Test complete Neo4j initialization with all components."""
         # Set up a full environment with valid configuration
         env_vars = {
@@ -53,13 +54,15 @@ class TestServerInitialization:
 
             with patch("neo4j_yass_mcp.server._config", test_config):
                 # Mock Neo4j and LangChain components
-                with patch("neo4j_yass_mcp.server.SecureNeo4jGraph") as mock_graph_class:
+                with patch("neo4j_yass_mcp.async_graph.AsyncSecureNeo4jGraph") as mock_graph_class:
                     with patch("neo4j_yass_mcp.server.chatLLM") as mock_llm_func:
                         with patch(
                             "neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"
                         ) as mock_chain_func:
                             # Set up mock returns
                             mock_graph_instance = Mock()
+                            mock_graph_instance.refresh_schema = AsyncMock()  # Phase 4: Async method
+                            mock_graph_instance.get_schema = "Node: Test"
                             mock_graph_class.return_value = mock_graph_instance
 
                             mock_llm_instance = Mock()
@@ -71,15 +74,15 @@ class TestServerInitialization:
                             # Import and call initialize
                             from neo4j_yass_mcp.server import initialize_neo4j
 
-                            initialize_neo4j()
+                            await initialize_neo4j()  # Phase 4: Now async
 
-                        # Verify SecureNeo4jGraph was created with security params
+                        # Verify AsyncSecureNeo4jGraph was created with security params
                         mock_graph_class.assert_called_once_with(
                             url="bolt://testhost:7687",
                             username="testuser",
                             password="StrongP@ssw0rd!123",
                             database="testdb",
-                            timeout=60,
+                            driver_config={"connection_timeout": 60},  # Phase 4: Async driver config
                             sanitizer_enabled=True,
                             complexity_limit_enabled=True,
                             read_only_mode=False,
@@ -101,7 +104,8 @@ class TestServerInitialization:
                         assert chain_kwargs["verbose"] is True
                         assert chain_kwargs["return_intermediate_steps"] is True
 
-    def test_security_configuration_integration(self):
+    @pytest.mark.asyncio
+    async def test_security_configuration_integration(self):
         """Test security features work together (password check, debug mode, read-only)."""
         env_vars = {
             "NEO4J_PASSWORD": "StrongP@ssw0rd!123",  # Strong password
@@ -123,9 +127,10 @@ class TestServerInitialization:
                 with pytest.raises(
                     ValueError, match="DEBUG_MODE=true is not allowed in production"
                 ):
-                    initialize_neo4j()
+                    await initialize_neo4j()  # Phase 4: Now async
 
-    def test_development_environment_allows_debug(self):
+    @pytest.mark.asyncio
+    async def test_development_environment_allows_debug(self):
         """Test development environment allows debug mode with weak password override."""
         env_vars = {
             "NEO4J_PASSWORD": "password",
@@ -142,13 +147,18 @@ class TestServerInitialization:
             test_config = RuntimeConfig.from_env()
 
             with patch("neo4j_yass_mcp.server._config", test_config):
-                with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
+                with patch("neo4j_yass_mcp.async_graph.AsyncSecureNeo4jGraph") as mock_graph_class:
+                    mock_graph_instance = Mock()
+                    mock_graph_instance.refresh_schema = AsyncMock()  # Phase 4: Async
+                    mock_graph_instance.get_schema = "Node: Test"
+                    mock_graph_class.return_value = mock_graph_instance
+
                     with patch("neo4j_yass_mcp.server.chatLLM"):
                         with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"):
                             from neo4j_yass_mcp.server import _debug_mode, initialize_neo4j
 
                             # Should succeed
-                            initialize_neo4j()
+                            await initialize_neo4j()  # Phase 4: Now async
 
                             # Verify debug mode is set
                             assert _debug_mode is True
@@ -266,6 +276,10 @@ class TestEndToEndQueryFlow:
     async def test_sanitizer_blocks_unsafe_query_end_to_end(self):
         """Test sanitizer integration blocks unsafe queries."""
         mock_graph = Mock()
+        # Phase 4: Security checks in AsyncSecureNeo4jGraph raise ValueError
+        mock_graph.query = AsyncMock(
+            side_effect=ValueError("Query blocked by sanitizer: Dangerous pattern detected")
+        )
 
         mock_audit_logger = Mock()
         mock_audit_logger.log_error = Mock()
@@ -289,8 +303,8 @@ class TestEndToEndQueryFlow:
                 # Verify audit logger recorded the block
                 mock_audit_logger.log_error.assert_called_once()
 
-                # Verify graph was never queried
-                mock_graph.query.assert_not_called()
+                # Verify graph.query was called (security check happens inside AsyncSecureNeo4jGraph)
+                mock_graph.query.assert_called_once()
 
 
 class TestReadOnlyModeIntegration:
@@ -300,6 +314,10 @@ class TestReadOnlyModeIntegration:
     async def test_read_only_blocks_write_queries(self):
         """Test read-only mode blocks write queries in execute_cypher."""
         mock_graph = Mock()
+        # Phase 4: Read-only check in AsyncSecureNeo4jGraph raises ValueError
+        mock_graph.query = AsyncMock(
+            side_effect=ValueError("Query blocked in read-only mode: Write operation not allowed")
+        )
         mock_audit_logger = Mock()
 
         with patch("neo4j_yass_mcp.server.graph", mock_graph):
@@ -323,7 +341,9 @@ class TestReadOnlyModeIntegration:
                         # Check for error (read-only mode returns {"error": msg})
                         assert "error" in result
                         assert "read-only" in result["error"].lower()
-                        mock_graph.query.assert_not_called()
+                        # Phase 4: graph.query is called, but raises ValueError inside AsyncSecureNeo4jGraph
+                        # So we can't assert_not_called(), but we can check it was attempted
+                        mock_graph.query.assert_called()
 
     @pytest.mark.asyncio
     async def test_read_only_allows_read_queries(self):

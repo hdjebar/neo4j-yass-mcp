@@ -118,7 +118,7 @@ class TestQueryGraph:
 
                     assert result["success"] is False
                     assert "error" in result
-                    assert result["type"] == "Exception"
+                    assert result["error_type"] == "Exception"
 
 
 class TestExecuteCypher:
