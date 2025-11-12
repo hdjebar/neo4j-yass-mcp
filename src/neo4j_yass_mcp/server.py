@@ -194,7 +194,19 @@ def _resource_rate_limit_message(resource_label: str) -> Callable[[dict[str, Any
     return builder
 
 
-# Initialize FastMCP server
+# ============================================================================
+# Bootstrap Integration - Gradual Migration Pattern
+# ============================================================================
+#
+# Strategy: Keep existing module-level variables but add opt-in bootstrap support
+# This allows gradual migration without breaking existing code
+#
+# Phase 3.2 (Current): Add bootstrap imports and helper functions
+# Phase 3.3 (Future): Replace module variables with state delegation
+# Phase 3.4 (Future): Remove module variables entirely
+# ============================================================================
+
+# Initialize FastMCP server (module-level for now, will move to bootstrap state)
 mcp = FastMCP("neo4j-yass-mcp", version="1.1.0")
 
 # Global variables for Neo4j and LangChain components
