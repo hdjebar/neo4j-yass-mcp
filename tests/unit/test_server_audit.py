@@ -5,7 +5,7 @@ Covers audit logging in exception handlers for query_graph and execute_cypher.
 Tests lines 653, 868 in server.py
 """
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from fastmcp import Context
@@ -70,10 +70,9 @@ class TestErrorAuditLogging:
         mock_get_audit.return_value = mock_audit_logger
 
         # Setup server state to cause an exception
+        # Phase 4: Now async - use AsyncMock for graph.query
         mock_graph = MagicMock()
-        mock_session = Mock()
-        mock_graph.query = mock_session
-        mock_session.side_effect = RuntimeError("Cypher syntax error")
+        mock_graph.query = AsyncMock(side_effect=RuntimeError("Cypher syntax error"))
 
         server.graph = mock_graph
 
@@ -132,10 +131,9 @@ class TestErrorAuditLogging:
         mock_get_audit.return_value = None
 
         # Setup server state to cause an exception
+        # Phase 4: Now async - use AsyncMock for graph.query
         mock_graph = MagicMock()
-        mock_session = Mock()
-        mock_graph.query = mock_session
-        mock_session.side_effect = Exception("Test error")
+        mock_graph.query = AsyncMock(side_effect=Exception("Test error"))
 
         server.graph = mock_graph
 

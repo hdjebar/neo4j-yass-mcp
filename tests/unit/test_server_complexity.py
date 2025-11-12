@@ -6,7 +6,7 @@ Tests lines 562-587, 760-785 in server.py
 """
 
 from copy import deepcopy
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from fastmcp import Context
@@ -109,8 +109,14 @@ class TestComplexityLimitEnforcement:
         mock_audit_logger = MagicMock()
         mock_get_audit.return_value = mock_audit_logger
 
-        # Setup server state
-        server.graph = MagicMock()
+        # Phase 4: Setup server state with async mock that raises ValueError (complexity check in graph)
+        mock_graph = MagicMock()
+        mock_graph.query = AsyncMock(
+            side_effect=ValueError(
+                "Query blocked by complexity limiter: Query has variable-length path without LIMIT"
+            )
+        )
+        server.graph = mock_graph
 
         # Create test config with complexity limiter enabled
         test_config = deepcopy(server._config)
@@ -123,25 +129,22 @@ class TestComplexityLimitEnforcement:
                 cypher_query=complex_query, ctx=create_mock_context()
             )
 
-            # Verify complexity block response
+            # Phase 4: Verify security error response (complexity check now in AsyncSecureNeo4jGraph)
             assert result["success"] is False
-            assert result["complexity_blocked"] is True
+            assert result["error_type"] == "SecurityError"
             assert "Query blocked by complexity limiter" in result["error"]
-            assert result["complexity_score"] == 200
-            assert result["complexity_limit"] == 100
             assert "query" in result
             assert complex_query[:50] in result["query"]
 
-            # Verify audit logging
+            # Phase 4: Verify audit logging (metadata simplified in async migration)
             mock_audit_logger.log_error.assert_called_once()
             call_args = mock_audit_logger.log_error.call_args[1]
             assert call_args["tool"] == "execute_cypher"
             assert "metadata" in call_args
-            assert call_args["metadata"]["complexity_blocked"] is True
-            assert call_args["metadata"]["complexity_score"] == 200
+            assert call_args["metadata"]["security_blocked"] is True
 
-            # Verify complexity check was called
-            mock_check_complexity.assert_called_once_with(complex_query)
+            # Phase 4: Complexity check is done in AsyncSecureNeo4jGraph, not in handler
+            # So mock_check_complexity is not called directly by handler anymore
 
     @pytest.mark.asyncio
     async def test_query_graph_complexity_allowed(self):
@@ -183,10 +186,9 @@ class TestComplexityLimitEnforcement:
         from neo4j_yass_mcp import server
 
         # Setup server state
+        # Phase 4: Now async - use AsyncMock for graph.query
         server.graph = MagicMock()
-        mock_session = Mock()
-        server.graph.query = mock_session
-        mock_session.return_value = [{"n": 1}]
+        server.graph.query = AsyncMock(return_value=[{"n": 1}])
 
         # Create test config with complexity limiter disabled
         test_config = deepcopy(server._config)
@@ -207,14 +209,18 @@ class TestComplexityLimitEnforcement:
     @pytest.mark.asyncio
     @patch("neo4j_yass_mcp.handlers.tools.check_query_complexity")
     async def test_complexity_score_none_handling(self, mock_check_complexity):
-        """Test handling when complexity_score is None"""
+        """Test handling when complexity_score is None (Phase 4: Now async)"""
         from neo4j_yass_mcp import server
 
         # Setup: Complexity check fails but no score
         mock_check_complexity.return_value = (False, "Unknown complexity error", None)
 
-        # Setup server state
-        server.graph = MagicMock()
+        # Phase 4: Setup server state with async mock that raises ValueError (complexity check in graph)
+        mock_graph = MagicMock()
+        mock_graph.query = AsyncMock(
+            side_effect=ValueError("Query blocked by complexity limiter: Unknown complexity error")
+        )
+        server.graph = mock_graph
 
         # Create test config with complexity limiter enabled
         test_config = deepcopy(server._config)
@@ -226,11 +232,10 @@ class TestComplexityLimitEnforcement:
                 cypher_query="MATCH (n) RETURN n", ctx=create_mock_context()
             )
 
-            # Verify error response handles None score
+            # Phase 4: Verify security error response (complexity check now in AsyncSecureNeo4jGraph)
             assert result["success"] is False
-            assert result["complexity_blocked"] is True
-            assert result["complexity_score"] is None
-            assert result["complexity_limit"] is None
+            assert result["error_type"] == "SecurityError"
+            assert "Query blocked by complexity limiter" in result["error"]
 
 
 if __name__ == "__main__":

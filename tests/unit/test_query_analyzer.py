@@ -27,7 +27,9 @@ class TestQueryPlanAnalyzer:
 
     @pytest.fixture
     def mock_graph(self):
-        """Create a mock SecureNeo4jGraph."""
+        """Create a mock AsyncSecureNeo4jGraph (Phase 4: Now async)."""
+        from unittest.mock import AsyncMock
+
         graph = Mock()
         # Mock for PROFILE mode
         profile_result = [
@@ -37,17 +39,19 @@ class TestQueryPlanAnalyzer:
             }
         ]
 
-        # graph.query is synchronous (not async), so use regular Mock
-        graph.query = Mock(return_value=profile_result)
+        # Phase 4: graph.query is now async, use AsyncMock
+        graph.query = AsyncMock(return_value=profile_result)
         return graph
 
     @pytest.fixture
     def error_mock_graph(self):
-        """Create a mock SecureNeo4jGraph that raises errors."""
+        """Create a mock AsyncSecureNeo4jGraph that raises errors (Phase 4: Now async)."""
+        from unittest.mock import AsyncMock
+
         graph = Mock()
 
-        # graph.query is synchronous (not async), so use Mock with side_effect
-        graph.query = Mock(side_effect=Exception("Query execution failed"))
+        # Phase 4: graph.query is now async, use AsyncMock with side_effect
+        graph.query = AsyncMock(side_effect=Exception("Query execution failed"))
         return graph
 
     @pytest.fixture

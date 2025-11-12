@@ -7,7 +7,7 @@ and integration between components (Neo4j, LangChain, sanitizer, audit logger).
 
 import os
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from fastmcp import Context
@@ -164,6 +164,7 @@ class TestEndToEndQueryFlow:
         mock_graph = Mock()
         mock_graph.get_schema = "Node: Person\nRelationship: KNOWS"
 
+        # Phase 4: Now async - chain.invoke stays as Mock since it's part of LangChain
         mock_chain = Mock()
         mock_chain.invoke = Mock(
             return_value={
@@ -202,6 +203,7 @@ class TestEndToEndQueryFlow:
         mock_graph = Mock()
         mock_graph.get_schema = "Node: Person\nRelationship: KNOWS"
 
+        # Phase 4: Now async - chain.invoke stays as Mock since it's part of LangChain
         # Mock chain to return Cypher with CALL apoc (triggers SUSPICIOUS_PATTERNS)
         mock_chain = Mock()
         mock_chain.invoke = Mock(
@@ -229,8 +231,9 @@ class TestEndToEndQueryFlow:
     @pytest.mark.asyncio
     async def test_execute_cypher_end_to_end(self):
         """Test complete execute_cypher flow with sanitizer and audit."""
+        # Phase 4: Now async - use AsyncMock for graph.query
         mock_graph = Mock()
-        mock_graph.query = Mock(
+        mock_graph.query = AsyncMock(
             return_value=[{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}]
         )
 
@@ -325,8 +328,9 @@ class TestReadOnlyModeIntegration:
     @pytest.mark.asyncio
     async def test_read_only_allows_read_queries(self):
         """Test read-only mode allows read queries."""
+        # Phase 4: Now async - use AsyncMock for graph.query
         mock_graph = Mock()
-        mock_graph.query = Mock(return_value=[{"n": "data"}])
+        mock_graph.query = AsyncMock(return_value=[{"n": "data"}])
 
         with patch("neo4j_yass_mcp.server.graph", mock_graph):
             with patch("neo4j_yass_mcp.server._read_only_mode", True):
@@ -355,8 +359,9 @@ class TestResponseTruncationIntegration:
         # Generate large result set
         large_result = [{"id": i, "data": "x" * 1000} for i in range(10000)]
 
+        # Phase 4: Now async - use AsyncMock for graph.query
         mock_graph = Mock()
-        mock_graph.query = Mock(return_value=large_result)
+        mock_graph.query = AsyncMock(return_value=large_result)
 
         with patch("neo4j_yass_mcp.server.graph", mock_graph):
             with patch("neo4j_yass_mcp.server._response_token_limit", 1000):
@@ -442,9 +447,10 @@ class TestAuditLoggerIntegration:
                 initialize_audit_logger()
                 audit_logger = get_audit_logger()
 
+                # Phase 4: Now async - use AsyncMock for graph.query
                 # Mock graph
                 mock_graph = Mock()
-                mock_graph.query = Mock(return_value=[{"result": "data"}])
+                mock_graph.query = AsyncMock(return_value=[{"result": "data"}])
 
                 with patch("neo4j_yass_mcp.server.graph", mock_graph):
                     from neo4j_yass_mcp.server import execute_cypher
