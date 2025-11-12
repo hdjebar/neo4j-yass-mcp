@@ -76,7 +76,18 @@ async def query_graph(query: str, ctx: Context | None = None) -> dict[str, Any]:
         # at the SecureNeo4jGraph layer BEFORE query execution
         start_time = time.time()
 
-        # Use modern asyncio.to_thread() pattern (Python 3.9+)
+        # Phase 4: Use asyncio.to_thread() for LangChain sync operations
+        # NOTE: This blocks LLM streaming because GraphCypherQAChain.invoke() is synchronous.
+        # The entire chain execution (LLM generation + Neo4j query) happens in a thread,
+        # and tokens accumulate there before returning all at once.
+        #
+        # To enable streaming, we would need:
+        # 1. Custom async LangChain chain implementation (replace GraphCypherQAChain)
+        # 2. Direct streaming from LLM to client without buffering in thread
+        # 3. Async graph operations (✅ already done in Phase 4)
+        #
+        # Parallelization works great for other tools (execute_cypher, refresh_schema,
+        # analyze_query_performance) which are fully async and can run in parallel.
         result = await asyncio.to_thread(current_chain.invoke, {"query": query})
 
         execution_time_ms = (time.time() - start_time) * 1000

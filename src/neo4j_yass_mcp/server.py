@@ -15,7 +15,6 @@ Features:
 import json
 import logging
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import Any
 
@@ -253,9 +252,6 @@ mcp = FastMCP("neo4j-yass-mcp", version="1.3.0")
 graph: AsyncSecureNeo4jGraph | None = None  # Phase 4: Now async!
 chain: GraphCypherQAChain | None = None
 
-# Thread pool for async operations (LangChain is sync)
-_executor: ThreadPoolExecutor | None = None
-
 # Read-only mode flag
 _read_only_mode: bool = False
 
@@ -316,27 +312,6 @@ def get_client_id_from_context(ctx: Context | None = None) -> str:
         "FastMCP Context missing session_id, client_id, and request_id - using 'unknown' bucket"
     )
     return "unknown"
-
-
-def get_executor() -> ThreadPoolExecutor:
-    """
-    Get or create the thread pool executor for running sync LangChain operations.
-
-    Phase 3.3: Now delegates to bootstrap module's get_executor() for better
-    state management. Falls back to module-level _executor for backwards compatibility.
-    """
-    global _executor
-
-    # Try to get executor from bootstrap state (preferred)
-    try:
-        from neo4j_yass_mcp.bootstrap import get_executor as bootstrap_get_executor
-
-        return bootstrap_get_executor()
-    except Exception:
-        # Fallback to module-level executor for backwards compatibility
-        if _executor is None:
-            _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="langchain_")
-        return _executor
 
 
 def check_read_only_access(cypher_query: str) -> str | None:

@@ -19,7 +19,6 @@ Benefits:
 """
 
 import logging
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
 from fastmcp import FastMCP
@@ -64,9 +63,6 @@ class ServerState:
     _debug_mode: bool = False
     _read_only_mode: bool = False
     _response_token_limit: int | None = None
-
-    # Thread pool executor (for LangChain sync operations)
-    _executor: ThreadPoolExecutor | None = None  # Created on demand
 
 
 def initialize_server_state(
@@ -219,44 +215,17 @@ def reset_server_state() -> None:
     _server_state = None
 
 
-def get_executor() -> ThreadPoolExecutor:
-    """
-    Get or create thread pool executor for sync LangChain operations.
-
-    Returns:
-        ThreadPoolExecutor instance
-    """
-
-    state = get_server_state()
-
-    if state._executor is None:
-        max_workers = state.config.server.max_workers
-        state._executor = ThreadPoolExecutor(
-            max_workers=max_workers,
-            thread_name_prefix="neo4j_yass_mcp_",
-        )
-        logger.info(f"Created ThreadPoolExecutor with {max_workers} workers")
-
-    return state._executor
-
-
 def cleanup():
     """
     Clean up server resources.
 
-    Shuts down thread pool and closes connections.
+    Closes Neo4j driver connection.
 
     Example:
         >>> # On server shutdown
         >>> cleanup()
     """
     state = get_server_state()
-
-    # Shutdown executor
-    if state._executor is not None:
-        logger.info("Shutting down thread pool executor...")
-        state._executor.shutdown(wait=True)
-        state._executor = None
 
     # Close Neo4j driver
     if state.graph is not None and hasattr(state.graph, "_driver"):

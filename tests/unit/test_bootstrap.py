@@ -128,7 +128,7 @@ class TestServerStateStructure:
         assert state._debug_mode is False
         assert state._read_only_mode is False
         assert state._response_token_limit is None
-        assert state._executor is None
+        # Phase 4: _executor removed (no longer needed with native async)
 
 
 class TestMultiInstanceSupport:

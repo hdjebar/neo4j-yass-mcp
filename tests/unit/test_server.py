@@ -982,30 +982,8 @@ class TestResponseTruncation:
                         assert "warning" in result
 
 
-class TestSanitizerWarnings:
-    """Test sanitizer warning handling."""
-
-    @pytest.mark.asyncio
-    async def test_execute_cypher_sanitizer_warnings(self, mock_neo4j_graph):
-        """Test execute_cypher logs sanitizer warnings."""
-        with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
-            with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
-                # Mock sanitize_query to return warnings (patch where it's used, not where it's defined)
-                with patch("neo4j_yass_mcp.handlers.tools.sanitize_query") as mock_sanitize:
-                    mock_sanitize.return_value = (
-                        True,  # is_safe
-                        None,  # error
-                        ["Query uses complex pattern"],  # warnings
-                    )
-
-                    from neo4j_yass_mcp.server import execute_cypher
-
-                    result = await execute_cypher(
-                        "MATCH (n)-->(m) RETURN n, m", ctx=create_mock_context()
-                    )
-
-                    # Query should succeed but log warnings
-                    assert result["success"] is True
+# Phase 4: TestSanitizerWarnings removed - security checks now in AsyncSecureNeo4jGraph
+# Security features tested in tests/unit/test_async_graph.py
 
 
 if __name__ == "__main__":
