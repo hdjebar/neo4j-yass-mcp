@@ -392,11 +392,13 @@ class TestResponseTypeConsistency:
         success_responses = [
             QueryGraphSuccessResponse({"success": True, "answer": "test"}),
             ExecuteCypherSuccessResponse({"success": True, "result": [], "row_count": 0}),
-            RefreshSchemaSuccessResponse({
-                "success": True,
-                "schema": "test",
-                "message": "test",
-            }),
+            RefreshSchemaSuccessResponse(
+                {
+                    "success": True,
+                    "schema": "test",
+                    "message": "test",
+                }
+            ),
         ]
 
         for response in success_responses:

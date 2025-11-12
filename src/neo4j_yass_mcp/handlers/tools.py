@@ -622,5 +622,3 @@ async def analyze_query_performance(
             )
 
         return error_response
-
-

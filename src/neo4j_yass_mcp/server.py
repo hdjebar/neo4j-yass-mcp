@@ -329,6 +329,7 @@ def get_executor() -> ThreadPoolExecutor:
     # Try to get executor from bootstrap state (preferred)
     try:
         from neo4j_yass_mcp.bootstrap import get_executor as bootstrap_get_executor
+
         return bootstrap_get_executor()
     except Exception:
         # Fallback to module-level executor for backwards compatibility
@@ -639,7 +640,6 @@ def initialize_neo4j():
 
 # NOTE: Initialization is deferred to the main() entry point to avoid
 # performing network/LLM connections at import time (improves testability).
-
 
 
 # =============================================================================

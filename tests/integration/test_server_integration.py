@@ -48,6 +48,7 @@ class TestServerInitialization:
         with patch.dict(os.environ, env_vars, clear=True):
             # Reload config with new environment
             from neo4j_yass_mcp.config import RuntimeConfig
+
             test_config = RuntimeConfig.from_env()
 
             with patch("neo4j_yass_mcp.server._config", test_config):
@@ -112,13 +113,16 @@ class TestServerInitialization:
         with patch.dict(os.environ, env_vars, clear=True):
             # Reload config with new environment
             from neo4j_yass_mcp.config import RuntimeConfig
+
             test_config = RuntimeConfig.from_env()
 
             with patch("neo4j_yass_mcp.server._config", test_config):
                 from neo4j_yass_mcp.server import initialize_neo4j
 
                 # Should raise ValueError due to DEBUG_MODE in production
-                with pytest.raises(ValueError, match="DEBUG_MODE=true is not allowed in production"):
+                with pytest.raises(
+                    ValueError, match="DEBUG_MODE=true is not allowed in production"
+                ):
                     initialize_neo4j()
 
     def test_development_environment_allows_debug(self):
@@ -134,6 +138,7 @@ class TestServerInitialization:
         with patch.dict(os.environ, env_vars, clear=True):
             # Reload config with new environment
             from neo4j_yass_mcp.config import RuntimeConfig
+
             test_config = RuntimeConfig.from_env()
 
             with patch("neo4j_yass_mcp.server._config", test_config):
@@ -174,9 +179,7 @@ class TestEndToEndQueryFlow:
                 with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
                     from neo4j_yass_mcp.server import query_graph
 
-                    result = await query_graph(
-                        "How old is John Doe?", ctx=create_mock_context()
-                    )
+                    result = await query_graph("How old is John Doe?", ctx=create_mock_context())
 
                     # Verify result structure
                     assert result["success"] is True
@@ -277,8 +280,7 @@ class TestEndToEndQueryFlow:
                 # Verify query was blocked
                 assert result["success"] is False
                 assert (
-                    "blocked" in result["error"].lower()
-                    or "dangerous" in result["error"].lower()
+                    "blocked" in result["error"].lower() or "dangerous" in result["error"].lower()
                 )
 
                 # Verify audit logger recorded the block

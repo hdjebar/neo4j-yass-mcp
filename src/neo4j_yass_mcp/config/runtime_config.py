@@ -319,6 +319,7 @@ class RuntimeConfig(BaseModel):
         except ValueError:
             # Log warning but don't fail - return None for invalid values
             import logging
+
             logging.warning(f"Invalid NEO4J_RESPONSE_TOKEN_LIMIT value '{value}', ignoring")
             return None
 
@@ -375,9 +376,7 @@ class RuntimeConfig(BaseModel):
                 enabled=os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true",
                 rate=int(os.getenv("RATE_LIMIT_REQUESTS", "10")),
                 per_seconds=int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60")),
-                burst=(
-                    int(burst) if (burst := os.getenv("RATE_LIMIT_BURST")) else None
-                ),
+                burst=(int(burst) if (burst := os.getenv("RATE_LIMIT_BURST")) else None),
             ),
             tool_rate_limit=ToolRateLimitConfig(
                 enabled=os.getenv("MCP_TOOL_RATE_LIMIT_ENABLED", "true").lower() == "true",

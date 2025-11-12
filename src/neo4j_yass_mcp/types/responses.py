@@ -36,7 +36,9 @@ class SecurityBlockedResponse(BaseErrorResponse):
     """Response when a query is blocked by security policies."""
 
     security_blocked: Literal[True]
-    block_type: Literal["sanitizer_blocked", "complexity_blocked", "read_only_blocked", "security_blocked"]
+    block_type: Literal[
+        "sanitizer_blocked", "complexity_blocked", "read_only_blocked", "security_blocked"
+    ]
 
 
 # ============================================================================

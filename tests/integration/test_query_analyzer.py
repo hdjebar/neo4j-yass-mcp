@@ -194,7 +194,9 @@ class TestQueryAnalysisIntegration:
         mock_audit_logger.log_query = Mock()
         mock_audit_logger.log_response = Mock()
 
-        with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=mock_audit_logger):
+        with patch(
+            "neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=mock_audit_logger
+        ):
             with patch("neo4j_yass_mcp.server.graph", mock_graph_with_plan):
                 query = "MATCH (n:Person) RETURN n.name"
 

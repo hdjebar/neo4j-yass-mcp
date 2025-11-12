@@ -427,6 +427,7 @@ class TestInitializeNeo4j:
         ):
             # Reload config with new environment
             from neo4j_yass_mcp.config import RuntimeConfig
+
             test_config = RuntimeConfig.from_env()
 
             with patch("neo4j_yass_mcp.server._config", test_config):
@@ -453,12 +454,15 @@ class TestInitializeNeo4j:
         ):
             # Reload config with new environment
             from neo4j_yass_mcp.config import RuntimeConfig
+
             test_config = RuntimeConfig.from_env()
 
             with patch("neo4j_yass_mcp.server._config", test_config):
                 from neo4j_yass_mcp.server import initialize_neo4j
 
-                with pytest.raises(ValueError, match="DEBUG_MODE=true is not allowed in production"):
+                with pytest.raises(
+                    ValueError, match="DEBUG_MODE=true is not allowed in production"
+                ):
                     initialize_neo4j()
 
     def test_initialize_neo4j_debug_mode_in_development(self):
@@ -474,6 +478,7 @@ class TestInitializeNeo4j:
         ):
             # Reload config with new environment
             from neo4j_yass_mcp.config import RuntimeConfig
+
             test_config = RuntimeConfig.from_env()
 
             with patch("neo4j_yass_mcp.server._config", test_config):
@@ -498,6 +503,7 @@ class TestInitializeNeo4j:
         ):
             # Reload config with new environment
             from neo4j_yass_mcp.config import RuntimeConfig
+
             test_config = RuntimeConfig.from_env()
 
             with patch("neo4j_yass_mcp.server._config", test_config):
@@ -525,6 +531,7 @@ class TestInitializeNeo4j:
         ):
             # Reload config with new environment
             from neo4j_yass_mcp.config import RuntimeConfig
+
             test_config = RuntimeConfig.from_env()
 
             with patch("neo4j_yass_mcp.server._config", test_config):
@@ -551,6 +558,7 @@ class TestInitializeNeo4j:
         ):
             # Reload config with new environment
             from neo4j_yass_mcp.config import RuntimeConfig
+
             test_config = RuntimeConfig.from_env()
 
             with patch("neo4j_yass_mcp.server._config", test_config):
@@ -574,12 +582,15 @@ class TestInitializeNeo4j:
         ):
             # Reload config with new environment
             from neo4j_yass_mcp.config import RuntimeConfig
+
             test_config = RuntimeConfig.from_env()
 
             with patch("neo4j_yass_mcp.server._config", test_config):
                 with patch("neo4j_yass_mcp.server.SecureNeo4jGraph"):
                     with patch("neo4j_yass_mcp.server.chatLLM"):
-                        with patch("neo4j_yass_mcp.server.GraphCypherQAChain.from_llm") as mock_chain:
+                        with patch(
+                            "neo4j_yass_mcp.server.GraphCypherQAChain.from_llm"
+                        ) as mock_chain:
                             from neo4j_yass_mcp.server import initialize_neo4j
 
                             initialize_neo4j()
@@ -742,7 +753,8 @@ class TestAuditLoggerIntegration:
             with patch("neo4j_yass_mcp.server.chain", write_chain):
                 with patch("neo4j_yass_mcp.server._read_only_mode", True):
                     with patch(
-                        "neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=mock_audit_logger
+                        "neo4j_yass_mcp.handlers.tools.get_audit_logger",
+                        return_value=mock_audit_logger,
                     ):
                         from neo4j_yass_mcp.server import query_graph
 
@@ -759,7 +771,9 @@ class TestAuditLoggerIntegration:
         mock_audit_logger.log_response = Mock()
 
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
-            with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=mock_audit_logger):
+            with patch(
+                "neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=mock_audit_logger
+            ):
                 from neo4j_yass_mcp.server import execute_cypher
 
                 await execute_cypher("MATCH (n) RETURN n", ctx=create_mock_context())

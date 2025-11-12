@@ -137,7 +137,9 @@ def initialize_server_state(
         )
         logger.info("✅ Query complexity limiter enabled (prevents resource exhaustion attacks)")
     else:
-        logger.warning("⚠️  Query complexity limiter disabled - no protection against complex queries!")
+        logger.warning(
+            "⚠️  Query complexity limiter disabled - no protection against complex queries!"
+        )
 
     # Initialize rate limiter
     if config.rate_limiter.enabled:
