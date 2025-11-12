@@ -19,6 +19,7 @@ Benefits:
 """
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -66,7 +67,7 @@ class ServerState:
     _response_token_limit: int | None = None
 
     # Thread pool executor (for LangChain sync operations)
-    _executor: Any = None  # ThreadPoolExecutor, created on demand
+    _executor: ThreadPoolExecutor | None = None  # Created on demand
 
 
 def initialize_server_state(
@@ -219,14 +220,13 @@ def reset_server_state() -> None:
     _server_state = None
 
 
-def get_executor():
+def get_executor() -> ThreadPoolExecutor:
     """
     Get or create thread pool executor for sync LangChain operations.
 
     Returns:
         ThreadPoolExecutor instance
     """
-    from concurrent.futures import ThreadPoolExecutor
 
     state = get_server_state()
 

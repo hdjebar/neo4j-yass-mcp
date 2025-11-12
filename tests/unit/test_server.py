@@ -880,8 +880,8 @@ class TestSanitizerWarnings:
         """Test execute_cypher logs sanitizer warnings."""
         with patch("neo4j_yass_mcp.server.graph", mock_neo4j_graph):
             with patch("neo4j_yass_mcp.handlers.tools.get_audit_logger", return_value=None):
-                # Mock sanitize_query to return warnings
-                with patch("neo4j_yass_mcp.server.sanitize_query") as mock_sanitize:
+                # Mock sanitize_query to return warnings (patch where it's used, not where it's defined)
+                with patch("neo4j_yass_mcp.handlers.tools.sanitize_query") as mock_sanitize:
                     mock_sanitize.return_value = (
                         True,  # is_safe
                         None,  # error
