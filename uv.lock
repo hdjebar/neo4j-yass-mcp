@@ -1362,7 +1362,7 @@ wheels = [
 
 [[package]]
 name = "neo4j-yass-mcp"
-version = "1.2.2"
+version = "1.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "bandit" },
