@@ -47,11 +47,18 @@ venv.bak/
 .cache
 nosetests.xml
 coverage.xml
+coverage.json
 *.cover
 *.log
 .hypothesis/
 .pytest_cache/
 cover/
+
+# Security reports
+bandit_report.json
+safety_report.json
+SECURITY_AUDIT_REPORT_*.md
+SECURITY_SCAN_RESULTS_*.md
 
 # MyPy
 .mypy_cache/
