@@ -47,6 +47,15 @@ class Neo4jConfig(BaseModel):
         ge=1,
         description="Maximum tokens in response (None = unlimited)",
     )
+    max_query_result_rows: int = Field(
+        default=1000,
+        ge=1,
+        description="Maximum rows to return from queries (auto-inject LIMIT)",
+    )
+    auto_inject_limit: bool = Field(
+        default=True,
+        description="Automatically inject LIMIT clause for unbounded queries",
+    )
     allow_dangerous_requests: bool = Field(
         default=False,
         description="Allow LangChain dangerous requests flag",
@@ -350,6 +359,8 @@ class RuntimeConfig(BaseModel):
                 response_token_limit=cls._parse_token_limit(
                     os.getenv("NEO4J_RESPONSE_TOKEN_LIMIT")
                 ),
+                max_query_result_rows=int(os.getenv("MAX_QUERY_RESULT_ROWS", "1000")),
+                auto_inject_limit=os.getenv("AUTO_INJECT_LIMIT", "true").lower() == "true",
                 allow_dangerous_requests=(
                     os.getenv("LANGCHAIN_ALLOW_DANGEROUS_REQUESTS", "false").lower() == "true"
                 ),

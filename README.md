@@ -520,7 +520,7 @@ execute_cypher(
 
 Refresh the cached Neo4j schema after structural changes.
 
-### 4. `analyze_query_performance(query: str, mode: str = "profile", include_recommendations: bool = True)` ⭐ **NEW**
+### 4. `analyze_query_performance(query: str, mode: str = "explain", include_recommendations: bool = True)` ⭐ **NEW**
 
 Analyze Cypher query performance and get optimization recommendations. **Highest ROI feature!**
 
@@ -532,8 +532,8 @@ Analyze Cypher query performance and get optimization recommendations. **Highest
 - **Risk Assessment**: Evaluates query risk level (low/medium/high) before execution
 
 **Analysis Modes:**
-- **"explain"**: Fast analysis without query execution (recommended for validation)
-- **"profile"**: Detailed analysis with runtime statistics (recommended for optimization)
+- **"explain"**: Fast analysis without query execution - **DEFAULT** (safe, recommended for validation)
+- **"profile"**: Detailed analysis with runtime statistics (executes the query - use with caution)
 
 **Example:**
 ```python

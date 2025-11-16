@@ -57,6 +57,8 @@ class QuerySanitizer:
     """
 
     # Dangerous patterns that should be blocked
+    # NOTE: Comments are NOT included here - they're stripped before pattern matching
+    # to allow legitimate Cypher queries with comments (e.g., "MATCH (n) RETURN n // note")
     DANGEROUS_PATTERNS = [
         # System commands and file operations
         r"(?i)LOAD\s+CSV",  # File loading
@@ -73,9 +75,6 @@ class QuerySanitizer:
         r";\s+(?i:DELETE)",  # Query chaining with any whitespace
         r";\s+(?i:DROP)",  # Query chaining with any whitespace
         r";\s+(?i:CALL)",  # Query chaining with CALL
-        # Comment-based injection (multi-line aware)
-        r"/\*[\s\S]*?\*/",  # Block comments
-        r"//[^\n]*",  # Line comments
         # Excessive operations
         r"(?i)FOREACH\s*\([^)]*\s+IN\s+range\s*\(\s*\d+\s*,\s*\d{6,}",  # Large range iterations
         # String concatenation (LLM injection vector)
@@ -155,19 +154,37 @@ class QuerySanitizer:
 
         original_query = query
 
-        # Check 2: Check for dangerous patterns (operate on original query so comments are detected)
+        # Check 2: Detect UTF-8/Unicode attacks on ORIGINAL query (before stripping)
+        # This catches attacks inside string literals
+        utf8_safe, utf8_error = self._detect_utf8_attacks(original_query)
+        if not utf8_safe:
+            return False, utf8_error, warnings
+
+        # Check 3: Detect potential string escape injection BEFORE stripping strings
+        if self._detect_string_injection(original_query):
+            return False, "Potential string injection detected", warnings
+
+        # Check 4: Strip string literals BEFORE checking for dangerous patterns
+        # This prevents false positives like URLs ("https://...") being flagged as comments
+        query_without_strings = self._strip_string_literals(original_query)
+
+        # Check 5: Strip comments BEFORE checking for dangerous patterns
+        # This allows legitimate Cypher queries with comments (e.g., "MATCH (n) RETURN n // note")
+        # Comments are stripped early to prevent false positives while still catching
+        # malicious code hidden inside comments
+        query = self._strip_comments(query_without_strings)
+
+        # Check 6: Check for dangerous patterns on query with strings AND comments removed
+        # This prevents both false positives (legitimate comments) and bypasses (code in comments)
         for pattern in self.DANGEROUS_PATTERNS:
-            if re.search(pattern, original_query, re.IGNORECASE | re.MULTILINE):
+            if re.search(pattern, query, re.IGNORECASE | re.MULTILINE):
                 return False, f"Blocked: Query contains dangerous pattern: {pattern}", warnings
 
-        # Strip comments before further validation
-        query = self._strip_comments(original_query)
-
-        # Check 3: Null or empty after stripping comments
+        # Check 7: Null or empty after stripping comments
         if not query or not query.strip():
             return False, "Empty query not allowed", warnings
 
-        # Check 4: Check for suspicious patterns
+        # Check 8: Check for suspicious patterns
         for pattern in self.SUSPICIOUS_PATTERNS:
             if re.search(pattern, query, re.IGNORECASE):
                 # APOC exceptions
@@ -189,21 +206,36 @@ class QuerySanitizer:
                         f"Warning: Query contains pattern that may need review: {pattern}"
                     )
 
-        # Check 5: Balance of parentheses, braces, brackets
+        # Check 7: Balance of parentheses, braces, brackets
         if not self._check_balanced_delimiters(query):
             return False, "Unbalanced parentheses, braces, or brackets detected", warnings
 
-        # Check 6: Detect potential string escape injection
-        if self._detect_string_injection(query):
-            return False, "Potential string injection detected", warnings
-
-        # Check 7: Detect UTF-8/Unicode attacks
-        utf8_safe, utf8_error = self._detect_utf8_attacks(query)
-        if not utf8_safe:
-            return False, utf8_error, warnings
-
         # All checks passed
         return True, None, warnings
+
+    def _strip_string_literals(self, query: str) -> str:
+        """
+        Remove string literals from a query to avoid false positives.
+
+        Replaces both single-quoted and double-quoted strings with empty strings.
+        This prevents URLs like "https://..." or markdown like "// comment" inside
+        strings from being flagged as dangerous patterns.
+
+        Args:
+            query: The query to process
+
+        Returns:
+            Query with all string literals replaced by empty strings
+        """
+        # Remove single-quoted strings: 'string content'
+        # Handle escaped quotes: 'it\'s' or 'he said \'hi\''
+        query = re.sub(r"'(?:[^'\\]|\\.)*'", "''", query)
+
+        # Remove double-quoted strings: "string content"
+        # Handle escaped quotes: "she said \"hi\""
+        query = re.sub(r'"(?:[^"\\]|\\.)*"', '""', query)
+
+        return query
 
     def _strip_comments(self, query: str) -> str:
         """Remove block and line comments from a query"""

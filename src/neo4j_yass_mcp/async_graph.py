@@ -89,6 +89,63 @@ class AsyncNeo4jGraph:
             records = await result.data()
             return records
 
+    async def query_with_summary(
+        self, query: str, params: dict[str, Any] | None = None, *, fetch_records: bool = False
+    ) -> tuple[list[dict[str, Any]], Any]:
+        """
+        Execute a Cypher query and return both data and result summary.
+
+        This method provides access to the full Neo4j result summary, including
+        execution plan information from EXPLAIN/PROFILE queries.
+
+        IMPORTANT: By default (fetch_records=False), this method returns an EMPTY
+        records list []. Only the summary is fetched. This is optimal for plan
+        analysis but may surprise callers expecting query results. Set fetch_records=True
+        if you need the actual query results.
+
+        Args:
+            query: Cypher query to execute
+            params: Optional query parameters
+            fetch_records: If True, materialize all records. If False (default), only fetch
+                          the summary. For EXPLAIN/PROFILE queries, set to False to avoid
+                          unnecessary result streaming.
+
+        Returns:
+            Tuple of (records, summary) where:
+            - records: List of result records as dictionaries (EMPTY [] if fetch_records=False)
+            - summary: Neo4j ResultSummary containing plan, statistics, etc.
+
+        Raises:
+            Exception: If query execution fails
+
+        Examples:
+            # Plan analysis (no record materialization)
+            records, summary = await graph.query_with_summary("EXPLAIN MATCH (n) RETURN n")
+            # records = []
+            # summary.plan contains execution plan
+
+            # Fetch both records and summary
+            records, summary = await graph.query_with_summary(
+                "MATCH (n:Person) RETURN n", fetch_records=True
+            )
+            # records = [{...}, {...}]
+            # summary contains metadata
+        """
+        logger.debug(f"Executing async query with summary: {query[:100]}...")
+
+        async with self._driver.session(database=self._database) as session:
+            result = await session.run(query, params or {})
+
+            # For EXPLAIN/PROFILE queries, we typically only need the summary
+            # Avoid materializing records unless explicitly requested
+            if fetch_records:
+                records = await result.data()
+            else:
+                records = []
+
+            summary = await result.consume()
+            return records, summary
+
     async def refresh_schema(self) -> None:
         """
         Refresh the graph schema asynchronously.
@@ -381,3 +438,74 @@ class AsyncSecureNeo4jGraph(AsyncNeo4jGraph):
         # ALL SECURITY CHECKS PASSED - Execute query
         logger.debug("All security checks passed, executing async query")
         return await super().query(query, params)
+
+    async def query_with_summary(
+        self, query: str, params: dict[str, Any] | None = None, *, fetch_records: bool = False
+    ) -> tuple[list[dict[str, Any]], Any]:
+        """
+        Execute a Cypher query with security checks and return both data and summary.
+
+        Security checks (in order):
+        1. Query sanitization - Blocks injections, malformed Unicode, dangerous patterns
+        2. Complexity limiting - Prevents resource exhaustion attacks
+        3. Read-only enforcement - Blocks write operations if read_only_mode=True
+
+        Args:
+            query: Cypher query to execute
+            params: Optional query parameters
+            fetch_records: If True, materialize all records. If False (default), only fetch
+                          the summary. For EXPLAIN/PROFILE queries, set to False to avoid
+                          unnecessary result streaming.
+
+        Returns:
+            Tuple of (records, summary) where:
+            - records: List of result records as dictionaries (empty if fetch_records=False)
+            - summary: Neo4j ResultSummary containing plan, statistics, etc.
+
+        Raises:
+            ValueError: If query violates any security policy
+        """
+        logger.debug(f"AsyncSecureNeo4jGraph.query_with_summary() called with: {query[:100]}...")
+
+        # SECURITY CHECK 1: Sanitization (injection + Unicode attacks)
+        if self.sanitizer_enabled:
+            is_safe, sanitize_error, warnings = sanitize_query(query, params)
+
+            if not is_safe:
+                error_msg = f"Query blocked by sanitizer: {sanitize_error}"
+                logger.warning(f"🔒 SECURITY: {error_msg}")
+                raise ValueError(error_msg)
+
+            # Log warnings (non-blocking)
+            if warnings:
+                for warning in warnings:
+                    logger.warning(f"Query sanitizer warning: {warning}")
+
+        # SECURITY CHECK 2: Complexity limiting (DoS protection)
+        if self.complexity_limit_enabled:
+            is_allowed, complexity_error, complexity_score = check_query_complexity(query)
+
+            if not is_allowed:
+                error_msg = f"Query blocked by complexity limiter: {complexity_error}"
+                logger.warning(f"🔒 SECURITY: {error_msg}")
+                raise ValueError(error_msg)
+
+            # Log complexity warnings (non-blocking)
+            if complexity_score and complexity_score.warnings:
+                for warning in complexity_score.warnings:
+                    logger.info(f"Query complexity warning: {warning}")
+
+        # SECURITY CHECK 3: Read-only mode enforcement
+        if self.read_only_mode:
+            from neo4j_yass_mcp.security.validators import check_read_only_access
+
+            read_only_error = check_read_only_access(query, read_only_mode=True)
+
+            if read_only_error:
+                error_msg = f"Query blocked in read-only mode: {read_only_error}"
+                logger.warning(f"🔒 SECURITY: {error_msg}")
+                raise ValueError(error_msg)
+
+        # ALL SECURITY CHECKS PASSED - Execute query
+        logger.debug("All security checks passed, executing async query with summary")
+        return await super().query_with_summary(query, params, fetch_records=fetch_records)

@@ -67,12 +67,12 @@ Complete guide to all Neo4j YASS MCP documentation.
 - [docs/inprogress/QUERY_ANALYSIS_QUICK_REFERENCE.md](docs/inprogress/QUERY_ANALYSIS_QUICK_REFERENCE.md) - Quick reference card
 - [examples/query_analysis_examples.py](examples/query_analysis_examples.py) - Practical examples
 
-### 📦 Audit Reports
-- [docs/repo-arai/COMPREHENSIVE_AUDIT_REPORT_2025-11-08.md](docs/repo-arai/COMPREHENSIVE_AUDIT_REPORT_2025-11-08.md)
-- [docs/repo-arai/CONSOLIDATED_IMPLEMENTATION_PLAN.md](docs/repo-arai/CONSOLIDATED_IMPLEMENTATION_PLAN.md)
-- [docs/repo-arai/DOCKER_BEST_PRACTICES_VERIFICATION_2025-11-08.md](docs/repo-arai/DOCKER_BEST_PRACTICES_VERIFICATION_2025-11-08.md)
-- [docs/repo-arai/PYTHON_UPGRADE_REFACTORING_REPORT_2025-11-08.md](docs/repo-arai/PYTHON_UPGRADE_REFACTORING_REPORT_2025-11-08.md)
-- [docs/repo-arai/PHASE3_FINAL_REPORT.md](docs/repo-arai/PHASE3_FINAL_REPORT.md)
+### 📦 AI Analysis & Reviews (ARAI)
+- [docs/repo-arai/README.md](docs/repo-arai/README.md) - Index of AI-assisted analysis
+- [docs/repo-arai/FINAL_SUMMARY.md](docs/repo-arai/FINAL_SUMMARY.md) - Query plan analysis refactoring (v1.4.0)
+- [docs/repo-arai/SOFTWARE_ARCHITECTURE_DOCUMENT.md](docs/repo-arai/SOFTWARE_ARCHITECTURE_DOCUMENT.md) - System architecture
+- [docs/repo-arai/archive/](docs/repo-arai/archive/) - Historical audits and phase reports
+- [docs/repo-arai/llm-analysis/](docs/repo-arai/llm-analysis/) - AI architecture reviews
 
 ### 🗄️ Archive
 - [docs/archive/README.md](docs/archive/README.md) - Historical documentation
@@ -100,7 +100,7 @@ Complete guide to all Neo4j YASS MCP documentation.
 ### For DevOps/SRE
 1. [DOCKER.md](DOCKER.md) - Container deployment
 2. [.env.example](.env.example) - Configuration
-3. [docs/repo-arai/DOCKER_BEST_PRACTICES_VERIFICATION_2025-11-08.md](docs/repo-arai/DOCKER_BEST_PRACTICES_VERIFICATION_2025-11-08.md)
+3. [docs/repo-arai/archive/DOCKER_BEST_PRACTICES_VERIFICATION_2025-11-08.md](docs/repo-arai/archive/DOCKER_BEST_PRACTICES_VERIFICATION_2025-11-08.md)
 4. [verify-publication-ready.sh](verify-publication-ready.sh) - Pre-deployment checks
 
 ## Documentation Structure
@@ -148,10 +148,11 @@ neo4j-yass-mcp/
 │   │   ├── FEATURE_SUMMARY.md
 │   │   └── [feature proposals]
 │   │
-│   ├── repo-arai/                   # Audit reports
-│   │   ├── COMPREHENSIVE_AUDIT_REPORT_2025-11-08.md
-│   │   ├── CONSOLIDATED_IMPLEMENTATION_PLAN.md
-│   │   └── [phase reports]
+│   ├── repo-arai/                   # AI analysis & reviews
+│   │   ├── README.md                # ARAI index
+│   │   ├── FINAL_SUMMARY.md         # Current work summary
+│   │   ├── archive/                 # Historical audits
+│   │   └── llm-analysis/            # AI reviews
 │   │
 │   └── archive/                     # Historical docs
 │       ├── README.md
@@ -186,18 +187,22 @@ neo4j-yass-mcp/
 
 ## Recent Updates
 
-### 2025-11-09
-- ✅ Rate limiting refactored to decorator-based architecture
-- ✅ Documentation reorganized and cleaned up
-- ✅ Examples directory created with standalone demos
-- ✅ 417 tests passing, 84.84% coverage
-- ✅ Development docs moved to `docs/development/`
+### 2025-11-15
+- ✅ Query plan analysis refactoring complete (v1.4.0)
+- ✅ PROFILE mode safety guards implemented
+- ✅ Documentation cleanup and reorganization
+- ✅ All tests passing (519/519, 46.11% coverage for affected modules)
+- ✅ AI analysis directory (repo-arai) reorganized with proper index
+- ✅ Outdated planning documents archived
 
 ### Key Changes
-- **New**: `tool_wrappers.py` - Async-safe rate limiting
-- **New**: `examples/` - Standalone demonstrations
-- **Moved**: Development docs to `docs/development/`
-- **Archived**: Outdated coverage docs to `docs/archive/`
+- **Fixed**: QueryPlanAnalyzer now surfaces real Neo4j execution plans
+- **Fixed**: No unnecessary record materialization
+- **Fixed**: Sanitizer no longer blocks URLs in string literals
+- **Added**: PROFILE mode blocks write queries by default (safe by default)
+- **Updated**: All documentation aligned with implementation
+- **Organized**: `docs/repo-arai/` with archive/ and llm-analysis/ subdirectories
+- **Archived**: Outdated planning docs (ARCHITECTURE_REFACTORING_PLAN, etc.)
 
 ## Contributing to Documentation
 
@@ -213,5 +218,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 
-**Last Updated**: 2025-11-10
-**Status**: Current and comprehensive - Public release ready
+**Last Updated**: 2025-11-15
+**Status**: Current and comprehensive - v1.4.0

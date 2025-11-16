@@ -248,10 +248,12 @@ async def _execute_cypher_impl(
     """
     # Lazy imports to avoid circular dependencies
     from neo4j_yass_mcp.server import (
+        _config,
         _get_graph,
         sanitize_error_message,
         truncate_response,
     )
+    from neo4j_yass_mcp.tools.query_utils import inject_limit_clause, should_inject_limit
 
     # Phase 3.3: Use state accessor functions for bootstrap support
     current_graph = _get_graph()
@@ -268,6 +270,16 @@ async def _execute_cypher_impl(
         logger.info(f"Executing Cypher query: {cypher_query}")
 
         params = parameters or {}
+
+        # Auto-inject LIMIT to prevent resource exhaustion
+        limit_injected = False
+        original_query = cypher_query
+
+        if _config.neo4j.auto_inject_limit and should_inject_limit(cypher_query):
+            cypher_query, limit_injected = inject_limit_clause(
+                cypher_query,
+                max_rows=_config.neo4j.max_query_result_rows
+            )
 
         # Phase 4: Native async query execution (no asyncio.to_thread)
         # Security checks (sanitization, complexity, read-only) now handled by AsyncSecureNeo4jGraph
@@ -288,6 +300,17 @@ async def _execute_cypher_impl(
             "count": len(result) if isinstance(result, list) else 1,
             "success": True,
         }
+
+        # Add warning if LIMIT was auto-injected
+        if limit_injected:
+            response["limit_injected"] = True
+            response["max_rows"] = _config.neo4j.max_query_result_rows
+            response["warning"] = (
+                f"Query modified: LIMIT {_config.neo4j.max_query_result_rows} "
+                f"injected to prevent resource exhaustion. "
+                f"Add explicit LIMIT clause to control result size."
+            )
+            logger.info(f"LIMIT {_config.neo4j.max_query_result_rows} injected into query")
 
         if was_truncated:
             response["truncated"] = True
@@ -425,7 +448,8 @@ async def refresh_schema(ctx: Context | None = None) -> dict[str, Any]:
 # Decorator is applied in register_mcp_components() called from main()
 async def analyze_query_performance(
     query: str,
-    mode: str = "profile",
+    parameters: dict[str, Any] | None = None,
+    mode: str = "explain",
     include_recommendations: bool = True,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
@@ -436,8 +460,8 @@ async def analyze_query_performance(
     capabilities to identify performance bottlenecks and suggest optimizations.
 
     Analysis modes:
-    - "explain": Shows execution plan without running the query (faster)
-    - "profile": Shows execution plan with runtime statistics (more detailed)
+    - "explain": Shows execution plan without running the query (faster, safer - DEFAULT)
+    - "profile": Shows execution plan with runtime statistics (executes the query - use with caution)
 
     The analysis includes:
     - Performance bottleneck detection
@@ -450,7 +474,8 @@ async def analyze_query_performance(
 
     Args:
         query: The Cypher query to analyze
-        mode: Analysis mode - "explain" or "profile" (default: "profile")
+        parameters: Query parameters for parameterized Cypher queries (e.g., {"userId": 123, "name": "Alice"})
+        mode: Analysis mode - "explain" (safe, default) or "profile" (executes query)
         include_recommendations: Whether to include optimization recommendations (default: True)
 
     Returns:
@@ -462,8 +487,10 @@ async def analyze_query_performance(
         - analysis_summary: High-level summary of findings
 
     Examples:
-        - query: "MATCH (n:Person)-[:KNOWS]->(m:Person) RETURN n.name, m.name"
-        - query: "MATCH (n:Movie) WHERE n.rating > 8 RETURN n.title, n.rating"
+        - query: "MATCH (n:Person {id: $userId}) RETURN n.name"
+          parameters: {"userId": 123}
+        - query: "MATCH (n:Movie) WHERE n.rating > $minRating RETURN n.title"
+          parameters: {"minRating": 8.0}
         - mode: "explain" for quick plan analysis
         - mode: "profile" for detailed performance statistics
     """
@@ -496,6 +523,7 @@ async def analyze_query_performance(
         start_time = time.time()
         result = await analyzer.analyze_query(
             query=query,
+            parameters=parameters,
             mode=mode,
             include_recommendations=include_recommendations,
             include_cost_estimate=True,

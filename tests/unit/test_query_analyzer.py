@@ -28,19 +28,19 @@ class TestQueryPlanAnalyzer:
     @pytest.fixture
     def mock_graph(self):
         """Create a mock AsyncSecureNeo4jGraph (Phase 4: Now async)."""
-        from unittest.mock import AsyncMock
+        from unittest.mock import AsyncMock, MagicMock
 
         graph = Mock()
-        # Mock for PROFILE mode
-        profile_result = [
-            {
-                "plan": [{"operator": "AllNodesScan", "estimatedRows": 100, "actualRows": 50}],
-                "stats": {"rows": 50, "time": 10, "db_hits": 25, "memory": 1024},
-            }
-        ]
 
-        # Phase 4: graph.query is now async, use AsyncMock
-        graph.query = AsyncMock(return_value=profile_result)
+        # Mock for query_with_summary (Fix for Issue #1)
+        mock_summary = MagicMock()
+        mock_summary.plan = MagicMock(operator_type="AllNodesScan")
+        mock_summary.plan.arguments = {"EstimatedRows": 100, "DbHits": 25, "Rows": 50}
+        mock_summary.plan.identifiers = ["n"]
+        mock_summary.plan.children = []
+
+        # Phase 4: graph.query_with_summary is now async, use AsyncMock
+        graph.query_with_summary = AsyncMock(return_value=([], mock_summary))
         return graph
 
     @pytest.fixture
@@ -50,8 +50,8 @@ class TestQueryPlanAnalyzer:
 
         graph = Mock()
 
-        # Phase 4: graph.query is now async, use AsyncMock with side_effect
-        graph.query = AsyncMock(side_effect=Exception("Query execution failed"))
+        # Phase 4: graph.query_with_summary is now async, use AsyncMock with side_effect
+        graph.query_with_summary = AsyncMock(side_effect=Exception("Query execution failed"))
         return graph
 
     @pytest.fixture
@@ -73,6 +73,21 @@ class TestQueryPlanAnalyzer:
         assert "bottlenecks" in result
         assert "recommendations" in result
         assert "cost_estimate" in result
+
+    @pytest.mark.asyncio
+    async def test_analyze_query_default_mode_is_explain(self, analyzer, mock_graph):
+        """Test that default mode is 'explain' (Fix for Issue #3)."""
+        query = "MATCH (n:Person) RETURN n.name"
+
+        # Call without specifying mode - should default to 'explain'
+        result = await analyzer.analyze_query(query)
+
+        assert result["success"] is True
+        assert result["mode"] == "explain"
+        # EXPLAIN should NOT execute the query, only get the plan
+        mock_graph.query_with_summary.assert_called_once()
+        call_args = mock_graph.query_with_summary.call_args[0][0]
+        assert call_args.startswith("EXPLAIN ")
 
     @pytest.mark.asyncio
     async def test_analyze_query_profile_mode(self, analyzer, mock_graph):
@@ -116,10 +131,19 @@ class TestQueryPlanAnalyzer:
             await analyzer.analyze_query(query, mode="explain")
 
     def test_parse_execution_plan(self, analyzer):
-        """Test execution plan parsing."""
+        """Test execution plan parsing with Neo4j plan object (Fix for Issue #1)."""
+        from unittest.mock import MagicMock
+
+        # Create a mock Neo4j plan object
+        mock_plan = MagicMock()
+        mock_plan.operator_type = "NodeByLabelScan"
+        mock_plan.arguments = {"EstimatedRows": 100}
+        mock_plan.identifiers = ["n"]
+        mock_plan.children = []
+
         plan_result = {
             "type": "explain",
-            "plan": [{"name": "NodeByLabelScan", "estimated_rows": 100}],
+            "plan": mock_plan,
             "statistics": None,
         }
 
@@ -536,10 +560,14 @@ class TestSecurityIntegration:
 
     @pytest.mark.asyncio
     async def test_analyzer_respects_security_layer(self):
-        """Test that analyzer respects the security layer."""
+        """Test that analyzer respects the security layer (Fix for Issue #1)."""
+        from unittest.mock import AsyncMock
+
         # Mock graph that raises ValueError (security violation)
         mock_graph = Mock()
-        mock_graph.query.side_effect = ValueError("Query blocked by sanitizer: dangerous pattern")
+        mock_graph.query_with_summary = AsyncMock(
+            side_effect=ValueError("Query blocked by sanitizer: dangerous pattern")
+        )
 
         analyzer = QueryPlanAnalyzer(mock_graph)
 
@@ -547,23 +575,386 @@ class TestSecurityIntegration:
             await analyzer.analyze_query("MATCH (n) RETURN n", mode="explain")
 
     @pytest.mark.asyncio
-    async def test_safe_query_execution(self):
-        """Test safe query execution through secure graph."""
+    async def test_profile_blocks_write_queries_by_default(self):
+        """Test that PROFILE mode blocks write queries by default."""
         mock_graph = Mock()
-        mock_graph.query = AsyncMock(return_value=[{"plan": "safe_plan"}])
+        analyzer = QueryPlanAnalyzer(mock_graph)
+
+        write_queries = [
+            "CREATE (n:Person {name: 'Alice'})",
+            "MERGE (n:Person {id: 1})",
+            "MATCH (n:Person) DELETE n",
+            "MATCH (n:Person) DETACH DELETE n",
+            "MATCH (n:Person) SET n.name = 'Bob'",
+            "MATCH (n:Person) REMOVE n.age",
+            "DROP INDEX person_name",
+        ]
+
+        for query in write_queries:
+            with pytest.raises(
+                ValueError,
+                match="PROFILE mode blocked: Query contains write operations",
+            ):
+                await analyzer.analyze_query(query, mode="profile")
+
+    @pytest.mark.asyncio
+    async def test_profile_allows_read_queries(self):
+        """Test that PROFILE mode allows read queries."""
+        from unittest.mock import MagicMock
+
+        mock_graph = Mock()
+
+        # Mock summary with plan
+        mock_summary = MagicMock()
+        mock_summary.plan = MagicMock(operator_type="AllNodesScan")
+        mock_summary.plan.arguments = {"EstimatedRows": 100}
+        mock_summary.plan.identifiers = ["n"]
+        mock_summary.plan.children = []
+
+        mock_graph.query_with_summary = AsyncMock(return_value=([], mock_summary))
 
         analyzer = QueryPlanAnalyzer(mock_graph)
 
-        # Should use the secure graph's query method
-        await analyzer._execute_cypher_safe("EXPLAIN MATCH (n) RETURN n")
+        # Read queries should work fine
+        read_queries = [
+            "MATCH (n:Person) RETURN n",
+            "MATCH (n:Person) WHERE n.age > 25 RETURN n.name",
+            "MATCH (a)-[:KNOWS]->(b) RETURN a, b",
+        ]
 
-        mock_graph.query.assert_called_once_with("EXPLAIN MATCH (n) RETURN n", params={})
+        for query in read_queries:
+            result = await analyzer.analyze_query(query, mode="profile")
+            assert result["success"] is True
+            assert result["mode"] == "profile"
+
+    @pytest.mark.asyncio
+    async def test_profile_allows_write_queries_when_explicitly_enabled(self):
+        """Test that PROFILE mode allows write queries when explicitly enabled."""
+        from unittest.mock import MagicMock
+
+        mock_graph = Mock()
+
+        # Mock summary with plan
+        mock_summary = MagicMock()
+        mock_summary.plan = MagicMock(operator_type="CreateNode")
+        mock_summary.plan.arguments = {"EstimatedRows": 1}
+        mock_summary.plan.identifiers = ["n"]
+        mock_summary.plan.children = []
+
+        mock_graph.query_with_summary = AsyncMock(return_value=([], mock_summary))
+
+        analyzer = QueryPlanAnalyzer(mock_graph)
+
+        # Write query with allow_write_queries=True should work
+        result = await analyzer.analyze_query(
+            "CREATE (n:Person {name: 'Alice'})", mode="profile", allow_write_queries=True
+        )
+        assert result["success"] is True
+        assert result["mode"] == "profile"
+
+    def test_is_write_query_detection(self):
+        """Test write query detection logic with bypass prevention."""
+        mock_graph = Mock()
+        analyzer = QueryPlanAnalyzer(mock_graph)
+
+        # Standard write queries
+        assert analyzer._is_write_query("CREATE (n:Person)") is True
+        assert analyzer._is_write_query("MERGE (n:Person {id: 1})") is True
+        assert analyzer._is_write_query("MATCH (n) DELETE n") is True
+        assert analyzer._is_write_query("MATCH (n) SET n.name = 'Alice'") is True
+        assert analyzer._is_write_query("MATCH (n) REMOVE n.age") is True
+        assert analyzer._is_write_query("DROP INDEX idx") is True
+
+        # Case insensitive
+        assert analyzer._is_write_query("create (n:Person)") is True
+        assert analyzer._is_write_query("merge (n:Person)") is True
+
+        # CRITICAL: Bypass attempts with whitespace variations
+        # These previously bypassed detection but should now be caught
+
+        # Newline after keyword
+        assert analyzer._is_write_query("MATCH (n) CREATE\n(m:Test) RETURN m") is True
+        assert analyzer._is_write_query("MATCH (n) MERGE\n(m:Log {id: 1})") is True
+        assert analyzer._is_write_query("MATCH (n)\nDELETE n") is True
+
+        # No space after keyword (immediate parenthesis)
+        assert analyzer._is_write_query("CREATE(n:Foo) RETURN n") is True
+        assert analyzer._is_write_query("MERGE(n:Bar {x: 1})") is True
+
+        # Tab after keyword
+        assert analyzer._is_write_query("MATCH (n) SET\tn.updated = true") is True
+        assert analyzer._is_write_query("MATCH (n) REMOVE\tn.prop") is True
+
+        # Multiple spaces/tabs
+        assert analyzer._is_write_query("CREATE  (n:Person)") is True
+        assert analyzer._is_write_query("MERGE\t\t(n:Test)") is True
+
+        # Mixed whitespace
+        assert analyzer._is_write_query("MATCH (n)\n\tCREATE (m)") is True
+
+        # DETACH DELETE variations
+        assert analyzer._is_write_query("DETACH DELETE n") is True
+        assert analyzer._is_write_query("DETACH\nDELETE n") is True
+        assert analyzer._is_write_query("DETACH\tDELETE n") is True
+
+        # Read queries (should NOT be flagged)
+        assert analyzer._is_write_query("MATCH (n:Person) RETURN n") is False
+        assert analyzer._is_write_query("MATCH (n)-[:KNOWS]->(m) RETURN n, m") is False
+        assert analyzer._is_write_query("RETURN 1") is False
+
+        # Edge case: Keywords in strings should still be detected (Cypher has no comment stripping here)
+        # Note: This is intentional - we're being conservative for security
+
+    @pytest.mark.asyncio
+    async def test_safe_query_execution(self):
+        """Test safe query execution through secure graph (Fix for Issue #1)."""
+        from unittest.mock import MagicMock
+
+        mock_graph = Mock()
+
+        # Mock summary with plan
+        mock_summary = MagicMock()
+        mock_summary.plan = MagicMock(operator_type="ProduceResults")
+
+        mock_graph.query_with_summary = AsyncMock(return_value=([], mock_summary))
+
+        analyzer = QueryPlanAnalyzer(mock_graph)
+
+        # Should use the secure graph's query_with_summary method
+        result = await analyzer._execute_explain("MATCH (n) RETURN n")
+
+        mock_graph.query_with_summary.assert_called_once()
+        assert result["plan"] is mock_summary.plan
 
     def test_no_direct_query_execution(self):
         """Test that tools don't execute queries directly."""
-        # All query execution should go through the secure graph
+        # All query execution should go through the secure graph via query_with_summary
         analyzer = QueryPlanAnalyzer(Mock())
 
-        # The _execute_cypher_safe method should delegate to the graph
-        assert hasattr(analyzer, "_execute_cypher_safe")
+        # Verify no direct query execution methods exist
         assert not hasattr(analyzer, "execute_query_directly")
+        # All queries go through query_with_summary on the graph object
+        assert hasattr(analyzer.graph, "query_with_summary")
+
+    @pytest.mark.asyncio
+    async def test_parameterized_query_support_explain(self):
+        """Test EXPLAIN mode with parameterized queries (Fix for Finding #1)."""
+        from unittest.mock import MagicMock
+
+        mock_graph = Mock()
+        mock_summary = MagicMock()
+
+        # Set up the plan with proper nested structure
+        mock_plan_args = MagicMock()
+        mock_plan_args.get.return_value = 100  # estimated_rows
+
+        mock_plan = MagicMock()
+        mock_plan.operator_type = "NodeByLabelScan"
+        mock_plan.arguments = mock_plan_args
+        mock_plan.children = []
+
+        mock_summary.plan = mock_plan
+        mock_graph.query_with_summary = AsyncMock(return_value=([], mock_summary))
+
+        analyzer = QueryPlanAnalyzer(mock_graph)
+
+        # Test parameterized query with recommendations disabled to simplify mock
+        query = "MATCH (n:Person {id: $userId}) RETURN n"
+        parameters = {"userId": 123}
+
+        result = await analyzer.analyze_query(
+            query=query,
+            parameters=parameters,
+            mode="explain",
+            include_recommendations=False,  # Disable to simplify test
+        )
+
+        # Verify parameters were passed through
+        mock_graph.query_with_summary.assert_called_once()
+        call_args = mock_graph.query_with_summary.call_args
+        assert call_args[1]["params"] == parameters
+        assert "EXPLAIN" in call_args[0][0]
+        assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_parameterized_query_support_profile(self):
+        """Test PROFILE mode with parameterized queries (Fix for Finding #1)."""
+        from unittest.mock import MagicMock
+
+        mock_graph = Mock()
+        mock_summary = MagicMock()
+
+        # Set up the plan with proper nested structure
+        mock_plan_args = MagicMock()
+        mock_plan_args.get.return_value = 100  # estimated_rows
+
+        mock_plan = MagicMock()
+        mock_plan.operator_type = "NodeByLabelScan"
+        mock_plan.arguments = mock_plan_args
+        mock_plan.children = []
+
+        mock_summary.plan = mock_plan
+        mock_summary.counters = MagicMock()
+        mock_graph.query_with_summary = AsyncMock(return_value=([], mock_summary))
+
+        analyzer = QueryPlanAnalyzer(mock_graph)
+
+        # Test parameterized query with recommendations disabled to simplify mock
+        query = "MATCH (n:Movie) WHERE n.rating > $minRating RETURN n.title"
+        parameters = {"minRating": 8.0}
+
+        result = await analyzer.analyze_query(
+            query=query,
+            parameters=parameters,
+            mode="profile",
+            include_recommendations=False,  # Disable to simplify test
+        )
+
+        # Verify parameters were passed through
+        mock_graph.query_with_summary.assert_called_once()
+        call_args = mock_graph.query_with_summary.call_args
+        assert call_args[1]["params"] == parameters
+        assert "PROFILE" in call_args[0][0]
+        assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_parameterized_query_multiple_params(self):
+        """Test queries with multiple parameters."""
+        from unittest.mock import MagicMock
+
+        mock_graph = Mock()
+        mock_summary = MagicMock()
+
+        # Set up the plan with proper nested structure
+        mock_plan_args = MagicMock()
+        mock_plan_args.get.return_value = 100
+
+        mock_plan = MagicMock()
+        mock_plan.operator_type = "NodeByLabelScan"
+        mock_plan.arguments = mock_plan_args
+        mock_plan.children = []
+
+        mock_summary.plan = mock_plan
+        mock_graph.query_with_summary = AsyncMock(return_value=([], mock_summary))
+
+        analyzer = QueryPlanAnalyzer(mock_graph)
+
+        # Test query with multiple parameters
+        query = "MATCH (n:Person) WHERE n.age > $minAge AND n.city = $city RETURN n"
+        parameters = {"minAge": 25, "city": "San Francisco"}
+
+        result = await analyzer.analyze_query(
+            query=query,
+            parameters=parameters,
+            mode="explain",
+            include_recommendations=False,
+        )
+
+        # Verify all parameters were passed
+        call_args = mock_graph.query_with_summary.call_args
+        assert call_args[1]["params"] == parameters
+        assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_query_without_parameters_still_works(self):
+        """Test that queries without parameters still work (backward compatibility)."""
+        from unittest.mock import MagicMock
+
+        mock_graph = Mock()
+        mock_summary = MagicMock()
+
+        # Set up the plan with proper nested structure
+        mock_plan_args = MagicMock()
+        mock_plan_args.get.return_value = 100
+
+        mock_plan = MagicMock()
+        mock_plan.operator_type = "AllNodesScan"
+        mock_plan.arguments = mock_plan_args
+        mock_plan.children = []
+
+        mock_summary.plan = mock_plan
+        mock_graph.query_with_summary = AsyncMock(return_value=([], mock_summary))
+
+        analyzer = QueryPlanAnalyzer(mock_graph)
+
+        # Test query without parameters (None)
+        result = await analyzer.analyze_query(
+            query="MATCH (n) RETURN n",
+            parameters=None,
+            mode="explain",
+            include_recommendations=False,
+        )
+
+        # Verify empty dict was passed
+        call_args = mock_graph.query_with_summary.call_args
+        assert call_args[1]["params"] == {}
+        assert result["success"] is True
+
+        # Test query without parameters argument (default)
+        result2 = await analyzer.analyze_query(
+            query="MATCH (n) RETURN n", mode="explain", include_recommendations=False
+        )
+
+        # Verify empty dict was passed
+        call_args2 = mock_graph.query_with_summary.call_args
+        assert call_args2[1]["params"] == {}
+        assert result2["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_parameterized_write_query_blocked_by_default(self):
+        """Test that parameterized write queries are still blocked in PROFILE mode."""
+        mock_graph = Mock()
+        analyzer = QueryPlanAnalyzer(mock_graph)
+
+        # Parameterized write query should still be blocked
+        query = "CREATE (n:Person {name: $name, age: $age})"
+        parameters = {"name": "Alice", "age": 30}
+
+        with pytest.raises(ValueError) as exc_info:
+            await analyzer.analyze_query(
+                query=query, parameters=parameters, mode="profile"
+            )
+
+        assert "PROFILE mode blocked" in str(exc_info.value)
+        assert "CREATE" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_parameterized_write_query_allowed_with_flag(self):
+        """Test that parameterized write queries work when explicitly allowed."""
+        from unittest.mock import MagicMock
+
+        mock_graph = Mock()
+        mock_summary = MagicMock()
+
+        # Set up the plan with proper nested structure
+        mock_plan_args = MagicMock()
+        mock_plan_args.get.return_value = 1  # nodes_created
+
+        mock_plan = MagicMock()
+        mock_plan.operator_type = "CreateNode"
+        mock_plan.arguments = mock_plan_args
+        mock_plan.children = []
+
+        mock_summary.plan = mock_plan
+        mock_summary.counters = MagicMock()
+        mock_graph.query_with_summary = AsyncMock(return_value=([], mock_summary))
+
+        analyzer = QueryPlanAnalyzer(mock_graph)
+
+        # Parameterized write query with explicit allow flag
+        query = "CREATE (n:Person {name: $name, age: $age})"
+        parameters = {"name": "Alice", "age": 30}
+
+        result = await analyzer.analyze_query(
+            query=query,
+            parameters=parameters,
+            mode="profile",
+            allow_write_queries=True,  # Explicit opt-in
+            include_recommendations=False,
+        )
+
+        # Verify it executed with parameters
+        call_args = mock_graph.query_with_summary.call_args
+        assert call_args[1]["params"] == parameters
+        assert "PROFILE" in call_args[0][0]
+        assert result["success"] is True

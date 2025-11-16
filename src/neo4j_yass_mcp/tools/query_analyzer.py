@@ -48,33 +48,37 @@ class QueryPlanAnalyzer:
     async def analyze_query(
         self,
         query: str,
-        mode: str = "profile",
+        parameters: dict[str, Any] | None = None,
+        mode: str = "explain",
         include_recommendations: bool = True,
         include_cost_estimate: bool = True,
+        allow_write_queries: bool = False,
     ) -> dict[str, Any]:
         """
         Analyze a Cypher query and provide performance insights.
 
         Args:
             query: The Cypher query to analyze
-            mode: Analysis mode - "explain" for plan only, "profile" for plan + stats
+            parameters: Query parameters for parameterized Cypher queries (e.g., {"userId": 123})
+            mode: Analysis mode - "explain" (safe, default) or "profile" (executes query)
             include_recommendations: Whether to include optimization recommendations
             include_cost_estimate: Whether to include cost estimation
+            allow_write_queries: Whether to allow PROFILE on write queries (default: False)
 
         Returns:
             Dictionary containing analysis results, bottlenecks, and recommendations
 
         Raises:
-            ValueError: If query is invalid or analysis fails
+            ValueError: If query is invalid, contains writes in PROFILE mode, or analysis fails
         """
         logger.info(f"Starting query analysis in {mode} mode: {query[:100]}...")
 
         try:
             # Step 1: Get execution plan
             if mode.lower() == "explain":
-                plan_result = await self._execute_explain(query)
+                plan_result = await self._execute_explain(query, parameters)
             elif mode.lower() == "profile":
-                plan_result = await self._execute_profile(query)
+                plan_result = await self._execute_profile(query, parameters, allow_write_queries)
             else:
                 raise ValueError(f"Invalid analysis mode: {mode}. Use 'explain' or 'profile'")
 
@@ -121,67 +125,151 @@ class QueryPlanAnalyzer:
             logger.error(f"Query analysis failed: {str(e)}", exc_info=True)
             raise ValueError(f"Query analysis failed: {str(e)}") from e
 
-    async def _execute_explain(self, query: str) -> dict[str, Any]:
-        """Execute EXPLAIN to get execution plan without running the query."""
+    async def _execute_explain(
+        self, query: str, parameters: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """
+        Execute EXPLAIN to get execution plan without running the query.
+
+        Args:
+            query: The Cypher query to explain
+            parameters: Query parameters for parameterized queries (default: None)
+
+        Returns:
+            Dictionary containing:
+            - type: "explain"
+            - plan: Neo4j execution plan object
+            - records: Always empty list (EXPLAIN queries don't materialize records)
+            - statistics: None (EXPLAIN doesn't provide runtime stats)
+        """
         explain_query = f"EXPLAIN {query}"
         logger.debug("Executing EXPLAIN for query analysis")
 
         try:
-            # Use the secure graph to execute the explain query
-            result = await self._execute_cypher_safe(explain_query)
+            # Use query_with_summary to get the actual execution plan from Neo4j
+            # fetch_records=False avoids materializing result rows (we only need the plan)
+            records, summary = await self.graph.query_with_summary(
+                explain_query, params=parameters or {}, fetch_records=False
+            )
+
+            # Extract the plan from the summary
+            plan = summary.plan if hasattr(summary, "plan") else None
+
             return {
                 "type": "explain",
-                "plan": result,
+                "plan": plan,
+                "records": records,  # Always [] when fetch_records=False
                 "statistics": None,  # EXPLAIN doesn't provide runtime stats
             }
         except Exception as e:
             logger.error(f"EXPLAIN execution failed: {str(e)}")
             raise ValueError(f"Failed to execute EXPLAIN: {str(e)}") from e
 
-    async def _execute_profile(self, query: str) -> dict[str, Any]:
-        """Execute PROFILE to get execution plan with runtime statistics."""
+    def _is_write_query(self, query: str) -> bool:
+        """
+        Detect if a query contains write operations.
+
+        Uses regex with word boundaries to catch all whitespace variations
+        (spaces, tabs, newlines) and prevent bypass attacks.
+
+        Args:
+            query: The Cypher query to check
+
+        Returns:
+            True if query contains write operations, False otherwise
+        """
+        import re
+
+        # Write operation keywords with word boundaries
+        # \b ensures we match whole words regardless of surrounding whitespace
+        write_patterns = [
+            r'\bCREATE\b',
+            r'\bMERGE\b',
+            r'\bDELETE\b',
+            r'\bDETACH\s+DELETE\b',
+            r'\bSET\b',
+            r'\bREMOVE\b',
+            r'\bDROP\b',
+        ]
+
+        # Check each pattern with case-insensitive regex
+        for pattern in write_patterns:
+            if re.search(pattern, query, re.IGNORECASE):
+                return True
+
+        return False
+
+    async def _execute_profile(
+        self,
+        query: str,
+        parameters: dict[str, Any] | None = None,
+        allow_write_queries: bool = False,
+    ) -> dict[str, Any]:
+        """
+        Execute PROFILE to get execution plan with runtime statistics.
+
+        IMPORTANT: PROFILE executes the query to gather runtime statistics.
+        By default, write queries (CREATE/MERGE/DELETE/SET) are blocked unless
+        explicitly allowed via allow_write_queries=True.
+
+        Args:
+            query: The Cypher query to profile
+            parameters: Query parameters for parameterized queries (default: None)
+            allow_write_queries: Whether to allow profiling of write queries (default: False)
+
+        Returns:
+            Dictionary containing:
+            - type: "profile"
+            - plan: Neo4j execution plan object with runtime info
+            - records: Always empty list (we don't materialize query results, only plan stats)
+            - statistics: Runtime statistics (db_hits, time, memory, etc.)
+
+        Raises:
+            ValueError: If query is a write query and allow_write_queries=False
+        """
+        # Safety check: Block write queries unless explicitly allowed
+        if not allow_write_queries and self._is_write_query(query):
+            logger.warning(
+                f"PROFILE blocked: Query contains write operations. "
+                f"Use EXPLAIN for safe analysis or set allow_write_queries=True to override."
+            )
+            raise ValueError(
+                "PROFILE mode blocked: Query contains write operations (CREATE/MERGE/DELETE/SET/REMOVE/DROP). "
+                "Use EXPLAIN mode for safe analysis, or explicitly allow write queries if intentional."
+            )
+
         profile_query = f"PROFILE {query}"
         logger.debug("Executing PROFILE for query analysis")
 
         try:
-            # Use the secure graph to execute the profile query
-            result = await self._execute_cypher_safe(profile_query)
+            # Use query_with_summary to get the actual execution plan and statistics from Neo4j
+            # fetch_records=False avoids materializing result rows (we only need plan + stats)
+            records, summary = await self.graph.query_with_summary(
+                profile_query, params=parameters or {}, fetch_records=False
+            )
 
-            # Extract statistics from PROFILE output
-            statistics = self._extract_profile_statistics(result)
+            # Extract the plan from the summary
+            plan = summary.plan if hasattr(summary, "plan") else None
 
-            return {"type": "profile", "plan": result, "statistics": statistics}
+            # Extract statistics from the summary
+            statistics = self._extract_profile_statistics_from_summary(summary)
+
+            return {
+                "type": "profile",
+                "plan": plan,
+                "records": records,  # Always [] when fetch_records=False
+                "statistics": statistics,
+            }
         except Exception as e:
             logger.error(f"PROFILE execution failed: {str(e)}")
             raise ValueError(f"Failed to execute PROFILE: {str(e)}") from e
-
-    async def _execute_cypher_safe(
-        self, query: str, parameters: dict | None = None
-    ) -> list[dict[str, Any]]:
-        """
-        Safely execute a Cypher query using the async secure graph.
-
-        Args:
-            query: Cypher query to execute
-            parameters: Optional query parameters
-
-        Returns:
-            Query results
-        """
-        # Phase 4: Native async query execution (graph.query is now async)
-        # ✅ NATIVE ASYNC - NO sync wrapper!
-        result = await self.graph.query(query, params=parameters or {})
-        # Cast to expected return type - graph.query should return list[dict[str, Any]]
-        from typing import cast
-
-        return cast(list[dict[str, Any]], result)
 
     def _parse_execution_plan(self, plan_result: dict[str, Any]) -> dict[str, Any]:
         """
         Parse and normalize the execution plan from Neo4j.
 
         Args:
-            plan_result: Raw result from EXPLAIN/PROFILE
+            plan_result: Raw result from EXPLAIN/PROFILE containing the Neo4j plan object
 
         Returns:
             Normalized execution plan structure
@@ -189,11 +277,11 @@ class QueryPlanAnalyzer:
         logger.debug("Parsing execution plan")
 
         try:
-            # Extract plan information from the result
-            plan_data = plan_result.get("plan", [])
+            # Extract the actual Neo4j plan object
+            plan_obj = plan_result.get("plan")
 
             parsed_plan = {
-                "type": plan_result.get("type", "unknown"),  # Preserve type from original result
+                "type": plan_result.get("type", "unknown"),
                 "operators": [],
                 "estimated_rows": 0,
                 "estimated_cost": 0,
@@ -201,27 +289,28 @@ class QueryPlanAnalyzer:
                 "root_operator": None,
             }
 
-            if plan_data and isinstance(plan_data, list):
-                # Parse each operator in the plan
-                for operator_data in plan_data:
-                    operator = self._parse_operator(operator_data)
-                    if operator:
-                        parsed_plan["operators"].append(operator)
+            if plan_obj:
+                # Parse the Neo4j plan object recursively
+                root_operator = self._parse_neo4j_plan_node(plan_obj)
+                if root_operator:
+                    parsed_plan["root_operator"] = root_operator
+                    # Flatten the plan tree into a list of operators
+                    parsed_plan["operators"] = self._flatten_plan_tree(root_operator)
 
-                # Identify root operator (usually the first one)
-                if parsed_plan["operators"]:
-                    parsed_plan["root_operator"] = parsed_plan["operators"][0]
+                # Extract plan-level metadata
+                if hasattr(plan_obj, "arguments"):
+                    args = plan_obj.arguments
+                    parsed_plan["estimated_rows"] = args.get("EstimatedRows", 0)
+                    parsed_plan["estimated_cost"] = args.get("EstimatedCost", 0)
 
             # Extract statistics if available (PROFILE mode)
             if plan_result.get("statistics"):
                 stats = plan_result["statistics"]
-                # Preserve original statistics structure
                 parsed_plan["statistics"] = stats
-                # Also add individual fields for easy access
                 parsed_plan.update(
                     {
                         "actual_rows": stats.get("rows", 0),
-                        "actual_time_ms": stats.get("time", 0),
+                        "actual_time_ms": stats.get("time_ms", 0),
                         "db_hits": stats.get("db_hits", 0),
                         "memory_usage": stats.get("memory", 0),
                     }
@@ -268,9 +357,142 @@ class QueryPlanAnalyzer:
 
         return None
 
+    def _parse_neo4j_plan_node(self, plan_node: Any) -> dict[str, Any] | None:
+        """
+        Parse a Neo4j plan node object into a normalized dictionary.
+
+        Args:
+            plan_node: Neo4j plan node object from summary.plan
+
+        Returns:
+            Normalized operator information
+        """
+        if not plan_node:
+            return None
+
+        try:
+            operator = {
+                "name": getattr(plan_node, "operator_type", "Unknown"),
+                "arguments": dict(getattr(plan_node, "arguments", {})),
+                "identifiers": list(getattr(plan_node, "identifiers", [])),
+                "estimated_rows": getattr(plan_node, "arguments", {}).get("EstimatedRows", 0),
+                "db_hits": getattr(plan_node, "arguments", {}).get("DbHits", 0),
+                "rows": getattr(plan_node, "arguments", {}).get("Rows", 0),
+                "children": [],
+            }
+
+            # Recursively parse child nodes
+            children = getattr(plan_node, "children", [])
+            if children:
+                for child in children:
+                    child_op = self._parse_neo4j_plan_node(child)
+                    if child_op:
+                        operator["children"].append(child_op)
+
+            return operator
+
+        except Exception as e:
+            logger.warning(f"Failed to parse plan node: {str(e)}")
+            return None
+
+    def _flatten_plan_tree(self, root: dict[str, Any]) -> list[dict[str, Any]]:
+        """
+        Flatten a plan tree into a list of operators.
+
+        Args:
+            root: Root operator of the plan tree
+
+        Returns:
+            List of all operators in the plan
+        """
+        operators = [root]
+        for child in root.get("children", []):
+            operators.extend(self._flatten_plan_tree(child))
+        return operators
+
+    def _extract_profile_statistics_from_summary(self, summary: Any) -> dict[str, Any]:
+        """
+        Extract runtime statistics from Neo4j result summary.
+
+        Args:
+            summary: Neo4j ResultSummary object from PROFILE query
+
+        Returns:
+            Extracted statistics
+        """
+        statistics: dict[str, float] = {"rows": 0.0, "time_ms": 0.0, "db_hits": 0.0, "memory": 0.0}
+
+        try:
+            # Extract counters from the summary
+            if hasattr(summary, "counters"):
+                counters = summary.counters
+                # Note: counters contains update statistics, not query performance stats
+
+            # Extract profile information from the plan
+            if hasattr(summary, "plan"):
+                plan = summary.plan
+                # Recursively collect statistics from the plan tree
+                statistics = self._collect_plan_statistics(plan)
+
+            # Extract result metadata
+            if hasattr(summary, "result_available_after"):
+                statistics["result_available_after_ms"] = summary.result_available_after
+
+            if hasattr(summary, "result_consumed_after"):
+                statistics["result_consumed_after_ms"] = summary.result_consumed_after
+
+            return statistics
+
+        except Exception as e:
+            logger.warning(f"Failed to extract profile statistics from summary: {str(e)}")
+            return statistics
+
+    def _collect_plan_statistics(self, plan_node: Any) -> dict[str, float]:
+        """
+        Recursively collect statistics from a plan tree.
+
+        Args:
+            plan_node: Neo4j plan node object
+
+        Returns:
+            Aggregated statistics
+        """
+        stats: dict[str, float] = {"rows": 0.0, "time_ms": 0.0, "db_hits": 0.0, "memory": 0.0}
+
+        if not plan_node:
+            return stats
+
+        try:
+            # Extract statistics from this node's arguments
+            args = getattr(plan_node, "arguments", {})
+
+            if "Rows" in args:
+                stats["rows"] = float(args["Rows"])
+            if "DbHits" in args:
+                stats["db_hits"] = float(args["DbHits"])
+            if "Time" in args:
+                stats["time_ms"] = float(args["Time"])
+            if "Memory" in args:
+                stats["memory"] = float(args["Memory"])
+
+            # Recursively collect from children (accumulate db_hits, max rows)
+            children = getattr(plan_node, "children", [])
+            for child in children:
+                child_stats = self._collect_plan_statistics(child)
+                stats["db_hits"] += child_stats["db_hits"]
+                stats["time_ms"] = max(stats["time_ms"], child_stats["time_ms"])
+                # For memory, we want the peak across the tree
+                stats["memory"] = max(stats["memory"], child_stats["memory"])
+
+            return stats
+
+        except Exception as e:
+            logger.warning(f"Failed to collect statistics from plan node: {str(e)}")
+            return stats
+
     def _extract_profile_statistics(self, result: list[dict[str, Any]]) -> dict[str, Any]:
         """
-        Extract runtime statistics from PROFILE results.
+        Extract runtime statistics from PROFILE results (legacy method, kept for compatibility).
 
         Args:
             result: PROFILE query results

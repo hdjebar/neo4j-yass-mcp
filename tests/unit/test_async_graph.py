@@ -210,6 +210,56 @@ class TestAsyncNeo4jGraph:
             # Verify driver was closed on exit
             mock_driver.close.assert_called_once()
 
+    @pytest.mark.asyncio
+    async def test_query_with_summary(self, mock_driver, mock_session):
+        """Test query_with_summary method for accessing execution plans (Fix for Issue #1)."""
+        with patch("neo4j_yass_mcp.async_graph.AsyncGraphDatabase.driver") as mock_db:
+            mock_db.return_value = mock_driver
+            mock_driver.session.return_value = mock_session
+
+            # Mock query result and summary
+            mock_result = AsyncMock()
+            mock_result.data = AsyncMock(return_value=[{"name": "Alice"}])
+
+            # Mock summary with plan
+            mock_summary = MagicMock()
+            mock_summary.plan = MagicMock(operator_type="ProduceResults")
+            mock_result.consume = AsyncMock(return_value=mock_summary)
+
+            mock_session.run = AsyncMock(return_value=mock_result)
+
+            graph = AsyncNeo4jGraph(
+                url="bolt://localhost:7687", username="neo4j", password="password"
+            )
+
+            # Test without fetch_records (default) - should return empty records
+            records, summary = await graph.query_with_summary("EXPLAIN MATCH (n:Person) RETURN n.name")
+
+            assert len(records) == 0  # No records fetched by default
+            assert summary is mock_summary
+            assert summary.plan.operator_type == "ProduceResults"
+
+            # Verify data() was NOT called, but consume() was
+            mock_result.data.assert_not_called()
+            mock_result.consume.assert_called_once()
+
+            # Reset mocks
+            mock_result.data.reset_mock()
+            mock_result.consume.reset_mock()
+
+            # Test with fetch_records=True - should return records
+            records, summary = await graph.query_with_summary(
+                "MATCH (n:Person) RETURN n.name", fetch_records=True
+            )
+
+            assert len(records) == 1
+            assert records[0]["name"] == "Alice"
+            assert summary is mock_summary
+
+            # Verify data() and consume() were both called
+            mock_result.data.assert_called_once()
+            mock_result.consume.assert_called_once()
+
 
 class TestAsyncSecureNeo4jGraph:
     """Test suite for AsyncSecureNeo4jGraph security layer."""
@@ -462,3 +512,47 @@ class TestAsyncSecureNeo4jGraph:
 
                     # Verify query was executed
                     assert len(result) == 1
+
+    @pytest.mark.asyncio
+    async def test_secure_query_with_summary(self, mock_driver, mock_session):
+        """Test query_with_summary with security layer (Fix for Issue #1)."""
+        with patch("neo4j_yass_mcp.async_graph.AsyncGraphDatabase.driver") as mock_db:
+            mock_db.return_value = mock_driver
+            mock_driver.session.return_value = mock_session
+
+            # Mock query result and summary
+            mock_result = AsyncMock()
+            mock_result.data = AsyncMock(return_value=[])
+
+            # Mock summary with plan
+            mock_summary = MagicMock()
+            mock_summary.plan = MagicMock(operator_type="ProduceResults")
+            mock_result.consume = AsyncMock(return_value=mock_summary)
+
+            mock_session.run = AsyncMock(return_value=mock_result)
+
+            # Mock security checks
+            with patch("neo4j_yass_mcp.async_graph.sanitize_query") as mock_sanitize:
+                mock_sanitize.return_value = (True, None, [])
+
+                with patch("neo4j_yass_mcp.async_graph.check_query_complexity") as mock_complexity:
+                    mock_complexity.return_value = (True, None, None)
+
+                    graph = AsyncSecureNeo4jGraph(
+                        url="bolt://localhost:7687",
+                        username="neo4j",
+                        password="password",
+                        sanitizer_enabled=True,
+                        complexity_limit_enabled=True,
+                        read_only_mode=False,
+                    )
+
+                    records, summary = await graph.query_with_summary("EXPLAIN MATCH (n) RETURN n")
+
+                    # Verify security checks were called
+                    mock_sanitize.assert_called_once()
+                    mock_complexity.assert_called_once()
+
+                    # Verify we got both records and summary
+                    assert summary is mock_summary
+                    assert summary.plan.operator_type == "ProduceResults"
