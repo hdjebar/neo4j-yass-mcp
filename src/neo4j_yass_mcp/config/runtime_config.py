@@ -18,7 +18,7 @@ class Neo4jConfig(BaseModel):
     """Neo4j database connection configuration."""
 
     uri: str = Field(
-        default="bolt://localhost:7687",
+        default="bolt+s://localhost:7687",  # Security: Default to encrypted connections
         description="Neo4j connection URI",
     )
     username: str = Field(

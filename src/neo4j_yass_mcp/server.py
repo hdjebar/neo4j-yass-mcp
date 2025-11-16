@@ -614,7 +614,7 @@ async def initialize_neo4j():
         llm=llm,
         graph=graph,
         allow_dangerous_requests=allow_dangerous,
-        verbose=True,
+        verbose=False,  # Security: Prevent PII/data exposure in logs
         return_intermediate_steps=True,
     )
 

@@ -93,7 +93,7 @@ def is_password_weak(
 
     # Fallback: Manual check against known weak passwords
     if password.lower() in [p.lower() for p in WEAK_PASSWORDS]:
-        return True, f"Password '{password}' is in the list of commonly used weak passwords"
+        return True, "Password is in the list of commonly used weak passwords"
 
     # Basic manual checks if zxcvbn not available
     if len(password) < 8:
