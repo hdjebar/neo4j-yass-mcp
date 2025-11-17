@@ -57,9 +57,20 @@ class AsyncNeo4jGraph:
         self._database = database
         self._driver_config = driver_config or {}
 
+        # Security: Warn about unencrypted connections
+        if url.startswith("bolt://") and "localhost" not in url and "127.0.0.1" not in url:
+            logger.warning(
+                "⚠️ SECURITY WARNING: Unencrypted Neo4j connection detected! "
+                f"URI: {url} - Consider using bolt+s:// or neo4j+s:// for encrypted connections."
+            )
+
         # Create async driver
+        driver_config = {**self._driver_config}
+        if url.startswith(("bolt+s://", "neo4j+s://")):
+            driver_config.setdefault("encrypted", True)
+
         self._driver: AsyncDriver = AsyncGraphDatabase.driver(
-            url, auth=(username, password), **self._driver_config
+            url, auth=(username, password), **driver_config
         )
 
         # Schema cache
